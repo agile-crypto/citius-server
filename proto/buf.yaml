@@ -1,0 +1,20 @@
+version: v1
+deps:
+  - buf.build/bufbuild/protovalidate
+  - buf.build/googleapis/googleapis
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - BASIC
+  except:
+    # Allow legacy imports from google/api and google/protobuf
+    - IMPORT_USED
+    # API protos use a single proto package (caas.crypto.v1) split across
+    # subdirectories (types/, messages/, services/) for readability.
+    - PACKAGE_DIRECTORY_MATCH
+    - PACKAGE_SAME_DIRECTORY
+build:
+  excludes:
+    - google
