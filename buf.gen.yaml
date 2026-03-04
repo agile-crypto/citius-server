@@ -1,0 +1,21 @@
+# buf.gen.yaml — Root-level code generation config for storage + provider protos
+# Used by: make proto (via buf generate)
+#
+# The existing proto/buf.gen.yaml handles the API service protos.
+# This root config is reserved for future use if we need separate
+# generation targets. Currently, `cd proto && buf generate` uses
+# proto/buf.gen.yaml which outputs to gen/go/.
+#
+# Storage protos: proto/storage/ → gen/go/store/
+# Provider protos: proto/provider/ → gen/go/provider/
+
+version: v1
+plugins:
+  - plugin: buf.build/protocolbuffers/go
+    out: gen/go
+    opt:
+      - paths=source_relative
+  - plugin: buf.build/grpc/go
+    out: gen/go
+    opt:
+      - paths=source_relative
