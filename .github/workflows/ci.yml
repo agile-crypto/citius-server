@@ -2,13 +2,13 @@ name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: ["main"]
   pull_request:
-    branches: ["**"]
+    branches: ["main"]
 
 jobs:
   ci:
-    name: ci          # <-- this is the status-check name you'll reference in branch protection
+    name: ci          
     runs-on: ubuntu-latest
 
     steps:
