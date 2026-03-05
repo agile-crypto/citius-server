@@ -1,11 +1,12 @@
 # Server — Makefile
 #
 # Targets:
-#   ci          — CI entry point: lint + test-race (merge gate)
+#   ci          — CI entry point: lint + test-race + smoke (merge gate)
 #   build       — compile all internal packages
 #   test        — run all tests (no race detector)
 #   test-race   — run all tests with race detector
 #   test-cover  — run tests with coverage report
+#   smoke       — run smoke tests under test/smoke/...
 #   vet         — go vet
 #   lint        — lint-go + lint-proto
 #   lint-go     — golangci-lint
@@ -16,7 +17,7 @@
 #   clean       — remove build artifacts
 #   test-pkg    — run a specific package's tests (PKG=internal/core)
 
-.PHONY: build test test-race test-cover vet lint lint-go lint-proto
+.PHONY: build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg
 
 MODULE := github.ibm.com/citius/citius-server
@@ -24,7 +25,7 @@ MODULE := github.ibm.com/citius/citius-server
 # ---------------------------------------------------------------------------
 # CI gate — MUST pass before merge
 # ---------------------------------------------------------------------------
-ci: lint test-race
+ci: lint test-race smoke
 
 # ---------------------------------------------------------------------------
 # Build
@@ -49,6 +50,10 @@ test-cover:
 # Run a specific package's tests: make test-pkg PKG=internal/core
 test-pkg:
 	go test ./$(PKG)/... -v -count=1
+
+# Integration / smoke tests (live against generated artefacts, not internal/)
+smoke:
+	go test ./test/smoke/... -v -count=1
 
 # ---------------------------------------------------------------------------
 # Static analysis

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package caas.storage.v1;
+
+option go_package = "github.ibm.com/citius/citius-server/gen/go/store;store";
+
+import "google/protobuf/timestamp.proto";
+import "buf/validate/validate.proto";
+
+// KeyStatus represents the lifecycle state of a key.
+enum KeyStatus {
+  KEY_STATUS_UNSPECIFIED = 0;
+  KEY_STATUS_ACTIVE      = 1;
+  KEY_STATUS_SUSPENDED   = 2;
+  KEY_STATUS_DESTROYED   = 3;
+}
+
+// StoredKey is the persisted representation of a key (no key material).
+// Key material lives exclusively in StoredKeyVersion.
+message StoredKey {
+  string public_id           = 1 [(buf.validate.field).string = {prefix: "key_", min_len: 5}];
+  string name                = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string template_id         = 3;
+  string policy_id           = 4 [(buf.validate.field).string = {prefix: "pol_", min_len: 5}];
+  string scope               = 5;   // serialised ScopeSpecification (opaque JSON)
+  string provider_instance_id = 6 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
+  KeyStatus status           = 7;
+  google.protobuf.Timestamp create_time  = 8;
+  google.protobuf.Timestamp update_time  = 9;
+  google.protobuf.Timestamp destroy_time = 10;
+  map<string, string> labels = 11;
+  uint32 current_version     = 12 [(buf.validate.field).uint32.gte = 1];
+}
+
+// StoredKeyVersion holds the actual key material for one version of a key.
+// Only ONE of plaintext_material / ciphertext_material is populated.
+// hmac is always set for integrity verification.
+message StoredKeyVersion {
+  string version_id             = 1 [(buf.validate.field).string = {prefix: "ver_", min_len: 5}];
+  string key_id                 = 2 [(buf.validate.field).string = {prefix: "key_", min_len: 5}];
+  uint32 version_number         = 3 [(buf.validate.field).uint32.gte = 1];
+  bytes  plaintext_material     = 4;   // set when stored in plaintext (dev)
+  bytes  ciphertext_material    = 5;   // set when wrapped by a KEK
+  bytes  hmac                   = 6;   // always set — integrity check
+  string wrapping_key_id        = 7 [(buf.validate.field) = {ignore: IGNORE_IF_ZERO_VALUE, string: {prefix: "key_", min_len: 5}}];  // empty if plaintext
+  string provider_name          = 8;   // which provider generated this material
+  bytes  public_key_bytes       = 9;   // DER-encoded public key (asymmetric only)
+  google.protobuf.Timestamp create_time = 10;
+  bool   is_current             = 11;
+}
