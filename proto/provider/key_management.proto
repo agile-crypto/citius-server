@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+
+option go_package = "github.ibm.com/citius/citius-server/gen/go/provider;provider";
+
+import "buf/validate/validate.proto";
+import "types/templates.proto";
+
+// GenerateKeyRequest asks the provider to produce new key material.
+//
+// The core resolves template → AlgorithmDetails → validates policy,
+// then sends the typed algorithm specification to the provider.
+// The provider pattern-matches on algorithm.oneof to determine
+// what to generate (key size, curve, parameter set, etc.).
+//
+// No key_id is passed — the core assigns IDs after receiving material.
+message GenerateKeyRequest {
+  // Typed algorithm specification — the SINGLE SOURCE OF TRUTH.
+  // The provider switches on the oneof case:
+  //   algorithm.ecdsa   → extract curve, generate EC key pair
+  //   algorithm.aes_gcm → extract key_size_bits, generate symmetric key
+  //   algorithm.ml_dsa  → extract parameter_set, generate ML-DSA key pair
+  caas.crypto.v1.AlgorithmDetails algorithm = 1 [(buf.validate.field).required = true];
+}
+
+// GenerateKeyResponse returns opaque key material.
+//
+// The bytes are OPAQUE to the core — it stores them as-is in
+// StoredKeyVersion.plaintext_material.  For software providers this is
+// raw key bytes; for HSM providers it may be a serialized handle.
+// The same provider that generated the material knows how to interpret it.
+message GenerateKeyResponse {
+  bytes  key_material     = 1 [(buf.validate.field).bytes.min_len = 1];   // opaque to core; provider-interpreted
+  bytes  public_key_bytes = 2;   // DER-encoded SubjectPublicKeyInfo (asymmetric only)
+}
+
+// DestroyKeyRequest asks the provider to zeroize key material.
+// For HSM providers, key_material is the opaque handle returned at generation;
+// the provider deserializes it and calls the appropriate destroy operation
+// (e.g., C_DestroyObject).
+message DestroyKeyRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// DestroyKeyResponse has no meaningful fields.
+message DestroyKeyResponse {}
+
+// ExportPublicKeyRequest fetches the public half of an asymmetric key.
+// The provider interprets key_material to locate/derive the public key.
+message ExportPublicKeyRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// ExportPublicKeyResponse returns the DER-encoded SubjectPublicKeyInfo.
+message ExportPublicKeyResponse {
+  bytes public_key_bytes = 1 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// KeyOrchestrationService — provider-side key lifecycle.
+service KeyOrchestrationService {
+  rpc GenerateKey(GenerateKeyRequest)       returns (GenerateKeyResponse);
+  rpc DestroyKey(DestroyKeyRequest)         returns (DestroyKeyResponse);
+  rpc ExportPublicKey(ExportPublicKeyRequest) returns (ExportPublicKeyResponse);
+}
