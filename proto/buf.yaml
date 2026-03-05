@@ -13,8 +13,12 @@ lint:
     - IMPORT_USED
     # API protos use a single proto package (caas.crypto.v1) split across
     # subdirectories (types/, messages/, services/) for readability.
+    # Each subdirectory maps to its own Go package (gen/go/types, gen/go/messages,
+    # gen/go/services) via paths=source_relative — so go_package intentionally
+    # differs per directory.
     - PACKAGE_DIRECTORY_MATCH
     - PACKAGE_SAME_DIRECTORY
+    - PACKAGE_SAME_GO_PACKAGE
 build:
   excludes:
     - google

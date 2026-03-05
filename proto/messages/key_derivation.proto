@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package caas.crypto.v1;
 
-option go_package = "github.ibm.com/citius/citius-server/gen/go/api;api";
+option go_package = "github.ibm.com/citius/citius-server/gen/go/messages;api";
 
 import "messages/metadata.proto";
 import "messages/key_management.proto";
