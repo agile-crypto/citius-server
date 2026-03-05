@@ -16,16 +16,23 @@
 #   generate    — go generate
 #   clean       — remove build artifacts
 #   test-pkg    — run a specific package's tests (PKG=internal/core)
+#   hooks       — install .githooks/ as the local git hooks directory (run once per clone)
 
 .PHONY: build test test-race test-cover smoke vet lint lint-go lint-proto
-.PHONY: fmt proto generate clean ci test-pkg
+.PHONY: fmt proto generate clean ci test-pkg hooks _hooks-check
 
 MODULE := github.ibm.com/citius/citius-server
 
 # ---------------------------------------------------------------------------
 # CI gate — MUST pass before merge
 # ---------------------------------------------------------------------------
-ci: lint test-race smoke
+ci: _hooks-check lint test-race smoke
+
+# Warn (not fail) if the git hooks have not been installed in this clone.
+_hooks-check:
+	@if [ "$$(git config core.hooksPath 2>/dev/null)" != ".githooks" ]; then \
+	    echo " Git hooks not installed. Run 'make hooks' to block bad pushes."; \
+	fi
 
 # ---------------------------------------------------------------------------
 # Build
@@ -89,6 +96,13 @@ proto:
 # ---------------------------------------------------------------------------
 generate:
 	go generate ./internal/...
+
+# ---------------------------------------------------------------------------
+# Git hooks — run once after cloning
+# ---------------------------------------------------------------------------
+hooks:
+	git config core.hooksPath .githooks
+	@echo "Git hooks installed from .githooks/"
 
 # ---------------------------------------------------------------------------
 # Clean
