@@ -1,20 +1,37 @@
 package core
 
+import "context"
+
 // Operation string constants for cryptographic operations.
 // Used in PolicyEngine.ValidateOperation(ctx, policyName, operation, templateID, providerID)
-// where `operation` is a plain string. Untyped constants convert to string without cast.
+// where `operation` is a string and these values are typed as Operation (a string alias).
+
+type Operation string
+
 const (
-	OperationCreateKey = "create_key"
-	OperationReadKey   = "read_key"
-	OperationDeleteKey = "delete_key"
-	OperationSign      = "sign"
-	OperationVerify    = "verify"
-	OperationEncrypt   = "encrypt"
-	OperationDecrypt   = "decrypt"
-	OperationWrap      = "wrap"
-	OperationUnwrap    = "unwrap"
-	OperationDeriveKey = "derive_key"
-	OperationRotateKey = "rotate_key"
+	OperationCreateKey = Operation("create_key")
+	OperationReadKey   = Operation("read_key")
+	OperationDeleteKey = Operation("delete_key")
+	OperationSign      = Operation("sign")
+	OperationVerify    = Operation("verify")
+	OperationEncrypt   = Operation("encrypt")
+	OperationDecrypt   = Operation("decrypt")
+	OperationWrap      = Operation("wrap")
+	OperationUnwrap    = Operation("unwrap")
+	OperationDeriveKey = Operation("derive_key")
+	OperationRotateKey = Operation("rotate_key")
+)
+
+// WriteOp describes the storage operation for VetForWrite.
+// This is distinct from Operation (which represents crypto operations like sign/verify/encrypt).
+// WriteOp represents database write operations (create/update/delete) used by VetForWrite
+// to apply operation-specific validation rules.
+type WriteOp int
+
+const (
+	OpCreate WriteOp = iota
+	OpUpdate
+	OpDelete
 )
 
 // KeyCreationSpec carries the inputs for a CreateKey call across package boundaries.
@@ -35,4 +52,9 @@ type KeyMaterial struct {
 	PublicKeyBytes  []byte
 	PrivateKeyBytes []byte // nil for public-key-only operations
 	Algorithm       string
+}
+
+// VetForWriter is implemented by domain types that can be validated before a storage write.
+type VetForWriter interface {
+	VetForWrite(ctx context.Context, op WriteOp) error
 }

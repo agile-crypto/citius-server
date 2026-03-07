@@ -23,7 +23,7 @@ func TestOperation_stringConstants(t *testing.T) {
 	// Operation constants are untyped strings matching ValidateOperation's string param.
 	tests := []struct {
 		name string
-		op   string
+		op   core.Operation
 		want string
 	}{
 		{"sign", core.OperationSign, "sign"},
@@ -31,7 +31,7 @@ func TestOperation_stringConstants(t *testing.T) {
 		{"create_key", core.OperationCreateKey, "create_key"},
 	}
 	for _, tt := range tests {
-		if tt.op != tt.want {
+		if string(tt.op) != tt.want {
 			t.Errorf("%s: got %q want %q", tt.name, tt.op, tt.want)
 		}
 	}
