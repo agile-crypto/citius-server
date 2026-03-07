@@ -76,6 +76,9 @@ func IsNotImplemented(err error) bool { return hasCode(err, CodeNotImplemented) 
 // IsAlreadyExists reports whether the resource already exists.
 func IsAlreadyExists(err error) bool { return hasCode(err, CodeAlreadyExists) }
 
+// IsInvalidArgument reports whether err was caused by invalid input.
+func IsInvalidArgument(err error) bool { return hasCode(err, CodeInvalidArgument) }
+
 // hasCode returns true if any error in the chain is an *Error with one of the given codes.
 func hasCode(err error, codes ...Code) bool {
 	var e *Error
