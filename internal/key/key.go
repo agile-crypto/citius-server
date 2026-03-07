@@ -1,0 +1,155 @@
+package key
+
+import (
+	"context"
+	"fmt"
+
+	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	"github.ibm.com/citius/citius-server/internal/core"
+	"github.ibm.com/citius/citius-server/internal/errors"
+	"google.golang.org/protobuf/proto"
+)
+
+const (
+	opKeyVet errors.Op = "key.(Key).VetForWrite"
+)
+
+// Key is the domain representation of a cryptographic key.
+// It embeds *store.StoredKey and adds validation and copy semantics.
+type Key struct {
+	stored *storepb.StoredKey
+}
+
+// New wraps a StoredKey in the Key domain type.
+// If stored is nil, New returns a zero-value Key (public_id and name will be empty,
+// so VetForWrite will fail).
+func New(stored *storepb.StoredKey) *Key {
+	if stored == nil {
+		stored = &storepb.StoredKey{}
+	}
+	return &Key{stored: stored}
+}
+
+// StoredKey returns the embedded proto for direct field access.
+// Callers should use Clone() before mutating.
+func (k *Key) StoredKey() *storepb.StoredKey { return k.stored }
+
+func (k *Key) PublicID() string { return k.stored.GetPublicId() }
+
+func (k *Key) Name() string { return k.stored.GetName() }
+
+func (k *Key) TemplateID() string { return k.stored.GetTemplateId() }
+
+// Clone returns a deep copy of the Key.
+func (k *Key) Clone() *Key {
+	return &Key{stored: proto.Clone(k.stored).(*storepb.StoredKey)}
+}
+
+// VetForWrite validates the Key for the given storage operation.
+// It returns an *errors.Error with CodeInvalidArgument if any required field is missing.
+func (k *Key) VetForWrite(ctx context.Context, op core.WriteOp) error {
+	const opCreate = opKeyVet
+	switch op {
+	case core.OpCreate:
+		if k.stored.GetPublicId() == "" {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "public_id is required")
+		}
+		if k.stored.GetName() == "" {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "name is required")
+		}
+		if k.stored.GetTemplateId() == "" {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "template_id is required")
+		}
+	case core.OpUpdate:
+		if k.stored.GetPublicId() == "" {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "public_id is required for update")
+		}
+		if k.stored.GetName() == "" {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "name is required for update")
+		}
+	}
+	return nil
+}
+
+// Behavioral Methods
+
+// CanRotate returns an error if the key cannot be rotated in its current state.
+// A key can only be rotated when it is ACTIVE.
+func (k *Key) CanRotate() error {
+	if k.stored.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
+		return fmt.Errorf("cannot rotate key in status %s: only ACTIVE keys can be rotated", k.stored.GetStatus())
+	}
+	return nil
+}
+
+// CanPerformCrypto returns an error if the key cannot be used for cryptographic
+// operations in its current lifecycle state. Only ACTIVE keys can encrypt/sign.
+func (k *Key) CanPerformCrypto() error {
+	if k.stored.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
+		return fmt.Errorf("key is in status %s: cryptographic operations require ACTIVE status", k.stored.GetStatus())
+	}
+	return nil
+}
+
+// TODO: CanExport deferred — requires `bool extractable` field to be added to
+// StoredKey in key.proto. Will be implemented when key export support is added.
+
+// CanDelete returns an error if the key cannot be deleted.
+// Terminal keys (DESTROYED, DESTROYED_COMPROMISED) are already gone.
+func (k *Key) CanDelete() error {
+	if k.IsTerminal() {
+		return fmt.Errorf("key is already in terminal state %s", k.stored.GetStatus())
+	}
+	return nil
+}
+
+// Lifecycle State Machine
+// The state machine table documents all legal lifecycle transitions in one place
+// rather than scattering them across orchestrator methods.
+
+// validTransitions defines the legal state machine for key lifecycle.
+// Based on NIST SP 800-57 Part 1 Rev. 5 (8.2) key states:
+//
+//	PRE_ACTIVE:  ACTIVE, DESTROYED
+//	ACTIVE:      SUSPENDED, DEACTIVATED, COMPROMISED
+//	SUSPENDED:   ACTIVE, DEACTIVATED, COMPROMISED
+//	DEACTIVATED: DESTROYED, COMPROMISED
+//	COMPROMISED: DESTROYED, DESTROYED_COMPROMISED
+//	DESTROYED:   (terminal)
+//	DESTROYED_COMPROMISED: (terminal)
+var validTransitions = map[storepb.KeyStatus][]storepb.KeyStatus{
+	storepb.KeyStatus_KEY_STATUS_PRE_ACTIVE:            {storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_DESTROYED},
+	storepb.KeyStatus_KEY_STATUS_ACTIVE:                {storepb.KeyStatus_KEY_STATUS_SUSPENDED, storepb.KeyStatus_KEY_STATUS_DEACTIVATED, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
+	storepb.KeyStatus_KEY_STATUS_SUSPENDED:             {storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_DEACTIVATED, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
+	storepb.KeyStatus_KEY_STATUS_DEACTIVATED:           {storepb.KeyStatus_KEY_STATUS_DESTROYED, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
+	storepb.KeyStatus_KEY_STATUS_COMPROMISED:           {storepb.KeyStatus_KEY_STATUS_DESTROYED, storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED},
+	storepb.KeyStatus_KEY_STATUS_DESTROYED:             {}, // terminal — no transitions out
+	storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED: {}, // terminal — no transitions out
+}
+
+// TransitionTo attempts to move the key to a new lifecycle status.
+// Returns an error if the transition is not valid per the NIST SP 800-57 state machine.
+// On success, updates the key's status in place.
+func (k *Key) TransitionTo(newStatus storepb.KeyStatus) error {
+	current := k.stored.GetStatus()
+	allowed, ok := validTransitions[current]
+	if !ok {
+		return fmt.Errorf("unknown current status %s", current)
+	}
+	for _, s := range allowed {
+		if s == newStatus {
+			k.stored.Status = newStatus
+			return nil
+		}
+	}
+	return fmt.Errorf("invalid lifecycle transition: %s → %s", current, newStatus)
+}
+
+// IsTerminal returns true if the key is in a terminal state (DESTROYED or DESTROYED_COMPROMISED).
+func (k *Key) IsTerminal() bool {
+	s := k.stored.GetStatus()
+	return s == storepb.KeyStatus_KEY_STATUS_DESTROYED || s == storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED
+}
+
+// Compile-time assertion.
+var _ core.VetForWriter = (*Key)(nil)
