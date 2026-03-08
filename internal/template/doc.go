@@ -1,8 +1,15 @@
-// Package template contains the Template domain type, the in-memory registry,
-// and the YAML loader for algorithm template definitions.
+// Package template contains the Template domain type and the Registry
+// interface for algorithm template management.
 //
-// Templates are plain Go structs -- they do NOT embed a storage proto.
-// They are loaded from YAML configuration files at startup via LoadFromYAML()
-// and are never persisted to the database. Templates define which algorithms
-// are available, their security properties, and selection criteria.
+// Domain type:
+//   - Template is a plain Go struct (no proto embedding, no storage).
+//     Templates are immutable value objects loaded from YAML at startup.
+//     They define which algorithms are available, their security properties,
+//     and scope-based selection criteria.
+//
+// Interface:
+//   - Registry (domain service): Register, Get, List, and Select.
+//     Select picks the best template for a given ScopeSpec, honouring
+//     policy constraints and preferred properties.
+
 package template
