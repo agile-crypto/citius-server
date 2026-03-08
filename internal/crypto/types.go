@@ -1,8 +1,6 @@
 package crypto
 
 import (
-	"context"
-
 	messages "github.ibm.com/citius/citius-server/gen/go/messages"
 	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/key"
@@ -169,24 +167,4 @@ type DigestRequest struct {
 type DigestResult struct {
 	Digest    []byte
 	Algorithm string
-}
-
-// ============================================================================
-// Orchestrator interface
-// ============================================================================
-
-// Orchestrator performs cryptographic operations using stored keys.
-// Implementations coordinate key retrieval, policy validation, and provider dispatch.
-type Orchestrator interface {
-	Sign(ctx context.Context, req SignRequest) (SignResult, error)
-	Verify(ctx context.Context, req VerifyRequest) (VerifyResult, error)
-	Encrypt(ctx context.Context, req EncryptRequest) (EncryptResult, error)
-	Decrypt(ctx context.Context, req DecryptRequest) (DecryptResult, error)
-	WrapKey(ctx context.Context, req WrapKeyRequest) (WrapKeyResult, error)
-	UnwrapKey(ctx context.Context, req UnwrapKeyRequest) (UnwrapKeyResult, error)
-	DeriveKey(ctx context.Context, req DeriveKeyRequest) (*key.Key, error)
-	GenerateMAC(ctx context.Context, req MacRequest) (MacResult, error)
-	VerifyMAC(ctx context.Context, req VerifyMacRequest) (VerifyMacResult, error)
-	Digest(ctx context.Context, req DigestRequest) (DigestResult, error)
-	GenerateRandom(ctx context.Context, length int) ([]byte, error)
 }
