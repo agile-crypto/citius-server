@@ -50,7 +50,7 @@ func (p *Policy) VetForWrite(ctx context.Context, op core.WriteOp) error {
 
 // Behavioral Methods
 //
-// TODO: AllowsOperation(operation string) bool and AllowsTemplate(templateID string) bool
+// TODO: AllowsOperation(operation core.Operation) bool and AllowsTemplate(templateID string) bool
 // are deferred. StoredPolicy uses an opaque `rules_json` blob rather than discrete
 // AllowedOperations / AllowedAlgorithms repeated-string fields. These behavioural
 // methods will be implemented when the policy rules engine (PolicyEngine) parses

@@ -30,8 +30,8 @@ type Repository interface {
 	CreateVersion(ctx context.Context, keyName string, version *KeyVersion) error
 
 	// GetKeyVersion retrieves a specific version of a key by version number.
-	GetKeyVersion(ctx context.Context, keyName string, versionNum int32) (*KeyVersion, error)
+	GetKeyVersion(ctx context.Context, keyName string, versionNum uint32) (*KeyVersion, error)
 
 	// DeleteKeyVersion removes a specific version record.
-	DeleteKeyVersion(ctx context.Context, keyName string, versionNum int32) error
+	DeleteKeyVersion(ctx context.Context, keyName string, versionNum uint32) error
 }
