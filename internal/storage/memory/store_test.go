@@ -10,7 +10,7 @@ import (
 	"github.ibm.com/citius/citius-server/internal/storage/memory"
 )
 
-// helper: create a valid Key domain object
+// helper: create a valid Key domain object.
 func newTestKey(publicID, name, templateID string) *key.Key {
 	return key.New(&storepb.StoredKey{
 		PublicId:   publicID,
@@ -20,18 +20,42 @@ func newTestKey(publicID, name, templateID string) *key.Key {
 	})
 }
 
+// helper: create a valid KeyVersion domain object.
+func newTestKeyVersion(versionID, keyID string, providerName string) *key.KeyVersion {
+	return key.NewVersion(&storepb.StoredKeyVersion{
+		VersionId:         versionID,
+		KeyId:             keyID,
+		ProviderName:      providerName,
+		PlaintextMaterial: []byte("fake-key-bytes"),
+		Hmac:              []byte("fake-hmac"),
+		PublicKeyBytes:    []byte("fake-pub-key"),
+	})
+}
+
+// helper: create a key+version in the store (for tests that need setup).
+func mustCreateKey(t *testing.T, store *memory.MemoryStore, publicID, name, templateID string) {
+	t.Helper()
+	k := newTestKey(publicID, name, templateID)
+	v := newTestKeyVersion("ver_"+publicID, publicID, "software")
+	if err := store.CreateKey(context.Background(), k, v); err != nil {
+		t.Fatalf("mustCreateKey(%s): %v", publicID, err)
+	}
+}
+
 // ============================================================================
-// PutKey / GetKey
+// CreateKey / GetKey
 // ============================================================================
 
-func TestMemoryStore_PutKey_GetKey_roundtrip(t *testing.T) {
+func TestMemoryStore_CreateKey_GetKey_roundtrip(t *testing.T) {
 	store := memory.New()
 	ctx := context.Background()
-	key := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
+	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
+	v := newTestKeyVersion("ver_01", "key_01HXYZ", "software")
 
-	if err := store.PutKey(ctx, key); err != nil {
-		t.Fatalf("PutKey: %v", err)
+	if err := store.CreateKey(ctx, k, v); err != nil {
+		t.Fatalf("CreateKey: %v", err)
 	}
+
 	got, err := store.GetKey(ctx, "key_01HXYZ")
 	if err != nil {
 		t.Fatalf("GetKey: %v", err)
@@ -41,6 +65,28 @@ func TestMemoryStore_PutKey_GetKey_roundtrip(t *testing.T) {
 	}
 	if got.Name() != "signing-key" {
 		t.Errorf("Name: got %q want %q", got.Name(), "signing-key")
+	}
+	if got.StoredKey().GetCurrentVersion() != 1 {
+		t.Errorf("CurrentVersion: got %d want 1", got.StoredKey().GetCurrentVersion())
+	}
+}
+
+func TestMemoryStore_CreateKey_setsVersion1(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
+	v := newTestKeyVersion("ver_01", "key_01HXYZ", "software")
+	_ = store.CreateKey(ctx, k, v)
+
+	got, err := store.GetVersion(ctx, "key_01HXYZ", 1)
+	if err != nil {
+		t.Fatalf("GetVersion(1): %v", err)
+	}
+	if got.StoredKeyVersion().GetVersionNumber() != 1 {
+		t.Errorf("VersionNumber: got %d want 1", got.StoredKeyVersion().GetVersionNumber())
+	}
+	if !got.StoredKeyVersion().GetIsCurrent() {
+		t.Error("initial version should be marked is_current")
 	}
 }
 
@@ -55,29 +101,39 @@ func TestMemoryStore_GetKey_notFound(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_PutKey_overwrite(t *testing.T) {
+func TestMemoryStore_CreateKey_duplicate_returnsError(t *testing.T) {
 	store := memory.New()
 	ctx := context.Background()
-	k1 := newTestKey("key_01HXYZ", "original", "ecdsa-p256-sha256")
-	k2 := newTestKey("key_01HXYZ", "updated", "ecdsa-p256-sha256")
+	k := newTestKey("key_01HXYZ", "original", "ecdsa-p256-sha256")
+	v := newTestKeyVersion("ver_01", "key_01HXYZ", "software")
+	_ = store.CreateKey(ctx, k, v)
 
-	_ = store.PutKey(ctx, k1)
-	_ = store.PutKey(ctx, k2)
-
-	got, err := store.GetKey(ctx, "key_01HXYZ")
-	if err != nil {
-		t.Fatalf("GetKey: %v", err)
+	k2 := newTestKey("key_01HXYZ", "duplicate", "ecdsa-p256-sha256")
+	v2 := newTestKeyVersion("ver_02", "key_01HXYZ", "software")
+	err := store.CreateKey(ctx, k2, v2)
+	if err == nil {
+		t.Fatal("expected error for duplicate key")
 	}
-	if got.Name() != "updated" {
-		t.Errorf("Name: got %q want %q", got.Name(), "updated")
+	if !errors.IsAlreadyExists(err) {
+		t.Errorf("expected AlreadyExists, got: %v", err)
 	}
 }
 
-func TestMemoryStore_PutKey_nilKey_returnsError(t *testing.T) {
+func TestMemoryStore_CreateKey_nilKey_returnsError(t *testing.T) {
 	store := memory.New()
-	err := store.PutKey(context.Background(), nil)
+	v := newTestKeyVersion("ver_01", "key_01", "software")
+	err := store.CreateKey(context.Background(), nil, v)
 	if err == nil {
 		t.Fatal("expected error for nil key")
+	}
+}
+
+func TestMemoryStore_CreateKey_nilVersion_returnsError(t *testing.T) {
+	store := memory.New()
+	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
+	err := store.CreateKey(context.Background(), k, nil)
+	if err == nil {
+		t.Fatal("expected error for nil initialVersion")
 	}
 }
 
@@ -85,8 +141,7 @@ func TestMemoryStore_GetKey_returnsClone(t *testing.T) {
 	// Mutating the returned key should NOT affect the stored copy.
 	store := memory.New()
 	ctx := context.Background()
-	k := newTestKey("key_01HXYZ", "original", "ecdsa-p256-sha256")
-	_ = store.PutKey(ctx, k)
+	mustCreateKey(t, store, "key_01HXYZ", "original", "ecdsa-p256-sha256")
 
 	got, _ := store.GetKey(ctx, "key_01HXYZ")
 	got.StoredKey().Name = "mutated"
@@ -98,19 +153,41 @@ func TestMemoryStore_GetKey_returnsClone(t *testing.T) {
 }
 
 // ============================================================================
-// DeleteKey
+// DeleteKey (cascading)
 // ============================================================================
 
 func TestMemoryStore_DeleteKey_success(t *testing.T) {
 	store := memory.New()
 	ctx := context.Background()
-	_ = store.PutKey(ctx, newTestKey("key_01HXYZ", "k", "ecdsa-p256-sha256"))
+	mustCreateKey(t, store, "key_01HXYZ", "k", "ecdsa-p256-sha256")
+
 	if err := store.DeleteKey(ctx, "key_01HXYZ"); err != nil {
 		t.Fatalf("DeleteKey: %v", err)
 	}
 	_, err := store.GetKey(ctx, "key_01HXYZ")
 	if !errors.IsKeyNotFound(err) {
 		t.Errorf("expected KeyNotFound after delete, got: %v", err)
+	}
+}
+
+func TestMemoryStore_DeleteKey_cascadesVersions(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	mustCreateKey(t, store, "key_01HXYZ", "k", "ecdsa-p256-sha256")
+	// Add a second version so we verify both are cleaned up.
+	_ = store.AddVersion(ctx, "key_01HXYZ", newTestKeyVersion("ver_02", "key_01HXYZ", "software"))
+
+	if err := store.DeleteKey(ctx, "key_01HXYZ"); err != nil {
+		t.Fatalf("DeleteKey: %v", err)
+	}
+	// Both versions should be gone.
+	_, err := store.GetVersion(ctx, "key_01HXYZ", 1)
+	if err == nil {
+		t.Error("expected error fetching version 1 after cascading delete")
+	}
+	_, err = store.GetVersion(ctx, "key_01HXYZ", 2)
+	if err == nil {
+		t.Error("expected error fetching version 2 after cascading delete")
 	}
 }
 
@@ -132,8 +209,8 @@ func TestMemoryStore_DeleteKey_notFound_returnsError(t *testing.T) {
 func TestMemoryStore_ListKeys_all(t *testing.T) {
 	store := memory.New()
 	ctx := context.Background()
-	_ = store.PutKey(ctx, newTestKey("key_01", "k1", "ecdsa-p256-sha256"))
-	_ = store.PutKey(ctx, newTestKey("key_02", "k2", "ml-dsa-65"))
+	mustCreateKey(t, store, "key_01", "k1", "ecdsa-p256-sha256")
+	mustCreateKey(t, store, "key_02", "k2", "ml-dsa-65")
 
 	keys, err := store.ListKeys(ctx)
 	if err != nil {
@@ -142,14 +219,20 @@ func TestMemoryStore_ListKeys_all(t *testing.T) {
 	if len(keys) != 2 {
 		t.Errorf("ListKeys: got %d want 2", len(keys))
 	}
+	// Verify full Key objects are returned, not just names.
+	for _, k := range keys {
+		if k.PublicID() == "" {
+			t.Error("ListKeys returned key with empty PublicID")
+		}
+	}
 }
 
 func TestMemoryStore_ListKeys_multipleKeys(t *testing.T) {
 	store := memory.New()
 	ctx := context.Background()
-	_ = store.PutKey(ctx, newTestKey("key_01", "k1", "ecdsa-p256-sha256"))
-	_ = store.PutKey(ctx, newTestKey("key_02", "k2", "ml-dsa-65"))
-	_ = store.PutKey(ctx, newTestKey("key_03", "k3", "ecdsa-p256-sha256"))
+	mustCreateKey(t, store, "key_01", "k1", "ecdsa-p256-sha256")
+	mustCreateKey(t, store, "key_02", "k2", "ml-dsa-65")
+	mustCreateKey(t, store, "key_03", "k3", "ecdsa-p256-sha256")
 
 	keys, err := store.ListKeys(ctx)
 	if err != nil {
@@ -178,15 +261,15 @@ func TestMemoryStore_ListKeys_empty(t *testing.T) {
 func TestMemoryStore_UpdateKey_success(t *testing.T) {
 	store := memory.New()
 	ctx := context.Background()
-	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
-	_ = store.PutKey(ctx, k)
+	mustCreateKey(t, store, "key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
 
-	// Build an updated Key with new status
+	// Build an updated Key with new status.
 	updated := key.New(&storepb.StoredKey{
-		PublicId:   "key_01HXYZ",
-		Name:       "signing-key",
-		TemplateId: "ecdsa-p256-sha256",
-		Status:     storepb.KeyStatus_KEY_STATUS_SUSPENDED,
+		PublicId:       "key_01HXYZ",
+		Name:           "signing-key",
+		TemplateId:     "ecdsa-p256-sha256",
+		Status:         storepb.KeyStatus_KEY_STATUS_SUSPENDED,
+		CurrentVersion: 1,
 	})
 	if err := store.UpdateKey(ctx, updated); err != nil {
 		t.Fatalf("UpdateKey: %v", err)
@@ -222,9 +305,122 @@ func TestMemoryStore_UpdateKey_nil_returnsError(t *testing.T) {
 }
 
 // ============================================================================
+// AddVersion / GetVersion
+// ============================================================================
+
+func TestMemoryStore_AddVersion_GetVersion_roundtrip(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	mustCreateKey(t, store, "key_01", "k", "ecdsa-p256-sha256")
+
+	v2 := newTestKeyVersion("ver_02", "key_01", "software")
+	if err := store.AddVersion(ctx, "key_01", v2); err != nil {
+		t.Fatalf("AddVersion: %v", err)
+	}
+
+	got, err := store.GetVersion(ctx, "key_01", 2)
+	if err != nil {
+		t.Fatalf("GetVersion(2): %v", err)
+	}
+	if got.StoredKeyVersion().GetVersionId() != "ver_02" {
+		t.Errorf("VersionId: got %q want %q", got.StoredKeyVersion().GetVersionId(), "ver_02")
+	}
+	if got.StoredKeyVersion().GetVersionNumber() != 2 {
+		t.Errorf("VersionNumber: got %d want 2", got.StoredKeyVersion().GetVersionNumber())
+	}
+}
+
+func TestMemoryStore_AddVersion_GetOldVersion(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	mustCreateKey(t, store, "key_01", "k", "ecdsa-p256-sha256")
+
+	v2 := newTestKeyVersion("ver_02", "key_01", "software")
+	if err := store.AddVersion(ctx, "key_01", v2); err != nil {
+		t.Fatalf("AddVersion: %v", err)
+	}
+
+	got, err := store.GetVersion(ctx, "key_01", 1)
+	if err != nil {
+		t.Fatalf("GetVersion(1): %v", err)
+	}
+	if got.StoredKeyVersion().GetVersionNumber() != 1 {
+		t.Errorf("VersionNumber: got %d want 1", got.StoredKeyVersion().GetVersionNumber())
+	}
+	if got.StoredKeyVersion().GetVersionNumber() != 1 {
+		t.Errorf("VersionNumber: got %d want 1", got.StoredKeyVersion().GetVersionNumber())
+	}
+}
+
+func TestMemoryStore_GetVersion_notFound(t *testing.T) {
+	store := memory.New()
+	_, err := store.GetVersion(context.Background(), "key_01", 99)
+	if err == nil {
+		t.Fatal("expected error for missing version")
+	}
+	if !errors.IsNotFound(err) {
+		t.Errorf("expected NotFound error, got: %v", err)
+	}
+}
+
+func TestMemoryStore_AddVersion_returnsClone(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	mustCreateKey(t, store, "key_01", "k", "ecdsa-p256-sha256")
+
+	// Fetch version 1 (created by CreateKey) and mutate the returned clone.
+	got, _ := store.GetVersion(ctx, "key_01", 1)
+	got.StoredKeyVersion().ProviderName = "mutated"
+
+	// Re-fetch — should still have original value.
+	got2, _ := store.GetVersion(ctx, "key_01", 1)
+	if got2.StoredKeyVersion().GetProviderName() != "software" {
+		t.Error("GetVersion should return a clone — stored value was mutated")
+	}
+}
+
+func TestMemoryStore_AddVersion_assignsIncrementingVersionNumber(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	mustCreateKey(t, store, "key_01", "k", "ecdsa-p256-sha256") // creates version 1
+
+	_ = store.AddVersion(ctx, "key_01", newTestKeyVersion("ver_02", "key_01", "software"))
+	_ = store.AddVersion(ctx, "key_01", newTestKeyVersion("ver_03", "key_01", "software"))
+
+	v3, err := store.GetVersion(ctx, "key_01", 3)
+	if err != nil {
+		t.Fatalf("GetVersion(3): %v", err)
+	}
+	if v3.StoredKeyVersion().GetVersionNumber() != 3 {
+		t.Errorf("VersionNumber: got %d want 3", v3.StoredKeyVersion().GetVersionNumber())
+	}
+	if !v3.StoredKeyVersion().GetIsCurrent() {
+		t.Error("latest version should be marked is_current")
+	}
+
+	// Previous version should no longer be current.
+	v2, _ := store.GetVersion(ctx, "key_01", 2)
+	if v2.StoredKeyVersion().GetIsCurrent() {
+		t.Error("version 2 should not be marked is_current after version 3 added")
+	}
+}
+
+func TestMemoryStore_AddVersion_keyNotFound_returnsError(t *testing.T) {
+	store := memory.New()
+	v := newTestKeyVersion("ver_01", "key_missing", "software")
+	err := store.AddVersion(context.Background(), "key_missing", v)
+	if err == nil {
+		t.Fatal("expected error for adding version to non-existent key")
+	}
+	if !errors.IsKeyNotFound(err) {
+		t.Errorf("expected KeyNotFound, got: %v", err)
+	}
+}
+
+// ============================================================================
 // Compile-time assertion
 // ============================================================================
 
-// Note: the full Storage interface is NOT satisfied yet - only the key-related methods implemented so far.
+// Note: the full Storage interface is NOT satisfied yet — only the key-related methods implemented so far.
 // TODO:  Uncomment this assertion only after those steps are complete.
 //var _ storage.Storage = (*memory.MemoryStore)(nil)
