@@ -5,8 +5,12 @@ import (
 	"testing"
 
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	"github.ibm.com/citius/citius-server/internal/crypto"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
+	"github.ibm.com/citius/citius-server/internal/policy"
+	"github.ibm.com/citius/citius-server/internal/provider"
+	"github.ibm.com/citius/citius-server/internal/storage"
 	"github.ibm.com/citius/citius-server/internal/storage/memory"
 )
 
@@ -418,9 +422,204 @@ func TestMemoryStore_AddVersion_keyNotFound_returnsError(t *testing.T) {
 }
 
 // ============================================================================
-// Compile-time assertion
+// Policy storage operations
+// ============================================================================
+func newTestPolicy(publicID, name string) *policy.Policy {
+	return policy.New(&storepb.StoredPolicy{
+		PublicId: publicID,
+		Name:     name,
+	})
+}
+
+func TestMemoryStore_PutPolicy_GetPolicy_roundtrip(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	p := newTestPolicy("pol_01", "default-sig-policy")
+
+	if err := store.PutPolicy(ctx, p); err != nil {
+		t.Fatalf("PutPolicy: %v", err)
+	}
+	got, err := store.GetPolicy(ctx, "pol_01")
+	if err != nil {
+		t.Fatalf("GetPolicy: %v", err)
+	}
+	if got.Name() != "default-sig-policy" {
+		t.Errorf("Name: got %q want %q", got.Name(), "default-sig-policy")
+	}
+}
+
+func TestMemoryStore_GetPolicy_notFound(t *testing.T) {
+	store := memory.New()
+	_, err := store.GetPolicy(context.Background(), "pol_doesnotexist")
+	if err == nil {
+		t.Fatal("expected error for missing policy")
+	}
+	if !errors.IsPolicyNotFound(err) {
+		t.Errorf("expected PolicyNotFound, got: %v", err)
+	}
+}
+
+func TestMemoryStore_DeletePolicy_success(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	_ = store.PutPolicy(ctx, newTestPolicy("pol_01", "p"))
+	if err := store.DeletePolicy(ctx, "pol_01"); err != nil {
+		t.Fatalf("DeletePolicy: %v", err)
+	}
+	_, err := store.GetPolicy(ctx, "pol_01")
+	if !errors.IsPolicyNotFound(err) {
+		t.Errorf("expected PolicyNotFound after delete, got: %v", err)
+	}
+}
+
+func TestMemoryStore_ListPolicies_all(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	_ = store.PutPolicy(ctx, newTestPolicy("pol_01", "p1"))
+	_ = store.PutPolicy(ctx, newTestPolicy("pol_02", "p2"))
+
+	policyIDs, err := store.ListPolicies(ctx)
+	if err != nil {
+		t.Fatalf("ListPolicies: %v", err)
+	}
+	if len(policyIDs) != 2 {
+		t.Errorf("ListPolicies: got %d want 2", len(policyIDs))
+	}
+}
+
+func TestMemoryStore_ListPolicies_empty(t *testing.T) {
+	store := memory.New()
+	policyIDs, err := store.ListPolicies(context.Background())
+	if err != nil {
+		t.Fatalf("ListPolicies: %v", err)
+	}
+	if policyIDs == nil {
+		t.Error("ListPolicies should return empty slice, not nil")
+	}
+}
+
+func TestMemoryStore_GetPolicy_returnsClone(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	_ = store.PutPolicy(ctx, newTestPolicy("pol_01", "original"))
+	got, _ := store.GetPolicy(ctx, "pol_01")
+	got.StoredPolicy().Name = "mutated"
+	got2, _ := store.GetPolicy(ctx, "pol_01")
+	if got2.Name() != "original" {
+		t.Error("GetPolicy should return a clone")
+	}
+}
+
+// ============================================================================
+// ProviderInstance storage operations
 // ============================================================================
 
-// Note: the full Storage interface is NOT satisfied yet — only the key-related methods implemented so far.
-// TODO:  Uncomment this assertion only after those steps are complete.
-//var _ storage.Storage = (*memory.MemoryStore)(nil)
+func newTestProviderInstance(publicID, name, provType string) *provider.Instance {
+	return provider.NewInstance(&storepb.StoredProviderInstance{
+		PublicId:     publicID,
+		Name:         name,
+		ProviderType: provType,
+	})
+}
+
+func TestMemoryStore_PutProviderInstance_Get_roundtrip(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	pi := newTestProviderInstance("prv_01", "software-default", "software")
+
+	if err := store.PutProviderInstance(ctx, pi); err != nil {
+		t.Fatalf("PutProviderInstance: %v", err)
+	}
+	got, err := store.GetProviderInstance(ctx, "prv_01")
+	if err != nil {
+		t.Fatalf("GetProviderInstance: %v", err)
+	}
+	if got.StoredProviderInstance().GetName() != "software-default" {
+		t.Errorf("Name: got %q want %q", got.StoredProviderInstance().GetName(), "software-default")
+	}
+}
+
+func TestMemoryStore_GetProviderInstance_notFound(t *testing.T) {
+	store := memory.New()
+	_, err := store.GetProviderInstance(context.Background(), "prv_doesnotexist")
+	if err == nil {
+		t.Fatal("expected error for missing provider instance")
+	}
+	if !errors.IsNotFound(err) {
+		t.Errorf("expected NotFound, got: %v", err)
+	}
+}
+
+func TestMemoryStore_ListProviderInstances(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	_ = store.PutProviderInstance(ctx, newTestProviderInstance("prv_01", "sw1", "software"))
+	_ = store.PutProviderInstance(ctx, newTestProviderInstance("prv_02", "sw2", "software"))
+
+	piIDs, err := store.ListProviderInstances(ctx)
+	if err != nil {
+		t.Fatalf("ListProviderInstances: %v", err)
+	}
+	if len(piIDs) != 2 {
+		t.Errorf("ListProviderInstances: got %d want 2", len(piIDs))
+	}
+}
+
+// ============================================================================
+// Session storage operations
+// ============================================================================
+
+func newTestSession(publicID, keyID string) *crypto.Session {
+	return crypto.NewSession(&storepb.StoredSession{
+		PublicId:  publicID,
+		KeyId:     keyID,
+		Operation: "sign",
+		Status:    storepb.SessionStatus_SESSION_STATUS_ACTIVE,
+	})
+}
+
+func TestMemoryStore_PutSession_GetSession_roundtrip(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	s := newTestSession("ses_01", "key_01")
+
+	if err := store.PutSession(ctx, s); err != nil {
+		t.Fatalf("PutSession: %v", err)
+	}
+	got, err := store.GetSession(ctx, "ses_01")
+	if err != nil {
+		t.Fatalf("GetSession: %v", err)
+	}
+	if got.StoredSession().GetKeyId() != "key_01" {
+		t.Errorf("KeyId: got %q want %q", got.StoredSession().GetKeyId(), "key_01")
+	}
+}
+
+func TestMemoryStore_GetSession_notFound(t *testing.T) {
+	store := memory.New()
+	_, err := store.GetSession(context.Background(), "ses_doesnotexist")
+	if err == nil {
+		t.Fatal("expected error for missing session")
+	}
+	if !errors.IsNotFound(err) {
+		t.Errorf("expected NotFound, got: %v", err)
+	}
+}
+
+func TestMemoryStore_DeleteSession_success(t *testing.T) {
+	store := memory.New()
+	ctx := context.Background()
+	_ = store.PutSession(ctx, newTestSession("ses_01", "key_01"))
+	if err := store.DeleteSession(ctx, "ses_01"); err != nil {
+		t.Fatalf("DeleteSession: %v", err)
+	}
+	_, err := store.GetSession(ctx, "ses_01")
+	if !errors.IsNotFound(err) {
+		t.Errorf("expected NotFound after delete, got: %v", err)
+	}
+}
+
+// ============================================================================
+// Compile-time assertion
+// ============================================================================
+var _ storage.Storage = (*memory.MemoryStore)(nil)
