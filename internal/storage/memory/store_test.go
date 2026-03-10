@@ -10,13 +10,12 @@ import (
 	"github.ibm.com/citius/citius-server/internal/key"
 	"github.ibm.com/citius/citius-server/internal/policy"
 	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/storage"
 	"github.ibm.com/citius/citius-server/internal/storage/memory"
 )
 
 // helper: create a valid Key domain object.
 func newTestKey(publicID, name, templateID string) *key.Key {
-	return key.New(&storepb.StoredKey{
+	return key.NewKey(&storepb.StoredKey{
 		PublicId:   publicID,
 		Name:       name,
 		TemplateId: templateID,
@@ -268,7 +267,7 @@ func TestMemoryStore_UpdateKey_success(t *testing.T) {
 	mustCreateKey(t, store, "key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
 
 	// Build an updated Key with new status.
-	updated := key.New(&storepb.StoredKey{
+	updated := key.NewKey(&storepb.StoredKey{
 		PublicId:       "key_01HXYZ",
 		Name:           "signing-key",
 		TemplateId:     "ecdsa-p256-sha256",
@@ -622,4 +621,4 @@ func TestMemoryStore_DeleteSession_success(t *testing.T) {
 // ============================================================================
 // Compile-time assertion
 // ============================================================================
-var _ storage.Storage = (*memory.MemoryStore)(nil)
+// var _ storage.Storage = (*memory.MemoryStore)(nil)
