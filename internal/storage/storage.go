@@ -1,8 +1,13 @@
 package storage
 
 import (
+	"context"
+
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-// Alias for Vault logical.Storage
-type Storage logical.Storage
+type TxHandler func(Storage) error
+type Storage interface {
+	logical.Storage
+	DoTx(context.Context, TxHandler) error
+}
