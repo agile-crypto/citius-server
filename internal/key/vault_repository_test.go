@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/vault/sdk/logical"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
-	"github.ibm.com/citius/citius-server/internal/storage"
 )
 
 // helper: create a valid Key domain object.
@@ -33,7 +33,7 @@ func newTestKeyVersion(versionID, keyID string, providerName string) *key.KeyVer
 }
 
 // helper: create a key+version in the store (for tests that need setup).
-func mustCreateKey(t *testing.T, r *key.InMemRepository, publicID, name, templateID string) {
+func mustCreateKey(t *testing.T, r *key.VaultRepository, publicID, name, templateID string) {
 	t.Helper()
 	k := newTestKey(publicID, name, templateID)
 	v := newTestKeyVersion("ver_"+publicID, publicID, "software")
@@ -42,10 +42,13 @@ func mustCreateKey(t *testing.T, r *key.InMemRepository, publicID, name, templat
 	}
 }
 
-var repoFn = func() *key.InMemRepository {
-	keys := storage.NewInMemoryStorage[*key.Key]()
-	keyVersions := storage.NewInMemoryStorage[map[uint32]*key.KeyVersion]()
-	return key.NewInMemoryRepository(keys, keyVersions)
+var repoFn = func() *key.VaultRepository {
+	storage := &logical.InmemStorage{}
+	r, err := key.NewVaultRepository(context.Background(), storage)
+	if err != nil {
+		panic("failed to create VaultRepository: " + err.Error())
+	}
+	return r
 }
 
 // ============================================================================
