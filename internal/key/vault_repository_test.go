@@ -33,7 +33,7 @@ func newTestKeyVersion(versionID, keyID string, providerName string) *key.KeyVer
 }
 
 // helper: create a key+version in the store (for tests that need setup).
-func mustCreateKey(t *testing.T, r *key.VaultRepository, publicID, name, templateID string) {
+func mustCreateKey(t *testing.T, r key.Repository, publicID, name, templateID string) {
 	t.Helper()
 	k := newTestKey(publicID, name, templateID)
 	v := newTestKeyVersion("ver_"+publicID, publicID, "software")
@@ -42,7 +42,7 @@ func mustCreateKey(t *testing.T, r *key.VaultRepository, publicID, name, templat
 	}
 }
 
-var repoFn = func() *key.VaultRepository {
+var repoFn = func() key.Repository {
 	storage := &logical.InmemStorage{}
 	r, err := key.NewVaultRepository(context.Background(), storage)
 	if err != nil {
