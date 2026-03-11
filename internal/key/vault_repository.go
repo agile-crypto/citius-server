@@ -2,7 +2,6 @@ package key
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -10,6 +9,7 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	"github.ibm.com/citius/citius-server/internal/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 type VaultRepository struct {
@@ -24,7 +24,7 @@ const versionSep = ":"
 
 var _ Repository = (*VaultRepository)(nil)
 
-func NewVaultRepository(ctx context.Context, storage logical.Storage) (*VaultRepository, error) {
+func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRepository, error) {
 	const op errors.Op = "key.NewVaultRepository"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
@@ -37,9 +37,10 @@ func NewVaultRepository(ctx context.Context, storage logical.Storage) (*VaultRep
 		keyVersions: keyVersions,
 	}, nil
 }
-func put[T any](ctx context.Context, view logical.Storage, key string, value T) error {
+
+func put(ctx context.Context, view logical.Storage, key string, value proto.Message) error {
 	const op errors.Op = "key.put"
-	b, err := json.Marshal(value)
+	b, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -54,36 +55,37 @@ func put[T any](ctx context.Context, view logical.Storage, key string, value T) 
 	return nil
 }
 
-func get[T any](ctx context.Context, view logical.Storage, key string) (T, error) {
+func get(ctx context.Context, view logical.Storage, key string, result proto.Message) error {
 	const op errors.Op = "key.get"
-	var result T
+
 	entry, err := view.Get(ctx, key)
 	if err != nil {
-		return result, errors.Wrap(ctx, op, err)
+		return errors.Wrap(ctx, op, err)
 	}
 	if entry == nil {
-		return result, errors.New(ctx, op, errors.CodeKeyNotFound, "key not found: "+key)
+		return errors.New(ctx, op, errors.CodeKeyNotFound, "key not found: "+key)
 	}
 
-	if err := json.Unmarshal(entry.Value, &result); err != nil {
-		return result, errors.Wrap(ctx, op, err)
+	if err := proto.Unmarshal(entry.Value, result); err != nil {
+		return errors.Wrap(ctx, op, err)
 	}
-	return result, nil
+	return nil
 }
 
 func (r *VaultRepository) getKey(ctx context.Context, key string) (*Key, error) {
+	const op errors.Op = "key.(VaultRepository).getKey"
 	// Store objects are persisted in memory
-	storedKey, err := get[*storepb.StoredKey](ctx, r.keys, key)
-	if err != nil {
-		return nil, err
+	storedKey := &storepb.StoredKey{}
+	if err := get(ctx, r.keys, key, storedKey); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
 	}
 	return NewKey(storedKey), nil
 }
 
 func (r *VaultRepository) getKeyVersion(ctx context.Context, key string, version uint32) (*KeyVersion, error) {
 	const op errors.Op = "key.(VaultRepository).getKeyVersion"
-	storedVersion, err := get[*storepb.StoredKeyVersion](ctx, r.keyVersions, versionKey(key, version))
-	if err != nil {
+	storedVersion := &storepb.StoredKeyVersion{}
+	if err := get(ctx, r.keyVersions, versionKey(key, version), storedVersion); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return NewVersion(storedVersion), nil
