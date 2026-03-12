@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/hashicorp/vault/sdk/logical"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
@@ -12,6 +13,7 @@ import (
 )
 
 type VaultRepository struct {
+	mu          *sync.RWMutex
 	keys        logical.Storage // Storage view for keys (prefix: "key/")
 	keyVersions logical.Storage // Storage view for key versions (prefix: "key_version/")
 }
@@ -30,6 +32,7 @@ func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Opt
 	keys := logical.NewStorageView(storage, keyStoragePrefix)
 	keyVersions := logical.NewStorageView(storage, keyVersionStoragePrefix)
 	return &VaultRepository{
+		mu:          &sync.RWMutex{},
 		keys:        keys,
 		keyVersions: keyVersions,
 	}, nil
@@ -118,6 +121,9 @@ func (r *VaultRepository) CreateKey(ctx context.Context, k *Key, initialVersion 
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "initialVersion must not be nil")
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	keyId := k.PublicID()
 	k0, err := r.getKey(ctx, keyId)
 	if err != nil && !errors.IsKeyNotFound(err) {
@@ -149,6 +155,8 @@ func (r *VaultRepository) CreateKey(ctx context.Context, k *Key, initialVersion 
 
 func (r *VaultRepository) GetKey(ctx context.Context, publicID string) (*Key, error) {
 	const op errors.Op = "key.(VaultRepository).GetKey"
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	k, err := r.getKey(ctx, publicID)
 	if err != nil {
@@ -163,6 +171,8 @@ func (r *VaultRepository) GetKey(ctx context.Context, publicID string) (*Key, er
 
 func (r *VaultRepository) ListKeys(ctx context.Context) ([]*Key, error) {
 	const op errors.Op = "key.(VaultRepository).ListKeys"
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	ids, err := r.keys.List(ctx, "")
 	if err != nil {
@@ -190,6 +200,9 @@ func (r *VaultRepository) UpdateKey(ctx context.Context, k *Key) error {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "key must not be nil")
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	keyId := k.PublicID()
 	current, err := r.getKey(ctx, keyId)
 	if err != nil {
@@ -209,6 +222,8 @@ func (r *VaultRepository) UpdateKey(ctx context.Context, k *Key) error {
 
 func (r *VaultRepository) DeleteKey(ctx context.Context, publicID string) error {
 	const op errors.Op = "key.(VaultRepository).DeleteKey"
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	k, err := r.keys.Get(ctx, publicID)
 	if err != nil {
@@ -243,6 +258,9 @@ func (r *VaultRepository) AddVersion(ctx context.Context, keyName string, versio
 		return errors.New(ctx, op, errors.CodeInvalidArgument,
 			"version must not be nil")
 	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	// Look up the parent key to get current_version.
 	k, err := r.getKey(ctx, keyName)
@@ -289,6 +307,8 @@ func (r *VaultRepository) AddVersion(ctx context.Context, keyName string, versio
 
 func (r *VaultRepository) GetVersion(ctx context.Context, keyName string, versionNumber uint32) (*KeyVersion, error) {
 	const op errors.Op = "key.(VaultRepository).GetVersion"
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 
 	v, err := r.getKeyVersion(ctx, keyName, versionNumber)
 	if err != nil {
