@@ -55,7 +55,7 @@ var repoFn = func() key.Repository {
 // CreateKey / GetKey
 // ============================================================================
 
-func TestMemoryStore_CreateKey_GetKey_roundtrip(t *testing.T) {
+func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
@@ -80,7 +80,7 @@ func TestMemoryStore_CreateKey_GetKey_roundtrip(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_CreateKey_setsVersion1(t *testing.T) {
+func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
@@ -99,7 +99,7 @@ func TestMemoryStore_CreateKey_setsVersion1(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_GetKey_notFound(t *testing.T) {
+func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetKey(context.Background(), "key_doesnotexist")
 	if err == nil {
@@ -110,7 +110,7 @@ func TestMemoryStore_GetKey_notFound(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_CreateKey_duplicate_returnsError(t *testing.T) {
+func Test_VaultRepository_CreateKey_duplicate_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	k := newTestKey("key_01HXYZ", "original", "ecdsa-p256-sha256")
@@ -128,7 +128,7 @@ func TestMemoryStore_CreateKey_duplicate_returnsError(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_CreateKey_nilKey_returnsError(t *testing.T) {
+func Test_VaultRepository_CreateKey_nilKey_returnsError(t *testing.T) {
 	r := repoFn()
 	v := newTestKeyVersion("ver_01", "key_01", "software")
 	err := r.CreateKey(context.Background(), nil, v)
@@ -137,7 +137,7 @@ func TestMemoryStore_CreateKey_nilKey_returnsError(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_CreateKey_nilVersion_returnsError(t *testing.T) {
+func Test_VaultRepository_CreateKey_nilVersion_returnsError(t *testing.T) {
 	r := repoFn()
 	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
 	err := r.CreateKey(context.Background(), k, nil)
@@ -146,7 +146,7 @@ func TestMemoryStore_CreateKey_nilVersion_returnsError(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_GetKey_returnsClone(t *testing.T) {
+func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
 	// Mutating the returned key should NOT affect the stored copy.
 	r := repoFn()
 	ctx := context.Background()
@@ -165,7 +165,7 @@ func TestMemoryStore_GetKey_returnsClone(t *testing.T) {
 // DeleteKey (cascading)
 // ============================================================================
 
-func TestMemoryStore_DeleteKey_success(t *testing.T) {
+func Test_VaultRepository_DeleteKey_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "k", "ecdsa-p256-sha256")
@@ -179,7 +179,7 @@ func TestMemoryStore_DeleteKey_success(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_DeleteKey_cascadesVersions(t *testing.T) {
+func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "k", "ecdsa-p256-sha256")
@@ -200,7 +200,7 @@ func TestMemoryStore_DeleteKey_cascadesVersions(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_DeleteKey_notFound_returnsError(t *testing.T) {
+func Test_VaultRepository_DeleteKey_notFound_returnsError(t *testing.T) {
 	r := repoFn()
 	err := r.DeleteKey(context.Background(), "key_doesnotexist")
 	if err == nil {
@@ -215,7 +215,7 @@ func TestMemoryStore_DeleteKey_notFound_returnsError(t *testing.T) {
 // ListKeys
 // ============================================================================
 
-func TestMemoryStore_ListKeys_all(t *testing.T) {
+func Test_VaultRepository_ListKeys_all(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k1", "ecdsa-p256-sha256")
@@ -236,7 +236,7 @@ func TestMemoryStore_ListKeys_all(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_ListKeys_multipleKeys(t *testing.T) {
+func Test_VaultRepository_ListKeys_multipleKeys(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k1", "ecdsa-p256-sha256")
@@ -252,7 +252,7 @@ func TestMemoryStore_ListKeys_multipleKeys(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_ListKeys_empty(t *testing.T) {
+func Test_VaultRepository_ListKeys_empty(t *testing.T) {
 	r := repoFn()
 	keys, err := r.ListKeys(context.Background())
 	if err != nil {
@@ -267,7 +267,7 @@ func TestMemoryStore_ListKeys_empty(t *testing.T) {
 // UpdateKey
 // ============================================================================
 
-func TestMemoryStore_UpdateKey_success(t *testing.T) {
+func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
@@ -293,7 +293,7 @@ func TestMemoryStore_UpdateKey_success(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_UpdateKey_notFound_returnsError(t *testing.T) {
+func Test_VaultRepository_UpdateKey_notFound_returnsError(t *testing.T) {
 	r := repoFn()
 	k := newTestKey("key_missing", "signing-key", "ecdsa-p256-sha256")
 	err := r.UpdateKey(context.Background(), k)
@@ -305,7 +305,7 @@ func TestMemoryStore_UpdateKey_notFound_returnsError(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_UpdateKey_nil_returnsError(t *testing.T) {
+func Test_VaultRepository_UpdateKey_nil_returnsError(t *testing.T) {
 	r := repoFn()
 	err := r.UpdateKey(context.Background(), nil)
 	if err == nil {
@@ -317,7 +317,7 @@ func TestMemoryStore_UpdateKey_nil_returnsError(t *testing.T) {
 // AddVersion / GetVersion
 // ============================================================================
 
-func TestMemoryStore_AddVersion_GetVersion_roundtrip(t *testing.T) {
+func Test_VaultRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256")
@@ -339,7 +339,7 @@ func TestMemoryStore_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_AddVersion_GetOldVersion(t *testing.T) {
+func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256")
@@ -361,7 +361,7 @@ func TestMemoryStore_AddVersion_GetOldVersion(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_GetVersion_notFound(t *testing.T) {
+func Test_VaultRepository_GetVersion_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetVersion(context.Background(), "key_01", 99)
 	if err == nil {
@@ -372,7 +372,7 @@ func TestMemoryStore_GetVersion_notFound(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_AddVersion_returnsClone(t *testing.T) {
+func Test_VaultRepository_AddVersion_returnsClone(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256")
@@ -388,7 +388,7 @@ func TestMemoryStore_AddVersion_returnsClone(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_AddVersion_assignsIncrementingVersionNumber(t *testing.T) {
+func Test_VaultRepository_AddVersion_assignsIncrementingVersionNumber(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256") // creates version 1
@@ -414,7 +414,7 @@ func TestMemoryStore_AddVersion_assignsIncrementingVersionNumber(t *testing.T) {
 	}
 }
 
-func TestMemoryStore_AddVersion_keyNotFound_returnsError(t *testing.T) {
+func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 	r := repoFn()
 	v := newTestKeyVersion("ver_01", "key_missing", "software")
 	err := r.AddVersion(context.Background(), "key_missing", v)
