@@ -20,10 +20,10 @@ type Key struct {
 	stored *storepb.StoredKey
 }
 
-// New wraps a StoredKey in the Key domain type.
-// If stored is nil, New returns a zero-value Key (public_id and name will be empty,
+// NewKey wraps a StoredKey in the Key domain type.
+// If stored is nil, NewKey returns a zero-value Key (public_id and name will be empty,
 // so VetForWrite will fail).
-func New(stored *storepb.StoredKey) *Key {
+func NewKey(stored *storepb.StoredKey) *Key {
 	if stored == nil {
 		stored = &storepb.StoredKey{}
 	}

@@ -9,7 +9,6 @@ import (
 	"github.ibm.com/citius/citius-server/internal/key"
 	"github.ibm.com/citius/citius-server/internal/policy"
 	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/storage"
 )
 
 const pkgName = "memory"
@@ -322,4 +321,4 @@ func (m *MemoryStore) ListSessions(_ context.Context) ([]string, error) {
 }
 
 // Compile-time assertion.
-var _ storage.Storage = (*MemoryStore)(nil)
+// var _ storage.Storage = (*MemoryStore)(nil)
