@@ -2,7 +2,6 @@ package key
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -26,7 +25,7 @@ const versionSep = ":"
 
 var _ Repository = (*VaultRepository)(nil)
 
-func NewVaultRepository(ctx context.Context, storage logical.Storage) (*VaultRepository, error) {
+func NewVaultRepository(ctx context.Context, storage storage.Storage, opt ...Option) (*VaultRepository, error) {
 	const op errors.Op = "key.NewVaultRepository"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
@@ -38,7 +37,7 @@ func NewVaultRepository(ctx context.Context, storage logical.Storage) (*VaultRep
 
 func put(ctx context.Context, s storage.Storage, key string, value proto.Message) error {
 	const op errors.Op = "key.put"
-	b, err := json.Marshal(value)
+	b, err := proto.Marshal(value)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -58,16 +57,16 @@ func get(ctx context.Context, s storage.Storage, key string, result proto.Messag
 
 	entry, err := s.Get(ctx, key)
 	if err != nil {
-		return result, errors.Wrap(ctx, op, err)
+		return errors.Wrap(ctx, op, err)
 	}
 	if entry == nil {
-		return result, errors.New(ctx, op, errors.CodeKeyNotFound, "key not found: "+key)
+		return errors.New(ctx, op, errors.CodeKeyNotFound, "key not found: "+key)
 	}
 
-	if err := json.Unmarshal(entry.Value, &result); err != nil {
-		return result, errors.Wrap(ctx, op, err)
+	if err := proto.Unmarshal(entry.Value, result); err != nil {
+		return errors.Wrap(ctx, op, err)
 	}
-	return result, nil
+	return nil
 }
 
 func getKey(ctx context.Context, s storage.Storage, key string) (*Key, error) {
