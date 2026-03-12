@@ -24,6 +24,9 @@ const versionSep = ":"
 
 var _ Repository = (*VaultRepository)(nil)
 
+// Key repositories can share the same lock, provided as option. This allows to create per-request
+// repositories that share the same lock, so that they can be used concurrently.
+// By default, a single instance of VaultRepository is thread-safe (has its own lock).
 func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRepository, error) {
 	const op errors.Op = "key.NewVaultRepository"
 	if storage == nil {
@@ -31,8 +34,10 @@ func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Opt
 	}
 	keys := logical.NewStorageView(storage, keyStoragePrefix)
 	keyVersions := logical.NewStorageView(storage, keyVersionStoragePrefix)
+	opts := getOpts(opt...)
+
 	return &VaultRepository{
-		mu:          &sync.RWMutex{},
+		mu:          opts.withLock,
 		keys:        keys,
 		keyVersions: keyVersions,
 	}, nil
