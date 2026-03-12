@@ -7,16 +7,13 @@ import (
 
 	"github.com/hashicorp/vault/sdk/logical"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
-	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/storage"
 	"google.golang.org/protobuf/proto"
 )
 
 type VaultRepository struct {
-	storage storage.Storage
-	// keys        logical.Storage // Storage view for keys (prefix: "key/")
-	// keyVersions logical.Storage // Storage view for key versions (prefix: "key_version/")
+	keys        logical.Storage // Storage view for keys (prefix: "key/")
+	keyVersions logical.Storage // Storage view for key versions (prefix: "key_version/")
 }
 
 const keyStoragePrefix = "key/"
@@ -25,17 +22,20 @@ const versionSep = ":"
 
 var _ Repository = (*VaultRepository)(nil)
 
-func NewVaultRepository(ctx context.Context, storage storage.Storage, opt ...Option) (*VaultRepository, error) {
+func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRepository, error) {
 	const op errors.Op = "key.NewVaultRepository"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
+	keys := logical.NewStorageView(storage, keyStoragePrefix)
+	keyVersions := logical.NewStorageView(storage, keyVersionStoragePrefix)
 	return &VaultRepository{
-		storage: storage,
+		keys:        keys,
+		keyVersions: keyVersions,
 	}, nil
 }
 
-func put(ctx context.Context, s storage.Storage, key string, value proto.Message) error {
+func put(ctx context.Context, view logical.Storage, key string, value proto.Message) error {
 	const op errors.Op = "key.put"
 	b, err := proto.Marshal(value)
 	if err != nil {
@@ -46,16 +46,16 @@ func put(ctx context.Context, s storage.Storage, key string, value proto.Message
 		Value: b,
 	}
 
-	if err := s.Put(ctx, entry); err != nil {
+	if err := view.Put(ctx, entry); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
 }
 
-func get(ctx context.Context, s storage.Storage, key string, result proto.Message) error {
+func get(ctx context.Context, view logical.Storage, key string, result proto.Message) error {
 	const op errors.Op = "key.get"
 
-	entry, err := s.Get(ctx, key)
+	entry, err := view.Get(ctx, key)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -69,31 +69,27 @@ func get(ctx context.Context, s storage.Storage, key string, result proto.Messag
 	return nil
 }
 
-func getKey(ctx context.Context, s storage.Storage, key string) (*Key, error) {
+func (r *VaultRepository) getKey(ctx context.Context, key string) (*Key, error) {
 	const op errors.Op = "key.(VaultRepository).getKey"
 	// Store objects are persisted in memory
 	storedKey := &storepb.StoredKey{}
-	if err := get(ctx, s, keyStoragePrefix+key, storedKey); err != nil {
+	if err := get(ctx, r.keys, key, storedKey); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return NewKey(storedKey), nil
 }
 
-func getKeyVersion(ctx context.Context, s storage.Storage, key string, version uint32) (*KeyVersion, error) {
+func (r *VaultRepository) getKeyVersion(ctx context.Context, key string, version uint32) (*KeyVersion, error) {
 	const op errors.Op = "key.(VaultRepository).getKeyVersion"
 	storedVersion := &storepb.StoredKeyVersion{}
-	if err := get(ctx, s, keyVersionStoragePrefix+versionKey(key, version), storedVersion); err != nil {
+	if err := get(ctx, r.keyVersions, versionKey(key, version), storedVersion); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return NewVersion(storedVersion), nil
 }
 
-func putKey(ctx context.Context, s storage.Storage, key string, value *Key, opType core.WriteOp) error {
-	const op errors.Op = "key.(VaultRepository).putKey"
-	if err := value.VetForWrite(ctx, opType); err != nil {
-		return errors.Wrap(ctx, op, err)
-	}
-	return put(ctx, s, keyStoragePrefix+key, value.stored)
+func (r *VaultRepository) putKey(ctx context.Context, key string, value *Key) error {
+	return put(ctx, r.keys, key, value.stored)
 }
 
 func versionKey(keyId string, version uint32) string {
@@ -108,13 +104,9 @@ func versionPrefix(keyId string) string {
 	return keyId + versionSep
 }
 
-func putKeyVersion(ctx context.Context, s storage.Storage, key string, value *KeyVersion, opType core.WriteOp) error {
-	const op errors.Op = "key.(VaultRepository).putKeyVersion"
-	if err := value.VetForWrite(ctx, opType); err != nil {
-		return errors.Wrap(ctx, op, err)
-	}
+func (r *VaultRepository) putKeyVersion(ctx context.Context, key string, value *KeyVersion) error {
 	versionKey := versionKey(key, value.VersionNumber())
-	return put(ctx, s, keyVersionStoragePrefix+versionKey, value.stored)
+	return put(ctx, r.keyVersions, versionKey, value.stored)
 }
 
 func (r *VaultRepository) CreateKey(ctx context.Context, k *Key, initialVersion *KeyVersion) error {
@@ -126,37 +118,30 @@ func (r *VaultRepository) CreateKey(ctx context.Context, k *Key, initialVersion 
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "initialVersion must not be nil")
 	}
 
-	txHandler := func(s storage.Storage) error {
-		keyId := k.PublicID()
-		k0, err := getKey(ctx, s, keyId)
-		if err != nil && !errors.IsKeyNotFound(err) {
-			return errors.Wrap(ctx, op, err)
-		}
-		if k0 != nil {
-			return errors.New(ctx, op, errors.CodeAlreadyExists, "key already exists: "+keyId)
-		}
-
-		// Assign version 1 to the initial version.
-		initialVersion.StoredKeyVersion().VersionNumber = 1
-		initialVersion.StoredKeyVersion().IsCurrent = true
-
-		// Store the key and its first version atomically.
-		// stored := k.Clone() // No need to clone; marshalled
-		k.StoredKey().CurrentVersion = 1
-		if err := putKey(ctx, s, keyId, k, core.OpCreate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-
-		if err := putKeyVersion(ctx, s, keyId, initialVersion, core.OpCreate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-
-		return nil
-	}
-
-	if err := r.storage.DoTx(ctx, txHandler); err != nil {
+	keyId := k.PublicID()
+	k0, err := r.getKey(ctx, keyId)
+	if err != nil && !errors.IsKeyNotFound(err) {
 		return errors.Wrap(ctx, op, err)
 	}
+	if k0 != nil {
+		return errors.New(ctx, op, errors.CodeAlreadyExists, "key already exists: "+keyId)
+	}
+
+	// Assign version 1 to the initial version.
+	initialVersion.StoredKeyVersion().VersionNumber = 1
+	initialVersion.StoredKeyVersion().IsCurrent = true
+
+	// Store the key and its first version atomically.
+	// stored := k.Clone() // No need to clone; marshalled
+	k.StoredKey().CurrentVersion = 1
+	if err := r.putKey(ctx, keyId, k); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+
+	if err := r.putKeyVersion(ctx, keyId, initialVersion); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+
 	return nil
 }
 
@@ -165,7 +150,7 @@ func (r *VaultRepository) CreateKey(ctx context.Context, k *Key, initialVersion 
 func (r *VaultRepository) GetKey(ctx context.Context, publicID string) (*Key, error) {
 	const op errors.Op = "key.(VaultRepository).GetKey"
 
-	k, err := getKey(ctx, r.storage, publicID)
+	k, err := r.getKey(ctx, publicID)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -179,15 +164,14 @@ func (r *VaultRepository) GetKey(ctx context.Context, publicID string) (*Key, er
 func (r *VaultRepository) ListKeys(ctx context.Context) ([]*Key, error) {
 	const op errors.Op = "key.(VaultRepository).ListKeys"
 
-	// TODO: Txn required?
-	ids, err := r.storage.List(ctx, keyStoragePrefix)
+	ids, err := r.keys.List(ctx, "")
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
 	out := make([]*Key, 0, len(ids))
 	for _, id := range ids {
-		k, err := getKey(ctx, r.storage, id)
+		k, err := r.getKey(ctx, id)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -206,23 +190,16 @@ func (r *VaultRepository) UpdateKey(ctx context.Context, k *Key) error {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "key must not be nil")
 	}
 
-	txHandler := func(s storage.Storage) error {
-		keyId := k.PublicID()
-		current, err := getKey(ctx, r.storage, keyId)
-		if err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		if current == nil {
-			return errors.New(ctx, op, errors.CodeKeyNotFound,
-				"key not found: "+keyId)
-		}
-		if err := putKey(ctx, r.storage, keyId, k, core.OpUpdate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		return nil
+	keyId := k.PublicID()
+	current, err := r.getKey(ctx, keyId)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
 	}
-
-	if err := r.storage.DoTx(ctx, txHandler); err != nil {
+	if current == nil {
+		return errors.New(ctx, op, errors.CodeKeyNotFound,
+			"key not found: "+keyId)
+	}
+	if err := r.putKey(ctx, keyId, k); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
@@ -233,34 +210,27 @@ func (r *VaultRepository) UpdateKey(ctx context.Context, k *Key) error {
 func (r *VaultRepository) DeleteKey(ctx context.Context, publicID string) error {
 	const op errors.Op = "key.(VaultRepository).DeleteKey"
 
-	txHandler := func(s storage.Storage) error {
-		k, err := getKey(ctx, s, publicID)
-		if err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		if k == nil {
-			return errors.New(ctx, op, errors.CodeKeyNotFound,
-				"key not found: "+publicID)
-		}
-
-		if err := s.Delete(ctx, keyStoragePrefix+publicID); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-
-		versions, err := s.List(ctx, keyVersionStoragePrefix+versionPrefix(publicID))
-		if err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		for _, v := range versions {
-			if err := s.Delete(ctx, keyVersionStoragePrefix+versionKeyStr(publicID, v)); err != nil {
-				return errors.Wrap(ctx, op, err)
-			}
-		}
-		return nil
+	k, err := r.keys.Get(ctx, publicID)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	if k == nil {
+		return errors.New(ctx, op, errors.CodeKeyNotFound,
+			"key not found: "+publicID)
 	}
 
-	if err := r.storage.DoTx(ctx, txHandler); err != nil {
+	if err := r.keys.Delete(ctx, publicID); err != nil {
 		return errors.Wrap(ctx, op, err)
+	}
+
+	versions, err := r.keyVersions.List(ctx, versionPrefix(publicID))
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	for _, v := range versions {
+		if err := r.keyVersions.Delete(ctx, versionKeyStr(publicID, v)); err != nil {
+			return errors.Wrap(ctx, op, err)
+		}
 	}
 	return nil
 }
@@ -274,49 +244,43 @@ func (r *VaultRepository) AddVersion(ctx context.Context, keyName string, versio
 			"version must not be nil")
 	}
 
-	txHandler := func(s storage.Storage) error {
-		k, err := getKey(ctx, s, keyName)
-		if err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		if k == nil {
-			return errors.New(ctx, op, errors.CodeKeyNotFound,
-				"key not found: "+keyName)
-		}
-
-		oldVersion := k.StoredKey().GetCurrentVersion()
-		oldKeyVersion, err := getKeyVersion(ctx, s, keyName, oldVersion)
-		if err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		if oldKeyVersion == nil {
-			return errors.New(ctx, op, errors.CodeKeyNotFound,
-				"current version not found for key: "+keyName)
-		}
-
-		// Update new key version
-		newVersion := oldVersion + 1
-		version.StoredKeyVersion().VersionNumber = newVersion
-		version.StoredKeyVersion().IsCurrent = true
-		// update old key version
-		oldKeyVersion.stored.IsCurrent = false
-		// update key metadata
-		k.StoredKey().CurrentVersion = newVersion
-
-		// Store all versions
-		if err := putKeyVersion(ctx, s, keyName, version, core.OpCreate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		if err := putKeyVersion(ctx, s, keyName, oldKeyVersion, core.OpUpdate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		if err := putKey(ctx, s, keyName, k, core.OpUpdate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-		return nil
+	// Look up the parent key to get current_version.
+	k, err := r.getKey(ctx, keyName)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	if k == nil {
+		return errors.New(ctx, op, errors.CodeKeyNotFound,
+			"key not found: "+keyName)
 	}
 
-	if err := r.storage.DoTx(ctx, txHandler); err != nil {
+	oldVersion := k.StoredKey().GetCurrentVersion()
+	oldKeyVersion, err := r.getKeyVersion(ctx, keyName, oldVersion)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	if oldKeyVersion == nil {
+		return errors.New(ctx, op, errors.CodeKeyNotFound,
+			"current version not found for key: "+keyName)
+	}
+
+	// Update new key version
+	newVersion := oldVersion + 1
+	version.StoredKeyVersion().VersionNumber = newVersion
+	version.StoredKeyVersion().IsCurrent = true
+	// update old key version
+	oldKeyVersion.stored.IsCurrent = false
+	// update key metadata
+	k.StoredKey().CurrentVersion = newVersion
+
+	// Store all versions
+	if err := r.putKeyVersion(ctx, keyName, version); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	if err := r.putKeyVersion(ctx, keyName, oldKeyVersion); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	if err := r.putKey(ctx, keyName, k); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 
@@ -326,7 +290,7 @@ func (r *VaultRepository) AddVersion(ctx context.Context, keyName string, versio
 func (r *VaultRepository) GetVersion(ctx context.Context, keyName string, versionNumber uint32) (*KeyVersion, error) {
 	const op errors.Op = "key.(VaultRepository).GetVersion"
 
-	v, err := getKeyVersion(ctx, r.storage, keyName, versionNumber)
+	v, err := r.getKeyVersion(ctx, keyName, versionNumber)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}

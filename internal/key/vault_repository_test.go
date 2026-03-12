@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/hashicorp/vault/sdk/logical"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
-	"github.ibm.com/citius/citius-server/internal/storage"
 )
 
 // helper: create a valid Key domain object.
@@ -43,7 +43,7 @@ func mustCreateKey(t *testing.T, r key.Repository, publicID, name, templateID st
 }
 
 var repoFn = func() key.Repository {
-	storage := storage.NewInMemoryStorage()
+	storage := &logical.InmemStorage{}
 	r, err := key.NewVaultRepository(context.Background(), storage)
 	if err != nil {
 		panic("failed to create VaultRepository: " + err.Error())
