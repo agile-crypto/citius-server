@@ -7,7 +7,7 @@ option go_package = "github.ibm.com/citius/citius-server/gen/go/store;store";
 
 import "google/protobuf/timestamp.proto";
 import "buf/validate/validate.proto";
-import "store/common.proto";
+import "types/common.proto";
 
 // Status enumerates the lifecycle statuses of a key
 enum StatusV2 {
@@ -27,10 +27,10 @@ message KeyVersionV2 {
   uint32 id = 1;
   // version number
   // @gotags: gorm:"not_null;uniqueIndex:key_version_idx"
-  uint32 version = 2;
-  // the key id to which this version belongs
-  // @gotags: gorm:"not_null;uniqueIndex:key_version_idx"
-  string key_id = 3;
+  uint32 version = 2 [(buf.validate.field).string = {prefix: "ver_", min_len: 5}];
+  // the public id of the key to which this version belongs
+  // @gotags: gorm:"not_null,index;uniqueIndex:key_version_idx"
+  string key_id = 3 [(buf.validate.field).string = {prefix: "key_", min_len: 5}];
   // the key to which this version belongs
   // use GORM foreign key
   // @gotags: gorm:"foreignkey:KeyId"
@@ -57,10 +57,10 @@ message KeyVersionV2 {
   string digest_algorithm = 11;
   // id of the key used to encrypt the key material
   // @gotags: gorm:"not_null"
-  string wrapping_key_id = 12;
+  string wrapping_key_id = 11 [(buf.validate.field) = {ignore: IGNORE_IF_ZERO_VALUE, string: {prefix: "key_", min_len: 5}}];
   // id of the provider where the key lives
   // @gotags: gorm:"not_null"
-  string provider_id = 13;
+  string provider_id = 12 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
   // Lifecycle state of the key version
   // @gotags: gorm:"not_null"
   StatusV2 status = 14;
@@ -69,25 +69,27 @@ message KeyVersionV2 {
 // Key represents a cryptographic key stored in the database
 message KeyV2 {
   // @gotags: gorm:"primary_key"
-  string public_id = 1;
+  string public_id = 1 [(buf.validate.field).string = {prefix: "key_", min_len: 5}]; 
+  // @gotags: gorm:"not_null"
+  string key_name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // @gotags: gorm:"default:current_timestamp"
-  google.protobuf.Timestamp create_time = 2;
+  google.protobuf.Timestamp create_time = 3;
   // @gotags: gorm:"default:current_timestamp"
-  google.protobuf.Timestamp update_time = 3;
+  google.protobuf.Timestamp update_time = 4;
   // @gotags: gorm:"default:null"
-  google.protobuf.Timestamp destroy_time = 4;
+  google.protobuf.Timestamp destroy_time = 5;
   // @gotags: gorm:"not_null"
-  string primitive = 5;
+  string primitive = 6;
   // @gotags: gorm:"not_null"
-  caas.storage.v1.ScopeSpecification scope_specification = 6;
+  caas.crypto.v1.ScopeSpecification scope_specification = 7;
   // @gotags: gorm:"not_null"
-  string policy_id = 7;
+  string policy_id = 8 [(buf.validate.field).string = {prefix: "pol_", min_len: 5}];
   // key's versions
   // @gotags: gorm:"foreignkey:key_id"
-  repeated KeyVersionV2 versions = 8;
+  repeated KeyVersionV2 versions = 9;
   // id of the current version of the key
   // @gotags: gorm:"not_null"
-  uint32 current_version_id = 9;
+  uint32 current_version_id = 10 [(buf.validate.field).uint32.gte = 1];
   // Labels associated with the key
-  map<string, string> labels = 10;
+  map<string, string> labels = 11;
 }
