@@ -57,10 +57,10 @@ message KeyVersionV2 {
   string digest_algorithm = 11;
   // id of the key used to encrypt the key material
   // @gotags: gorm:"not_null"
-  string wrapping_key_id = 11 [(buf.validate.field) = {ignore: IGNORE_IF_ZERO_VALUE, string: {prefix: "key_", min_len: 5}}];
+  string wrapping_key_id = 12 [(buf.validate.field) = {ignore: IGNORE_IF_ZERO_VALUE, string: {prefix: "key_", min_len: 5}}];
   // id of the provider where the key lives
   // @gotags: gorm:"not_null"
-  string provider_id = 12 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
+  string provider_id = 13 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
   // Lifecycle state of the key version
   // @gotags: gorm:"not_null"
   StatusV2 status = 14;
