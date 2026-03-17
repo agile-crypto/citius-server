@@ -21,8 +21,11 @@ func NewTemplate(stored *api.TemplateInfo) *Template {
 	return &Template{stored: stored}
 }
 
-// StoredTemplate returns the embedded proto.
-func (t *Template) StoredTemplate() *api.TemplateInfo { return t.stored }
+// Proto returns the embedded TemplateInfo proto.
+// NOTE: Template wraps an API-surface proto (caas.crypto.v1), not a storage proto.
+// This is a pragmatic trade-off to avoid duplicating TemplateInfo's deeply nested
+// algorithm types — see doc.go for rationale.
+func (t *Template) Proto() *api.TemplateInfo { return t.stored }
 
 // TemplateID returns the unique template identifier.
 func (t *Template) TemplateID() string { return t.stored.GetTemplateId() }
