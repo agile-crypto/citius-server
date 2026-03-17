@@ -22,7 +22,7 @@ type Registry interface {
 		allowedTemplates []string,
 		preferred map[string]string) (*Template, error)
 
-	// NOTE: LoadFromYAML is intentionally NOT part of this interface.
+	// NOTE: LoadStandardCatalog is intentionally NOT part of this interface.
 	// It is a startup/configuration concern implemented as a package-level function
-	// in the template package: template.LoadFromYAML(path string, r *Registry) error
+	// in the template package: template.LoadStandardCatalog(path string, r Registry) error
 }

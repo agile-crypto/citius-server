@@ -2,10 +2,11 @@
 // interface for algorithm template management.
 //
 // Domain type:
-//   - Template is a plain Go struct (no proto embedding, no storage).
-//     Templates are immutable value objects loaded from YAML at startup.
-//     They define which algorithms are available, their security properties,
-//     and scope-based selection criteria.
+//   - Template wraps *api.TemplateInfo (proto), following the same
+//     domain-wrapping pattern used by key.Key, policy.Policy, and
+//     provider.Instance.  Templates are loaded from JSON at startup
+//     and stored in Vault InmemStorage for consistent access via
+//     the Registry interface.
 //
 // Interface:
 //   - Registry (domain service): Register, Get, List, and Select.
