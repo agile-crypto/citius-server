@@ -28,3 +28,15 @@ func (pi *Instance) Clone() *Instance {
 		stored: proto.Clone(pi.stored).(*storepb.StoredProviderInstance),
 	}
 }
+
+func (pi *Instance) PublicID() string {
+	return pi.stored.GetPublicId()
+}
+
+func (pi *Instance) Name() string {
+	return pi.stored.GetName()
+}
+
+func (pi *Instance) ProviderType() string {
+	return pi.stored.GetProviderType()
+}
