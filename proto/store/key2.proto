@@ -7,7 +7,6 @@ option go_package = "github.ibm.com/citius/citius-server/gen/go/store;store";
 
 import "google/protobuf/timestamp.proto";
 import "buf/validate/validate.proto";
-import "types/common.proto";
 
 // Status enumerates the lifecycle statuses of a key
 enum Status {
@@ -77,7 +76,7 @@ message Key {
   // @gotags: gorm:"not_null"
   string primitive = 6;
   // @gotags: gorm:"not_null"
-  caas.crypto.v1.ScopeSpecification scope_specification = 7;
+  bytes scope_specification = 7;
   // @gotags: gorm:"not_null"
   string policy_id = 8 [(buf.validate.field).string = {prefix: "pol_", min_len: 5}];
   // ids of the key's versions
