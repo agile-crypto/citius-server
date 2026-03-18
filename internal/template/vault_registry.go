@@ -160,7 +160,7 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, al
 			continue
 		}
 		t := NewTemplate(stored)
-		if scopeSpec.IsZero() || templateMatchesScope(t, scopeSpec) {
+		if MatchesScope(t, scopeSpec) {
 			candidates = append(candidates, t)
 		}
 	}
@@ -183,10 +183,10 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, al
 	// Step 3: filter by preferred properties
 	// Properties are checked against the template's algorithm_properties map —
 	// the flattened search index with keys like quantum_safe, fips_approved.
-	for key, val := range preferred {
+	if len(preferred) > 0 {
 		filtered := candidates[:0]
 		for _, t := range candidates {
-			if templateHasProperty(t, key, val) {
+			if MatchesProperties(t, preferred) {
 				filtered = append(filtered, t)
 			}
 		}
@@ -398,41 +398,4 @@ func genericSecretScopeToCore(s api.GenericSecretScope) core.Scope {
 	default:
 		return ""
 	}
-}
-
-// ---------------------------------------------------------------------------
-// Select helpers
-// ---------------------------------------------------------------------------
-
-// templateMatchesScope reports whether t serves the given scope.
-// Inspects the template's ScopedCapabilities and checks if any ScopeSpecification
-// matches the requested core.ScopeSpec (Primitive + optional Scope variant).
-// A zero-value ScopeSpec matches all templates (no scope filter).
-func templateMatchesScope(t *Template, want core.ScopeSpec) bool {
-	if want.IsZero() {
-		return true
-	}
-	for _, sc := range t.GetScopedCapabilities() {
-		got := scopeSpecFromProto(sc.GetScope())
-		if got.Primitive == want.Primitive {
-			// If caller specified a scope variant, match it too.
-			// If caller only specified primitive (Scope == ""), any variant matches.
-			if want.Scope == "" || got.Scope == want.Scope {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// templateHasProperty reports whether a template satisfies a required property.
-// Looks up the property in the TemplateInfo's algorithm_properties map,
-// which contains all algorithm-derived parameters including fips_approved and quantum_safe.
-func templateHasProperty(t *Template, key, value string) bool {
-	props := t.Proto().GetAlgorithmProperties()
-	if props == nil {
-		return false
-	}
-	v, ok := props[key]
-	return ok && v == value
 }
