@@ -128,20 +128,33 @@ const (
 // The (Primitive, Scope) pair maps 1:1 to a specific variant of the
 // proto ScopeSpecification oneof.
 //
-// A zero-value ScopeSpec (both fields empty) means "no scope filter" —
+// A zero-value ScopeSpec (all fields empty/nil) means "no scope filter" —
 // matches all templates regardless of scope.
 //
-// TODO: expand to carry UniversalSecurityProperties (fips_approved,
-// quantum_safe, etc.) and per-primitive typed properties (non_malleable,
-// deterministic, etc.) from the proto *ScopeSpec messages. Currently
-// these are handled via the preferred map[string]string parameter in
-// Select and the template's algorithm_properties map.
+// Security filters are typed fields extracted from the proto's
+// UniversalSecurityProperties (inside ScopeSpecification.<primitive>.security).
+// These replace the former preferred map[string]string parameter in Select
+// and the removed algorithm_properties flat map on TemplateInfo.
+//
+// TODO: expand to carry per-primitive typed properties (non_malleable,
+// deterministic, nonce_misuse_resistant, forward_secrecy, etc.) from the
+// per-primitive *ScopeSpec messages in common.proto.
 type ScopeSpec struct {
 	Primitive Primitive // which cryptographic primitive (signature, aead, ...)
 	Scope     Scope     // which operational variant within the primitive
+
+	// Security filters — nil means "don't filter", non-nil applies the filter.
+	// Extracted from UniversalSecurityProperties in the proto ScopeSpecification.
+	FIPSApproved *bool // if non-nil, template's scope.security.fips_approved must match
+	QuantumSafe  *bool // if non-nil, template's scope.security.quantum_safe must match
 }
 
-// IsZero reports whether this ScopeSpec has no scope constraint.
+// IsZero reports whether this ScopeSpec has no scope constraint and no security filters.
 func (s ScopeSpec) IsZero() bool {
-	return s.Primitive == "" && s.Scope == ""
+	return s.Primitive == "" && s.Scope == "" && s.FIPSApproved == nil && s.QuantumSafe == nil
+}
+
+// HasSecurityFilter reports whether this ScopeSpec has any security filter set.
+func (s ScopeSpec) HasSecurityFilter() bool {
+	return s.FIPSApproved != nil || s.QuantumSafe != nil
 }

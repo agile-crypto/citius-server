@@ -109,31 +109,36 @@ func (r *VaultRegistry) List(ctx context.Context) []*Template {
 
 // Select returns the best-matching template for the given request.
 // The selection algorithm:
-//  1. If allowedTemplates has one entry and scope/preferred are empty,
+//  1. If candidates is restricted to one entry and scope is zero,
 //     treat it as a direct lookup (fast path for template_id=explicit case).
-//  2. Build candidates: all templates matching the scope (if scope is set).
-//  3. Filter by allowedTemplates (if non-empty).
-//  4. Filter by preferred properties (e.g. quantum_safe=true).
-//  5. Return first remaining candidate, or CodeTemplateNotFound.
+//  2. Determine the candidate ID set: when candidates is restricted,
+//     only those IDs are deserialized; when unrestricted, all stored IDs
+//     are loaded (avoids deserializing templates the policy already excludes).
+//  3. Deserialize each candidate and apply scope + security filters.
+//  4. Return first matching candidate, or CodeTemplateNotFound.
+//
+// Security filtering (fips_approved, quantum_safe) is part of scope matching:
+// the caller's ScopeSpec carries typed security filter fields, matched against
+// each template's ScopedCapabilities[].Scope.security (UniversalSecurityProperties).
 //
 // NOTE: Select accesses r.templates (logical.Storage) directly using readlock rather than
 // calling r.Get()/r.List(), because those methods also acquire r.mu.RLock()
 // and Go's sync.RWMutex is NOT reentrant.
 // TODO: Optimize with caching instead of full storage scan with serialization and deserialization
-func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, allowedTemplates []string, preferred map[string]string) (*Template, error) {
+func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, cs CandidateSet) (*Template, error) {
 	const op errors.Op = "template.(VaultRegistry).Select"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// Fast path: explicit template ID lookup (single allowed, no scope/properties)
-	if len(allowedTemplates) == 1 && len(preferred) == 0 && scopeSpec.IsZero() {
-		entry, err := r.templates.Get(ctx, allowedTemplates[0])
+	// Fast path: explicit template ID lookup (single restricted ID, no scope/security filters)
+	if cs.IsRestricted() && len(cs.IDs()) == 1 && scopeSpec.IsZero() {
+		entry, err := r.templates.Get(ctx, cs.IDs()[0])
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		if entry == nil {
 			return nil, errors.New(ctx, op, errors.CodeTemplateNotFound,
-				"template not found: "+allowedTemplates[0])
+				"template not found: "+cs.IDs()[0])
 		}
 		stored := &api.TemplateInfo{}
 		if err := proto.Unmarshal(entry.Value, stored); err != nil {
@@ -142,13 +147,22 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, al
 		return NewTemplate(stored), nil
 	}
 
-	// Load all templates from storage
-	ids, err := r.templates.List(ctx, "")
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
+	// Step 1: determine the candidate ID set.
+	// When the caller restricts to specific IDs, only those are eligible
+	// (no point deserializing templates we already know the policy excludes).
+	// When unrestricted, every stored template is a candidate.
+	var ids []string
+	if cs.IsRestricted() {
+		ids = cs.IDs()
+	} else {
+		var err error
+		ids, err = r.templates.List(ctx, "")
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
 	}
 
-	// Step 1: build candidates (all templates, or scope-filtered)
+	// Step 2: deserialize each candidate and apply scope + security filter.
 	var candidates []*Template
 	for _, id := range ids {
 		entry, err := r.templates.Get(ctx, id)
@@ -165,40 +179,12 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, al
 		}
 	}
 
-	// Step 2: filter by AllowedTemplates
-	if len(allowedTemplates) > 0 {
-		allowed := make(map[string]struct{}, len(allowedTemplates))
-		for _, id := range allowedTemplates {
-			allowed[id] = struct{}{}
-		}
-		filtered := candidates[:0]
-		for _, t := range candidates {
-			if _, ok := allowed[t.TemplateID()]; ok {
-				filtered = append(filtered, t)
-			}
-		}
-		candidates = filtered
-	}
-
-	// Step 3: filter by preferred properties
-	// Properties are checked against the template's algorithm_properties map —
-	// the flattened search index with keys like quantum_safe, fips_approved.
-	if len(preferred) > 0 {
-		filtered := candidates[:0]
-		for _, t := range candidates {
-			if MatchesProperties(t, preferred) {
-				filtered = append(filtered, t)
-			}
-		}
-		candidates = filtered
-	}
-
 	if len(candidates) == 0 {
 		return nil, errors.New(ctx, op, errors.CodeTemplateNotFound,
 			"no template matches the selection criteria")
 	}
 
-	// Step 4: return first candidate (deterministic — storage iteration order)
+	// Step 3: return first candidate (deterministic — storage/candidates iteration order)
 	return candidates[0].Clone(), nil
 }
 
@@ -209,6 +195,8 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, al
 // scopeSpecFromProto converts a proto ScopeSpecification to a core.ScopeSpec.
 // Extracts both the Primitive (from the oneof variant) and the Scope
 // (from the per-primitive scope enum value).
+// Also extracts UniversalSecurityProperties (fips_approved, quantum_safe)
+// from the per-primitive security field.
 // Returns zero-value ScopeSpec if spec is nil.
 func scopeSpecFromProto(spec *api.ScopeSpecification) core.ScopeSpec {
 	if spec == nil {
@@ -216,57 +204,93 @@ func scopeSpecFromProto(spec *api.ScopeSpecification) core.ScopeSpec {
 	}
 	switch s := spec.GetScopeSpec().(type) {
 	case *api.ScopeSpecification_Signature:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveSignature,
 			Scope:     signatureScopeToCore(s.Signature.GetScope()),
 		}
+		extractSecurity(&result, s.Signature.GetSecurity())
+		return result
 	case *api.ScopeSpecification_Aead:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveAead,
 			Scope:     aeadScopeToCore(s.Aead.GetScope()),
 		}
+		extractSecurity(&result, s.Aead.GetSecurity())
+		return result
 	case *api.ScopeSpecification_Mac:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveMac,
 			Scope:     macScopeToCore(s.Mac.GetScope()),
 		}
+		extractSecurity(&result, s.Mac.GetSecurity())
+		return result
 	case *api.ScopeSpecification_Kem:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveKem,
 			Scope:     kemScopeToCore(s.Kem.GetScope()),
 		}
+		extractSecurity(&result, s.Kem.GetSecurity())
+		return result
 	case *api.ScopeSpecification_KeyAgreement:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveKeyAgreement,
 			Scope:     keyAgreementScopeToCore(s.KeyAgreement.GetScope()),
 		}
+		extractSecurity(&result, s.KeyAgreement.GetSecurity())
+		return result
 	case *api.ScopeSpecification_Kdf:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveKdf,
 			Scope:     kdfScopeToCore(s.Kdf.GetScope()),
 		}
+		extractSecurity(&result, s.Kdf.GetSecurity())
+		return result
 	case *api.ScopeSpecification_Hash:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveHash,
 			Scope:     hashScopeToCore(s.Hash.GetScope()),
 		}
+		extractSecurity(&result, s.Hash.GetSecurity())
+		return result
 	case *api.ScopeSpecification_KeyWrapping:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveKeyWrapping,
 			Scope:     keyWrappingScopeToCore(s.KeyWrapping.GetScope()),
 		}
+		extractSecurity(&result, s.KeyWrapping.GetSecurity())
+		return result
 	case *api.ScopeSpecification_SymmetricCipher:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveSymmetricCipher,
 			Scope:     symmetricCipherScopeToCore(s.SymmetricCipher.GetScope()),
 		}
+		extractSecurity(&result, s.SymmetricCipher.GetSecurity())
+		return result
 	case *api.ScopeSpecification_GenericSecret:
-		return core.ScopeSpec{
+		result := core.ScopeSpec{
 			Primitive: core.PrimitiveGenericSecret,
 			Scope:     genericSecretScopeToCore(s.GenericSecret.GetScope()),
 		}
+		extractSecurity(&result, s.GenericSecret.GetSecurity())
+		return result
 	default:
 		return core.ScopeSpec{}
+	}
+}
+
+// extractSecurity populates ScopeSpec security fields from UniversalSecurityProperties.
+// Uses proto optional field semantics: nil → don't set, non-nil → set value.
+func extractSecurity(s *core.ScopeSpec, sec *api.UniversalSecurityProperties) {
+	if sec == nil {
+		return
+	}
+	if sec.FipsApproved != nil {
+		v := sec.GetFipsApproved()
+		s.FIPSApproved = &v
+	}
+	if sec.QuantumSafe != nil {
+		v := sec.GetQuantumSafe()
+		s.QuantumSafe = &v
 	}
 }
 
