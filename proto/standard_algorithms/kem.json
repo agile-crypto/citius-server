@@ -1,0 +1,220 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Key Encapsulation Mechanisms. CycloneDX naming: ml-kem-{parameterset} or {algorithm}",
+  "templates": {
+    "ml-kem-512": {
+      "templateId": "ml-kem-512",
+      "displayName": "ML-KEM-512",
+      "description": "Module-Lattice KEM, NIST Level 1 (128-bit). FIPS 203.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kem": {
+              "scope": "KEM_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCAPSULATE",
+            "CRYPTO_OPERATION_DECAPSULATE"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.4.1",
+        "primitive": "CRYPTO_PRIMITIVE_KEM",
+        "mlKem": {
+          "parameterSet": "ML_KEM_512"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 203"
+      ]
+    },
+    "ml-kem-768": {
+      "templateId": "ml-kem-768",
+      "displayName": "ML-KEM-768",
+      "description": "Module-Lattice KEM, NIST Level 3 (192-bit). FIPS 203. Recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kem": {
+              "scope": "KEM_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCAPSULATE",
+            "CRYPTO_OPERATION_DECAPSULATE"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.4.2",
+        "primitive": "CRYPTO_PRIMITIVE_KEM",
+        "mlKem": {
+          "parameterSet": "ML_KEM_768"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 203"
+      ]
+    },
+    "ml-kem-1024": {
+      "templateId": "ml-kem-1024",
+      "displayName": "ML-KEM-1024",
+      "description": "Module-Lattice KEM, NIST Level 5 (256-bit). FIPS 203. Highest security.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kem": {
+              "scope": "KEM_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCAPSULATE",
+            "CRYPTO_OPERATION_DECAPSULATE"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.4.3",
+        "primitive": "CRYPTO_PRIMITIVE_KEM",
+        "mlKem": {
+          "parameterSet": "ML_KEM_1024"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 203"
+      ]
+    },
+    "x25519": {
+      "templateId": "x25519",
+      "displayName": "X25519",
+      "description": "Curve25519 ECDH key agreement. Fast, constant-time. RFC 7748.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyAgreement": {
+              "scope": "KEY_AGREEMENT_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "forwardSecrecy": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_KEY_AGREEMENT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.101.110",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_AGREE",
+        "x25519": {}
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 7748"
+      ]
+    },
+    "x448": {
+      "templateId": "x448",
+      "displayName": "X448",
+      "description": "Curve448 ECDH key agreement. Higher security than X25519. RFC 7748.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyAgreement": {
+              "scope": "KEY_AGREEMENT_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 224,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "forwardSecrecy": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_KEY_AGREEMENT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.101.111",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_AGREE",
+        "x448": {}
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 7748"
+      ]
+    }
+  }
+}

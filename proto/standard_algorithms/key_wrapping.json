@@ -1,0 +1,277 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Key Wrapping algorithms. CycloneDX naming: aes-kw-{keysize}[-pad]",
+  "templates": {
+    "aes-kw-128": {
+      "templateId": "aes-kw-128",
+      "displayName": "AES-KW-128",
+      "description": "AES Key Wrap with 128-bit KEK. RFC 3394, NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyWrapping": {
+              "scope": "KEY_WRAPPING_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_WRAP_KEY",
+            "CRYPTO_OPERATION_UNWRAP_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "intCtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.5",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_WRAP",
+        "aesKeyWrap": {
+          "keySizeBits": 128,
+          "withPadding": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 3394",
+        "NIST SP 800-38F"
+      ]
+    },
+    "aes-kw-192": {
+      "templateId": "aes-kw-192",
+      "displayName": "AES-KW-192",
+      "description": "AES Key Wrap with 192-bit KEK. RFC 3394, NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyWrapping": {
+              "scope": "KEY_WRAPPING_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_WRAP_KEY",
+            "CRYPTO_OPERATION_UNWRAP_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "intCtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.25",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_WRAP",
+        "aesKeyWrap": {
+          "keySizeBits": 192,
+          "withPadding": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 3394",
+        "NIST SP 800-38F"
+      ]
+    },
+    "aes-kw-256": {
+      "templateId": "aes-kw-256",
+      "displayName": "AES-KW-256",
+      "description": "AES Key Wrap with 256-bit KEK. RFC 3394, NIST approved. Recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyWrapping": {
+              "scope": "KEY_WRAPPING_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_WRAP_KEY",
+            "CRYPTO_OPERATION_UNWRAP_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "intCtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.45",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_WRAP",
+        "aesKeyWrap": {
+          "keySizeBits": 256,
+          "withPadding": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 3394",
+        "NIST SP 800-38F"
+      ]
+    },
+    "aes-kwp-128": {
+      "templateId": "aes-kwp-128",
+      "displayName": "AES-KWP-128",
+      "description": "AES Key Wrap with Padding, 128-bit KEK. RFC 5649, supports arbitrary data.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyWrapping": {
+              "scope": "KEY_WRAPPING_SCOPE_WITH_PADDING",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_WRAP_KEY",
+            "CRYPTO_OPERATION_UNWRAP_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "intCtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.8",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_WRAP",
+        "aesKeyWrap": {
+          "keySizeBits": 128,
+          "withPadding": true
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 5649",
+        "NIST SP 800-38F"
+      ]
+    },
+    "aes-kwp-192": {
+      "templateId": "aes-kwp-192",
+      "displayName": "AES-KWP-192",
+      "description": "AES Key Wrap with Padding, 192-bit KEK. RFC 5649, supports arbitrary data.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyWrapping": {
+              "scope": "KEY_WRAPPING_SCOPE_WITH_PADDING",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_WRAP_KEY",
+            "CRYPTO_OPERATION_UNWRAP_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "intCtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.28",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_WRAP",
+        "aesKeyWrap": {
+          "keySizeBits": 192,
+          "withPadding": true
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 5649",
+        "NIST SP 800-38F"
+      ]
+    },
+    "aes-kwp-256": {
+      "templateId": "aes-kwp-256",
+      "displayName": "AES-KWP-256",
+      "description": "AES Key Wrap with Padding, 256-bit KEK. RFC 5649, supports arbitrary data. Recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "keyWrapping": {
+              "scope": "KEY_WRAPPING_SCOPE_WITH_PADDING",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_WRAP_KEY",
+            "CRYPTO_OPERATION_UNWRAP_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "intCtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.48",
+        "primitive": "CRYPTO_PRIMITIVE_KEY_WRAP",
+        "aesKeyWrap": {
+          "keySizeBits": 256,
+          "withPadding": true
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 5649",
+        "NIST SP 800-38F"
+      ]
+    }
+  }
+}
