@@ -7,27 +7,26 @@ option go_package = "github.ibm.com/citius/citius-server/gen/go/store;store";
 
 import "google/protobuf/timestamp.proto";
 import "buf/validate/validate.proto";
-import "types/common.proto";
 
 // Status enumerates the lifecycle statuses of a key
-enum Status {
-  STATUS_UNSPECIFIED = 0;
-  STATUS_ACTIVE = 1;
-  STATUS_SUSPENDED = 2;
-  STATUS_DESTROYED = 3;
-  STATUS_PRE_ACTIVE = 4;
-  STATUS_DEACTIVATED = 5;
-  STATUS_COMPROMISED = 6;
-  STATUS_DESTROYED_COMPROMISED = 7;
+enum KeyStatus2 {
+  KEY_STATUS2_UNSPECIFIED           = 0;
+  KEY_STATUS2_ACTIVE                = 1;
+  KEY_STATUS2_SUSPENDED             = 2;
+  KEY_STATUS2_DESTROYED             = 3;
+  KEY_STATUS2_PRE_ACTIVE            = 4;  // generated, not yet authorized
+  KEY_STATUS2_DEACTIVATED           = 5;  // no longer for protection, still for processing
+  KEY_STATUS2_COMPROMISED           = 6;  // integrity/confidentiality in question
+  KEY_STATUS2_DESTROYED_COMPROMISED = 7;  // was compromised, then destroyed
 }
 
 // KeyVersion represents a version of a key with its material
 message KeyVersion {
   // @gotags: gorm:"primary_key"
-  uint32 id = 1;
+  string public_id = 1 [(buf.validate.field).string = {prefix: "ver_", min_len: 5}];
   // version number
   // @gotags: gorm:"not_null;uniqueIndex:key_version_idx"
-  uint32 version = 2 [(buf.validate.field).string = {prefix: "ver_", min_len: 5}];
+  uint32 version = 2;
   // the public id of the key to which this version belongs
   // @gotags: gorm:"not_null,index;uniqueIndex:key_version_idx"
   string key_id = 3 [(buf.validate.field).string = {prefix: "key_", min_len: 5}];
@@ -59,7 +58,7 @@ message KeyVersion {
   string provider_id = 12 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
   // Lifecycle state of the key version
   // @gotags: gorm:"not_null"
-  Status status = 13;
+  KeyStatus2 status = 13;
 }
 
 // Key represents a cryptographic key stored in the database
@@ -77,15 +76,12 @@ message Key {
   // @gotags: gorm:"not_null"
   string primitive = 6;
   // @gotags: gorm:"not_null"
-  caas.crypto.v1.ScopeSpecification scope_specification = 7;
+  bytes scope_specification = 7;
   // @gotags: gorm:"not_null"
   string policy_id = 8 [(buf.validate.field).string = {prefix: "pol_", min_len: 5}];
-  // ids of the key's versions
-  // @gotags: gorm:"not_null"
-  repeated uint32 versions_ids = 9;
   // id of the current version of the key
   // @gotags: gorm:"not_null"
-  uint32 current_version_id = 10 [(buf.validate.field).uint32.gte = 1];
+  uint32 current_version = 9 [(buf.validate.field).uint32.gte = 1];
   // Labels associated with the key
-  map<string, string> labels = 11;
+  map<string, string> labels = 10;
 }
