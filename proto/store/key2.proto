@@ -9,15 +9,15 @@ import "google/protobuf/timestamp.proto";
 import "buf/validate/validate.proto";
 
 // Status enumerates the lifecycle statuses of a key
-enum Status {
-  STATUS_UNSPECIFIED = 0;
-  STATUS_ACTIVE = 1;
-  STATUS_SUSPENDED = 2;
-  STATUS_DESTROYED = 3;
-  STATUS_PRE_ACTIVE = 4;
-  STATUS_DEACTIVATED = 5;
-  STATUS_COMPROMISED = 6;
-  STATUS_DESTROYED_COMPROMISED = 7;
+enum KeyStatus2 {
+  KEY_STATUS2_UNSPECIFIED           = 0;
+  KEY_STATUS2_ACTIVE                = 1;
+  KEY_STATUS2_SUSPENDED             = 2;
+  KEY_STATUS2_DESTROYED             = 3;
+  KEY_STATUS2_PRE_ACTIVE            = 4;  // generated, not yet authorized
+  KEY_STATUS2_DEACTIVATED           = 5;  // no longer for protection, still for processing
+  KEY_STATUS2_COMPROMISED           = 6;  // integrity/confidentiality in question
+  KEY_STATUS2_DESTROYED_COMPROMISED = 7;  // was compromised, then destroyed
 }
 
 // KeyVersion represents a version of a key with its material
@@ -58,7 +58,7 @@ message KeyVersion {
   string provider_id = 12 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
   // Lifecycle state of the key version
   // @gotags: gorm:"not_null"
-  Status status = 13;
+  KeyStatus2 status = 13;
 }
 
 // Key represents a cryptographic key stored in the database
