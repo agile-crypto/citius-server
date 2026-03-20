@@ -23,10 +23,10 @@ enum Status {
 // KeyVersion represents a version of a key with its material
 message KeyVersion {
   // @gotags: gorm:"primary_key"
-  uint32 id = 1;
+  string public_id = 1 [(buf.validate.field).string = {prefix: "ver_", min_len: 5}];
   // version number
   // @gotags: gorm:"not_null;uniqueIndex:key_version_idx"
-  uint32 version = 2 [(buf.validate.field).string = {prefix: "ver_", min_len: 5}];
+  uint32 version = 2;
   // the public id of the key to which this version belongs
   // @gotags: gorm:"not_null,index;uniqueIndex:key_version_idx"
   string key_id = 3 [(buf.validate.field).string = {prefix: "key_", min_len: 5}];
@@ -79,12 +79,9 @@ message Key {
   bytes scope_specification = 7;
   // @gotags: gorm:"not_null"
   string policy_id = 8 [(buf.validate.field).string = {prefix: "pol_", min_len: 5}];
-  // ids of the key's versions
-  // @gotags: gorm:"not_null"
-  repeated uint32 versions_ids = 9;
   // id of the current version of the key
   // @gotags: gorm:"not_null"
-  uint32 current_version_id = 10 [(buf.validate.field).uint32.gte = 1];
+  uint32 current_version = 9 [(buf.validate.field).uint32.gte = 1];
   // Labels associated with the key
-  map<string, string> labels = 11;
+  map<string, string> labels = 10;
 }
