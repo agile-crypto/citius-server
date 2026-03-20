@@ -17,32 +17,22 @@ const (
 // Key is the domain representation of a cryptographic key.
 // It embeds *store.StoredKey and adds validation and copy semantics.
 type Key struct {
-	stored *storepb.StoredKey
+	*storepb.Key
 }
 
 // NewKey wraps a StoredKey in the Key domain type.
 // If stored is nil, NewKey returns a zero-value Key (public_id and name will be empty,
 // so VetForWrite will fail).
-func NewKey(stored *storepb.StoredKey) *Key {
+func NewKey(stored *storepb.Key) *Key {
 	if stored == nil {
-		stored = &storepb.StoredKey{}
+		stored = &storepb.Key{}
 	}
-	return &Key{stored: stored}
+	return &Key{Key: stored}
 }
-
-// StoredKey returns the embedded proto for direct field access.
-// Callers should use Clone() before mutating.
-func (k *Key) StoredKey() *storepb.StoredKey { return k.stored }
-
-func (k *Key) PublicID() string { return k.stored.GetPublicId() }
-
-func (k *Key) Name() string { return k.stored.GetName() }
-
-func (k *Key) TemplateID() string { return k.stored.GetTemplateId() }
 
 // Clone returns a deep copy of the Key.
 func (k *Key) Clone() *Key {
-	return &Key{stored: proto.Clone(k.stored).(*storepb.StoredKey)}
+	return &Key{Key: proto.Clone(k.Key).(*storepb.Key)}
 }
 
 // VetForWrite validates the Key for the given storage operation.
@@ -51,20 +41,23 @@ func (k *Key) VetForWrite(ctx context.Context, op core.WriteOp) error {
 	const opCreate = opKeyVet
 	switch op {
 	case core.OpCreate:
-		if k.stored.GetPublicId() == "" {
+		if k.GetPublicId() == "" {
 			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "public_id is required")
 		}
-		if k.stored.GetName() == "" {
+		if k.GetName() == "" {
 			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "name is required")
 		}
-		if k.stored.GetTemplateId() == "" {
-			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "template_id is required")
+		if k.GetPrimitive() == "" {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "primitive is required")
+		}
+		if k.ScopeSpecification == nil {
+			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "scope_specification is required")
 		}
 	case core.OpUpdate:
-		if k.stored.GetPublicId() == "" {
+		if k.GetPublicId() == "" {
 			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "public_id is required for update")
 		}
-		if k.stored.GetName() == "" {
+		if k.GetName() == "" {
 			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "name is required for update")
 		}
 	}
@@ -76,8 +69,8 @@ func (k *Key) VetForWrite(ctx context.Context, op core.WriteOp) error {
 // CanRotate returns an error if the key cannot be rotated in its current state.
 // A key can only be rotated when it is ACTIVE.
 func (k *Key) CanRotate() error {
-	if k.stored.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
-		return fmt.Errorf("cannot rotate key in status %s: only ACTIVE keys can be rotated", k.stored.GetStatus())
+	if k.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
+		return fmt.Errorf("cannot rotate key in status %s: only ACTIVE keys can be rotated", k.GetStatus())
 	}
 	return nil
 }
@@ -85,8 +78,8 @@ func (k *Key) CanRotate() error {
 // CanPerformCrypto returns an error if the key cannot be used for cryptographic
 // operations in its current lifecycle state. Only ACTIVE keys can encrypt/sign.
 func (k *Key) CanPerformCrypto() error {
-	if k.stored.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
-		return fmt.Errorf("key is in status %s: cryptographic operations require ACTIVE status", k.stored.GetStatus())
+	if k.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
+		return fmt.Errorf("key is in status %s: cryptographic operations require ACTIVE status", k.GetStatus())
 	}
 	return nil
 }
@@ -98,7 +91,7 @@ func (k *Key) CanPerformCrypto() error {
 // Terminal keys (DESTROYED, DESTROYED_COMPROMISED) are already gone.
 func (k *Key) CanDelete() error {
 	if k.IsTerminal() {
-		return fmt.Errorf("key is already in terminal state %s", k.stored.GetStatus())
+		return fmt.Errorf("key is already in terminal state %s", k.GetStatus())
 	}
 	return nil
 }
@@ -131,14 +124,14 @@ var validTransitions = map[storepb.KeyStatus][]storepb.KeyStatus{
 // Returns an error if the transition is not valid per the NIST SP 800-57 state machine.
 // On success, updates the key's status in place.
 func (k *Key) TransitionTo(newStatus storepb.KeyStatus) error {
-	current := k.stored.GetStatus()
+	current := k.GetStatus()
 	allowed, ok := validTransitions[current]
 	if !ok {
 		return fmt.Errorf("unknown current status %s", current)
 	}
 	for _, s := range allowed {
 		if s == newStatus {
-			k.stored.Status = newStatus
+			k.Status = newStatus
 			return nil
 		}
 	}
@@ -147,7 +140,7 @@ func (k *Key) TransitionTo(newStatus storepb.KeyStatus) error {
 
 // IsTerminal returns true if the key is in a terminal state (DESTROYED or DESTROYED_COMPROMISED).
 func (k *Key) IsTerminal() bool {
-	s := k.stored.GetStatus()
+	s := k.GetStatus()
 	return s == storepb.KeyStatus_KEY_STATUS_DESTROYED || s == storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED
 }
 

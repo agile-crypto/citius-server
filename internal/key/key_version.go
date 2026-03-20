@@ -13,38 +13,34 @@ import (
 // It belongs to the Key aggregate: key.Orchestrator creates and reads versions;
 // external callers access material only through KeyOrchestrator.GetKeyWithMaterial.
 type KeyVersion struct {
-	stored *storepb.StoredKeyVersion
+	*storepb.KeyVersion
 }
 
-// NewVersion wraps a StoredKeyVersion.
-func NewVersion(stored *storepb.StoredKeyVersion) *KeyVersion {
+// NewVersion wraps a KeyVersion.
+func NewVersion(stored *storepb.KeyVersion) *KeyVersion {
 	if stored == nil {
-		stored = &storepb.StoredKeyVersion{}
+		stored = &storepb.KeyVersion{}
 	}
-	return &KeyVersion{stored: stored}
+	return &KeyVersion{KeyVersion: stored}
 }
-
-func (v *KeyVersion) StoredKeyVersion() *storepb.StoredKeyVersion { return v.stored }
-
-func (v *KeyVersion) VersionNumber() uint32 { return v.stored.GetVersionNumber() }
 
 // Callers should use Clone() before mutating.
 func (v *KeyVersion) Clone() *KeyVersion {
-	return &KeyVersion{stored: proto.Clone(v.stored).(*storepb.StoredKeyVersion)}
+	return &KeyVersion{KeyVersion: proto.Clone(v.KeyVersion).(*storepb.KeyVersion)}
 }
 
 // VetForWrite validates the KeyVersion for the given storage operation.
 func (v *KeyVersion) VetForWrite(ctx context.Context, op core.WriteOp) error {
 	const opVet errors.Op = "key.(KeyVersion).VetForWrite"
 	if op == core.OpCreate {
-		if v.stored.GetVersionId() == "" {
+		if v.GetPublicId() == "" {
 			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "version_id is required")
 		}
-		if v.stored.GetKeyId() == "" {
+		if v.GetKeyId() == "" {
 			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "key_id is required")
 		}
-		if v.stored.GetProviderName() == "" {
-			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "provider_name is required")
+		if v.GetProviderId() == "" {
+			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "provider_id is required")
 		}
 	}
 	return nil

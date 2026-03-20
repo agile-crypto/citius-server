@@ -11,11 +11,11 @@ import (
 )
 
 func TestKey_VetForWrite_Create_happyPath(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		PublicId:   "key_01HXYZ",
-		Name:       "signing-key",
-		TemplateId: "ecdsa-p256-sha256",
-		Status:     storepb.KeyStatus_KEY_STATUS_ACTIVE,
+	k := key.NewKey(&storepb.Key{
+		PublicId:  "key_01HXYZ",
+		Name:      "signing-key",
+		Primitive: "signature",
+		Status:    storepb.KeyStatus_KEY_STATUS_ACTIVE,
 	})
 	if err := k.VetForWrite(context.Background(), core.OpCreate); err != nil {
 		t.Errorf("VetForWrite(Create): unexpected error: %v", err)
@@ -23,9 +23,9 @@ func TestKey_VetForWrite_Create_happyPath(t *testing.T) {
 }
 
 func TestKey_VetForWrite_Create_missingPublicId(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		Name:       "signing-key",
-		TemplateId: "ecdsa-p256-sha256",
+	k := key.NewKey(&storepb.Key{
+		Name:      "signing-key",
+		Primitive: "signature",
 	})
 	err := k.VetForWrite(context.Background(), core.OpCreate)
 	if err == nil {
@@ -37,9 +37,9 @@ func TestKey_VetForWrite_Create_missingPublicId(t *testing.T) {
 }
 
 func TestKey_VetForWrite_Create_missingName(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		PublicId:   "key_01HXYZ",
-		TemplateId: "ecdsa-p256-sha256",
+	k := key.NewKey(&storepb.Key{
+		PublicId:  "key_01HXYZ",
+		Primitive: "signature",
 	})
 	err := k.VetForWrite(context.Background(), core.OpCreate)
 	if err == nil {
@@ -50,14 +50,14 @@ func TestKey_VetForWrite_Create_missingName(t *testing.T) {
 	}
 }
 
-func TestKey_VetForWrite_Create_missingTemplateId(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
+func TestKey_VetForWrite_Create_missingPrimitive(t *testing.T) {
+	k := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ",
 		Name:     "signing-key",
 	})
 	err := k.VetForWrite(context.Background(), core.OpCreate)
 	if err == nil {
-		t.Fatal("expected error for missing TemplateId")
+		t.Fatal("expected error for missing Primitive")
 	}
 	if !errors.IsInvalidArgument(err) {
 		t.Errorf("expected InvalidArgument error, got %v", err)
@@ -66,7 +66,7 @@ func TestKey_VetForWrite_Create_missingTemplateId(t *testing.T) {
 
 func TestKey_VetForWrite_Update_allowsMissingCreateTime(t *testing.T) {
 	// Update only checks PublicId, Name
-	k := key.NewKey(&storepb.StoredKey{
+	k := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ",
 		Name:     "signing-key",
 	})
@@ -76,7 +76,7 @@ func TestKey_VetForWrite_Update_allowsMissingCreateTime(t *testing.T) {
 }
 
 func TestKey_VetForWrite_Update_missingPublicId(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{Name: "signing-key"})
+	k := key.NewKey(&storepb.Key{Name: "signing-key"})
 	err := k.VetForWrite(context.Background(), core.OpUpdate)
 	if err == nil {
 		t.Fatal("expected error for missing PublicId on Update")
@@ -87,24 +87,24 @@ func TestKey_VetForWrite_Update_missingPublicId(t *testing.T) {
 }
 
 func TestKey_Clone_independent(t *testing.T) {
-	original := key.NewKey(&storepb.StoredKey{
+	original := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ",
 		Name:     "signing-key",
 		Labels:   map[string]string{"env": "prod"},
 	})
 	cloned := original.Clone()
 	// Mutate the clone
-	cloned.StoredKey().Labels["env"] = "dev"
+	cloned.Labels["env"] = "dev"
 	// Original should be unchanged
-	if original.StoredKey().Labels["env"] != "prod" {
+	if original.Labels["env"] != "prod" {
 		t.Error("Clone() did not produce an independent copy — mutations alias the original")
 	}
 }
 
 func TestKey_PublicId_accessor(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{PublicId: "key_01HXYZ"})
-	if k.StoredKey().PublicId != "key_01HXYZ" {
-		t.Errorf("PublicID(): got %q want %q", k.PublicID(), "key_01HXYZ")
+	k := key.NewKey(&storepb.Key{PublicId: "key_01HXYZ"})
+	if k.PublicId != "key_01HXYZ" {
+		t.Errorf("PublicID(): got %q want %q", k.GetPublicId(), "key_01HXYZ")
 	}
 }
 
@@ -114,8 +114,8 @@ var _ core.VetForWriter = (*key.Key)(nil)
 //--- Behavioural Test ---//
 
 func TestKey_CanRotate_active(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		PublicId: "key_01HXYZ", Name: "test", TemplateId: "ecdsa-p256",
+	k := key.NewKey(&storepb.Key{
+		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
 		Status: storepb.KeyStatus_KEY_STATUS_ACTIVE,
 	})
 	if err := k.CanRotate(); err != nil {
@@ -124,8 +124,8 @@ func TestKey_CanRotate_active(t *testing.T) {
 }
 
 func TestKey_CanRotate_suspended(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		PublicId: "key_01HXYZ", Name: "test", TemplateId: "ecdsa-p256",
+	k := key.NewKey(&storepb.Key{
+		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
 		Status: storepb.KeyStatus_KEY_STATUS_SUSPENDED,
 	})
 	if err := k.CanRotate(); err == nil {
@@ -134,8 +134,8 @@ func TestKey_CanRotate_suspended(t *testing.T) {
 }
 
 func TestKey_CanPerformCrypto_active(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		PublicId: "key_01HXYZ", Name: "test", TemplateId: "ecdsa-p256",
+	k := key.NewKey(&storepb.Key{
+		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
 		Status: storepb.KeyStatus_KEY_STATUS_ACTIVE,
 	})
 	if err := k.CanPerformCrypto(); err != nil {
@@ -144,8 +144,8 @@ func TestKey_CanPerformCrypto_active(t *testing.T) {
 }
 
 func TestKey_CanPerformCrypto_destroyed(t *testing.T) {
-	k := key.NewKey(&storepb.StoredKey{
-		PublicId: "key_01HXYZ", Name: "test", TemplateId: "ecdsa-p256",
+	k := key.NewKey(&storepb.Key{
+		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
 		Status: storepb.KeyStatus_KEY_STATUS_DESTROYED,
 	})
 	if err := k.CanPerformCrypto(); err == nil {
@@ -171,15 +171,15 @@ func TestKey_TransitionTo_validTransitions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.from.String()+"→"+tt.to.String(), func(t *testing.T) {
-			k := key.NewKey(&storepb.StoredKey{
-				PublicId: "key_01HXYZ", Name: "test", TemplateId: "t",
+			k := key.NewKey(&storepb.Key{
+				PublicId: "key_01HXYZ", Name: "test", Primitive: "t",
 				Status: tt.from,
 			})
 			if err := k.TransitionTo(tt.to); err != nil {
 				t.Errorf("valid transition %s→%s returned error: %v", tt.from, tt.to, err)
 			}
-			if k.StoredKey().GetStatus() != tt.to {
-				t.Errorf("status not updated: got %v want %v", k.StoredKey().GetStatus(), tt.to)
+			if k.GetStatus() != tt.to {
+				t.Errorf("status not updated: got %v want %v", k.GetStatus(), tt.to)
 			}
 		})
 	}
@@ -198,32 +198,32 @@ func TestKey_TransitionTo_invalidTransitions(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.from.String()+"→"+tt.to.String(), func(t *testing.T) {
-			k := key.NewKey(&storepb.StoredKey{
-				PublicId: "key_01HXYZ", Name: "test", TemplateId: "t",
+			k := key.NewKey(&storepb.Key{
+				PublicId: "key_01HXYZ", Name: "test", Primitive: "t",
 				Status: tt.from,
 			})
 			if err := k.TransitionTo(tt.to); err == nil {
 				t.Errorf("invalid transition %s→%s should return error", tt.from, tt.to)
 			}
 			// Status should NOT have changed
-			if k.StoredKey().GetStatus() != tt.from {
+			if k.GetStatus() != tt.from {
 				t.Errorf("status should remain %v on invalid transition, got %v",
-					tt.from, k.StoredKey().GetStatus())
+					tt.from, k.GetStatus())
 			}
 		})
 	}
 }
 
 func TestKey_IsTerminal(t *testing.T) {
-	destroyed := key.NewKey(&storepb.StoredKey{Status: storepb.KeyStatus_KEY_STATUS_DESTROYED})
+	destroyed := key.NewKey(&storepb.Key{Status: storepb.KeyStatus_KEY_STATUS_DESTROYED})
 	if !destroyed.IsTerminal() {
 		t.Error("DESTROYED key should be terminal")
 	}
-	destroyedCompromised := key.NewKey(&storepb.StoredKey{Status: storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED})
+	destroyedCompromised := key.NewKey(&storepb.Key{Status: storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED})
 	if !destroyedCompromised.IsTerminal() {
 		t.Error("DESTROYED_COMPROMISED key should be terminal")
 	}
-	active := key.NewKey(&storepb.StoredKey{Status: storepb.KeyStatus_KEY_STATUS_ACTIVE})
+	active := key.NewKey(&storepb.Key{Status: storepb.KeyStatus_KEY_STATUS_ACTIVE})
 	if active.IsTerminal() {
 		t.Error("ACTIVE key should not be terminal")
 	}
