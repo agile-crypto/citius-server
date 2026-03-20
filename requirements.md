@@ -45,3 +45,10 @@ go install github.com/favadi/protoc-go-inject-tag@latest
 ```
 protoc-go-inject-tag -input="gen/go/*.pb.go"
 ```
+
+## 3. GORM setup with SQLite
+
+```
+go get -u gorm.io/gorm
+go get -u gorm.io/driver/sqlite
+```
