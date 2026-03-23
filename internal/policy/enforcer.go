@@ -9,20 +9,25 @@ import (
 
 // Enforcer implements policy.Engine.
 // It stores and retrieves policies from the provided Repository, and evaluates
-// operations against those policies.
+// operations against those policies via a pluggable RulesEvaluator strategy.
 type Enforcer struct {
-	store Repository
+	store     Repository
+	evaluator RulesEvaluator
 }
 
-// NewEnforcer creates an Enforcer backed by the given Repository.
-// Returns an error if repo is nil.
-func NewEnforcer(s Repository) (*Enforcer, error) {
+// NewEnforcer creates an Enforcer backed by the given Repository and
+// RulesEvaluator strategy. Both parameters are required.
+func NewEnforcer(s Repository, eval RulesEvaluator) (*Enforcer, error) {
 	const op errors.Op = "policy.NewEnforcer"
 	if s == nil {
 		return nil, errors.New(context.Background(), op, errors.CodeInvalidArgument,
 			"repository must not be nil")
 	}
-	return &Enforcer{store: s}, nil
+	if eval == nil {
+		return nil, errors.New(context.Background(), op, errors.CodeInvalidArgument,
+			"rules evaluator must not be nil")
+	}
+	return &Enforcer{store: s, evaluator: eval}, nil
 }
 
 // ---- Policy CRUD ----

@@ -16,7 +16,7 @@ func setupEnforcer(t *testing.T) *policy.Enforcer {
 	ctx := context.Background()
 	storage := &logical.InmemStorage{}
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
-	enforcer, err := policy.NewEnforcer(policyRepo)
+	enforcer, err := policy.NewEnforcer(policyRepo, policy.NewNoopEvaluator())
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -35,9 +35,19 @@ func makePolicy(publicID, name string) *policy.Policy {
 // ============================================================================
 
 func TestNewEnforcer_nilStorage_returnsError(t *testing.T) {
-	_, err := policy.NewEnforcer(nil)
+	_, err := policy.NewEnforcer(nil, policy.NewNoopEvaluator())
 	if err == nil {
 		t.Fatal("expected error for nil storage")
+	}
+}
+
+func TestNewEnforcer_nilEvaluator_returnsError(t *testing.T) {
+	ctx := context.Background()
+	storage := &logical.InmemStorage{}
+	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	_, err := policy.NewEnforcer(policyRepo, nil)
+	if err == nil {
+		t.Fatal("expected error for nil evaluator")
 	}
 }
 
