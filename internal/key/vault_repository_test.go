@@ -91,6 +91,35 @@ func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
 	}
 }
 
+func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
+	testCases := []struct {
+		name       string
+		keyId      string
+		wantStatus storepb.KeyStatus
+	}{
+		{"default_status", "kc01", storepb.KeyStatus_KEY_STATUS_ACTIVE},
+		{"explicit_active", "kc02", storepb.KeyStatus_KEY_STATUS_ACTIVE},
+		{"explicit_compromised", "kc03", storepb.KeyStatus_KEY_STATUS_COMPROMISED},
+	}
+	r := repoFn()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			ctx := context.Background()
+			km := []byte("fake-key-bytes")
+			err := r.CreateKey(ctx, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{
+				Primitive: core.PrimitiveSignature,
+				Scope:     core.SignatureScopeStandard,
+			}, km, WithInitialVersion(0), WithStatus(tc.wantStatus))
+			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyId, err)
+			v0, err := r.GetCurrentVersion(ctx, tc.keyId)
+			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyId, err)
+			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
+			assert.Equal(tc.wantStatus, v0.GetStatus(), "version should have expected status")
+		})
+	}
+
+}
 func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetKey(context.Background(), "key_doesnotexist")

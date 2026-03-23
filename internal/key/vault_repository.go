@@ -220,13 +220,20 @@ func (r *VaultRepository) CreateKey(ctx context.Context, id string, templateId, 
 		// if no name is provided, default to id
 		opts.withName = id
 	}
+	if opts.withStatus == storepb.KeyStatus_KEY_STATUS_UNSPECIFIED {
+		// default to ACTIVE if status is not provided
+		opts.withStatus = storepb.KeyStatus_KEY_STATUS_ACTIVE
+	}
+	opt0 := func(o *options) {
+		*o = opts
+	}
 	initialVersion := opts.withInitialVersion
 	vid := versionKey(id, initialVersion)
-	v, err := newKeyVersion(ctx, vid, id, templateId, providerId, initialVersion, keyMaterial, opt...)
+	v, err := newKeyVersion(ctx, vid, id, templateId, providerId, initialVersion, keyMaterial, opt0)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	k, err := newKey(ctx, id, policyId, scopeSpec, initialVersion, opt...)
+	k, err := newKey(ctx, id, policyId, scopeSpec, initialVersion, opt0)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
