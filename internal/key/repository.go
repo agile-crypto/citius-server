@@ -2,8 +2,6 @@ package key
 
 import (
 	"context"
-
-	"github.ibm.com/citius/citius-server/internal/core"
 )
 
 // Repository defines the persistence contract for the Key aggregate.
@@ -13,7 +11,8 @@ import (
 // create a KeyVersion without an associated Key (enforced by CreateKey).
 type Repository interface {
 
-	// Creates a key with given id and scope specification, along with its initial version.
+	// Atomically persists a key along with its initial current version in storage. The
+	// version number of the initial version must match the current version of the key.
 	//
 	// Returns CodeAlreadyExists if a key with the same PublicID already exists.
 	//
@@ -25,13 +24,8 @@ type Repository interface {
 	// least one KeyVersion.
 	//
 	// Allowed options:
-	//   - withStatus (optional): initial status of the key and version; if not set, defaults to ACTIVE
-	//   - withWrappingKeyId (optional): if not set, defaults to default storage wrapping key
-	//   - withDigestAlgorthm (optional): if not set, defaults to HMAC-SHA256
-	//   - withName (optional): name of the key; if not set, defaults to id
-	//   - withInitialVersion (optional): version number of the initial version; if not set, defaults to 1
-	//   - withVetForWrite (optional): if true, repository should perform vet-for-write checks on the key and version; defaults to true
-	CreateKey(ctx context.Context, id string, templateId, providerId, policyId string, scopeSpecification *core.ScopeSpec, keyMaterial []byte, opt ...Option) error
+	//   - withVetForWrite (optional): defaults to true
+	CreateKey(ctx context.Context, key *Key, initialVersion *KeyVersion, opt ...Option) error
 
 	// ── Key metadata reads ──
 
@@ -52,11 +46,10 @@ type Repository interface {
 	DeleteKey(ctx context.Context, id string) error
 
 	// ── Version operations (parent Key must exist) ──
-	// Creates and stores a new version for the key with given keyId. The current
-	// version of the key is updated to the new version. The version number of the
-	// new version is automatically assigned as the parent Key's previous current
-	// version + 1. By default, key versions have an Active status and previous
-	// versions' status are not modified.
+	// Stores a key version. The parent key must already exist. By default,
+	// this current version will be set to be the new current version of the parent
+	// key. The version number must be exactly 1 greater than the current
+	// version of the parent key.
 	//
 	// Only the key orchestrator calls these. External access to key material
 	// goes through KeyOrchestrator.GetKeyWithMaterial(), which enforces
@@ -73,11 +66,8 @@ type Repository interface {
 	// the version number and updating atomically.
 	//
 	// Allowed options:
-	//   - withPublicId (optional): if not set, generated
-	//   - withStatus (optional): if not set, defaults to ACTIVE
-	//   - withWrappingKeyId (optional): if not set, defaults to default storage wrapping key
-	//   - withDigestAlgorthm (optional): if not set, defaults to HMAC-SHA256
-	AddVersion(ctx context.Context, keyId string, templateId, providerId string, keyMaterial []byte, opt ...Option) error
+	//   - withVetForWrite (optional): defaults to true
+	AddVersion(ctx context.Context, version *KeyVersion, opt ...Option) error
 
 	// GetVersion retrieves a specific version of a key by version number.
 	GetVersion(ctx context.Context, keyId string, versionNum uint32) (*KeyVersion, error)

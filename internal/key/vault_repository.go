@@ -212,40 +212,31 @@ func (r *VaultRepository) deleteKeyVersion(ctx context.Context, keyId string, ve
 	return r.keyVersions.Delete(ctx, versionKey(keyId, version))
 }
 
-func (r *VaultRepository) CreateKey(ctx context.Context, id string, templateId, providerId, policyId string,
-	scopeSpec *core.ScopeSpec, keyMaterial []byte, opt ...Option) error {
+func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersion *KeyVersion, opt ...Option) error {
 	const op errors.Op = "key.(VaultRepository).CreateKey"
+	if key == nil {
+		return errors.New(ctx, op, errors.CodeInvalidArgument, "key must not be nil")
+	}
+	if initialVersion == nil {
+		return errors.New(ctx, op, errors.CodeInvalidArgument, "initialVersion must not be nil")
+	}
+	if key.PublicId != initialVersion.KeyId {
+		return errors.New(ctx, op, errors.CodeInvalidArgument, "key PublicId and initialVersion KeyId must match")
+	}
 	opts := getOpts(opt...)
-	if opts.withName == "" {
-		// if no name is provided, default to id
-		opts.withName = id
-	}
-	if opts.withStatus == storepb.KeyStatus_KEY_STATUS_UNSPECIFIED {
-		// default to ACTIVE if status is not provided
-		opts.withStatus = storepb.KeyStatus_KEY_STATUS_ACTIVE
-	}
-	opt0 := func(o *options) {
-		*o = opts
-	}
-	initialVersion := opts.withInitialVersion
-	vid := versionKey(id, initialVersion)
-	v, err := newKeyVersion(ctx, vid, id, templateId, providerId, initialVersion, keyMaterial, opt0)
-	if err != nil {
-		return errors.Wrap(ctx, op, err)
-	}
-	k, err := newKey(ctx, id, policyId, scopeSpec, initialVersion, opt0)
-	if err != nil {
-		return errors.Wrap(ctx, op, err)
+	if initialVersion.Version != opts.withInitialVersion {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			fmt.Sprintf("invalid initial version number (expected: %d, got: %d)", opts.withInitialVersion, initialVersion.Version))
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.putKey(ctx, k, opts.withVetForWrite); err != nil {
+	if err := r.putKey(ctx, key, opts.withVetForWrite); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	if err := r.putKeyVersion(ctx, v, opts.withVetForWrite); err != nil {
-		_ = r.deleteKey(ctx, id) // best effort cleanup
+	if err := r.putKeyVersion(ctx, initialVersion, opts.withVetForWrite); err != nil {
+		_ = r.deleteKey(ctx, key.PublicId) // best effort cleanup
 		return errors.Wrap(ctx, op, err)
 	}
 
@@ -345,9 +336,9 @@ func (r *VaultRepository) DeleteKey(ctx context.Context, id string) error {
 // ── Version operations ──
 
 // fails if the version number does not match the current version + 1, or if the parent key does not exist
-func (r *VaultRepository) AddVersion(ctx context.Context, keyId string, templateId, providerId string, keyMaterial []byte, opt ...Option) error {
+func (r *VaultRepository) AddVersion(ctx context.Context, version *KeyVersion, opt ...Option) error {
 	const op errors.Op = "key.(VaultRepository).AddVersion"
-	if keyId == "" {
+	if version.KeyId == "" {
 		return errors.New(ctx, op, errors.CodeInvalidArgument,
 			"keyId is required")
 	}
@@ -356,28 +347,25 @@ func (r *VaultRepository) AddVersion(ctx context.Context, keyId string, template
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	k, err := r.getKey(ctx, keyId)
+	k, err := r.getKey(ctx, version.KeyId)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	newVersionNumber := k.CurrentVersion + 1
-	if opts.withPublicId == "" {
-		opts.withPublicId = versionKey(keyId, newVersionNumber)
+	if version.Version != k.CurrentVersion+1 {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			fmt.Sprintf("invalid next version number (expected: %d, got: %d)", k.CurrentVersion+1, version.Version))
 	}
-	v, err := newKeyVersion(ctx, opts.withPublicId, keyId, templateId, providerId, newVersionNumber, keyMaterial, opt...)
-	if err != nil {
-		return errors.Wrap(ctx, op, err)
-	}
-	newKey := k.Clone()
-	newKey.CurrentVersion = newVersionNumber
 
-	err = r.putKeyVersion(ctx, v, opts.withVetForWrite)
+	newKey := k.Clone()
+	newKey.CurrentVersion += 1
+
+	err = r.putKeyVersion(ctx, version, opts.withVetForWrite)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	err = r.updateKey(ctx, newKey, opts.withVetForWrite)
 	if err != nil {
-		r.deleteKeyVersion(ctx, keyId, newVersionNumber)
+		r.deleteKeyVersion(ctx, version.KeyId, version.Version)
 		return errors.Wrap(ctx, op, err)
 	}
 
