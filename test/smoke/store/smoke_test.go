@@ -21,18 +21,18 @@ func validator(t *testing.T) protovalidate.Validator {
 	return v
 }
 
-func TestStoredKey_roundtrip(t *testing.T) {
-	orig := &storepb.StoredKey{
-		PublicId:   "key_01HXYZ",
-		Name:       "my-signing-key",
-		TemplateId: "ecdsa-p256-sha256",
-		Status:     storepb.KeyStatus_KEY_STATUS_ACTIVE,
+func TestKey_roundtrip(t *testing.T) {
+	orig := &storepb.Key{
+		PublicId:           "key_01HXYZ",
+		Name:               "my-signing-key",
+		ScopeSpecification: []byte("scope-spec"),
+		Status:             storepb.KeyStatus_KEY_STATUS_ACTIVE,
 	}
 	b, err := proto.Marshal(orig)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	got := new(storepb.StoredKey)
+	got := new(storepb.Key)
 	if err := proto.Unmarshal(b, got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -47,37 +47,37 @@ func TestStoredKey_roundtrip(t *testing.T) {
 	}
 }
 
-func TestStoredKeyVersion_fourFields(t *testing.T) {
+func TestKeyVersion_fourFields(t *testing.T) {
 	// Verify all four fields of the version pattern exist and can be set.
 	// Only one of plaintext_material / ciphertext_material should be populated at a time.
-	v := &storepb.StoredKeyVersion{
-		VersionId:          "ver_01HXYZ",
-		KeyId:              "key_01HXYZ",
-		PlaintextMaterial:  []byte("secret"),
-		CiphertextMaterial: nil,
-		Hmac:               []byte("mac"),
-		WrappingKeyId:      "",
-		ProviderName:       "software",
+	v := &storepb.KeyVersion{
+		PublicId:      "ver_01HXYZ",
+		KeyId:         "key_01HXYZ",
+		KeyMaterial:   []byte("secret"),
+		CtKeyMaterial: nil,
+		Digest:        []byte("mac"),
+		WrappingKeyId: "",
+		ProviderId:    "software",
 	}
-	if len(v.PlaintextMaterial) == 0 {
+	if len(v.KeyMaterial) == 0 {
 		t.Error("expected plaintext_material to be set")
 	}
-	if len(v.Hmac) == 0 {
-		t.Error("expected hmac to be set")
+	if len(v.Digest) == 0 {
+		t.Error("expected Digest to be set")
 	}
 }
 
-func TestStoredKeyVersion_fourFields_ciphertext(t *testing.T) {
+func TestKeyVersion_fourFields_ciphertext(t *testing.T) {
 	// Verify the ciphertext variant works — material is wrapped by a KEK.
-	v := &storepb.StoredKeyVersion{
-		VersionId:          "ver_01HABC",
-		KeyId:              "key_01HABC",
-		PlaintextMaterial:  nil,
-		CiphertextMaterial: []byte("encrypted-secret"),
-		Hmac:               []byte("mac"),
-		WrappingKeyId:      "key_01HWRAP",
+	v := &storepb.KeyVersion{
+		PublicId:      "ver_01HABC",
+		KeyId:         "key_01HABC",
+		KeyMaterial:   nil,
+		CtKeyMaterial: []byte("encrypted-secret"),
+		Digest:        []byte("mac"),
+		WrappingKeyId: "key_01HWRAP",
 	}
-	if len(v.CiphertextMaterial) == 0 {
+	if len(v.CtKeyMaterial) == 0 {
 		t.Error("expected ciphertext_material to be set")
 	}
 	if v.WrappingKeyId == "" {
@@ -156,16 +156,16 @@ func TestStoredSession_roundtrip(t *testing.T) {
 	}
 }
 
-func TestStoredKey_noMaterialFields(t *testing.T) {
-	// StoredKey must NOT have any key material fields — material lives in StoredKeyVersion only.
+func TestKey_noMaterialFields(t *testing.T) {
+	// Key must NOT have any key material fields — material lives in KeyVersion only.
 	// This test documents the design constraint via compile-time field access.
-	k := &storepb.StoredKey{
+	k := &storepb.Key{
 		PublicId: "key_01HXYZ",
 	}
-	// If this compiles, StoredKey has no material fields (they would fail to compile if present).
+	// If this compiles, Key has no material fields (they would fail to compile if present).
 	_ = k.PublicId
 	_ = k.Name
-	_ = k.TemplateId
+	_ = k.ScopeSpecification
 	_ = k.PolicyId
 	_ = k.Status
 	_ = k.CurrentVersion
@@ -190,139 +190,129 @@ func TestAllEnums_unspecifiedIsZero(t *testing.T) {
 // Validation tests — buf validate prefix and length constraints
 // ============================================================================
 
-func TestStoredKey_validate_valid(t *testing.T) {
+func TestKey_validate_valid(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "my-key",
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err != nil {
-		t.Errorf("expected valid StoredKey to pass validation: %v", err)
+		t.Errorf("expected valid Key to pass validation: %v", err)
 	}
 }
 
-func TestStoredKey_validate_wrongPrefix(t *testing.T) {
+func TestKey_validate_wrongPrefix(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "pol_01HXYZ12345678901234567890", // wrong prefix
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "pol_01HXYZ12345678901234567890", // wrong prefix
+		Name:           "my-key",
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Error("expected validation error for public_id with wrong prefix (pol_ instead of key_)")
 	}
 }
 
-func TestStoredKey_validate_emptyID(t *testing.T) {
+func TestKey_validate_emptyID(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "", // empty — violates min_len
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "", // empty — violates min_len
+		Name:           "my-key",
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Error("expected validation error for empty public_id")
 	}
 }
 
-func TestStoredKey_validate_emptyName(t *testing.T) {
+func TestKey_validate_emptyName(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "", // empty — violates min_len
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "", // empty — violates min_len
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Error("expected validation error for empty name")
 	}
 }
 
-func TestStoredKey_validate_policyID_not_valid_when_empty(t *testing.T) {
+func TestKey_validate_policyID_not_valid_when_empty(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "", // empty or with wrong prefix is not OK
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "my-key",
+		PolicyId:       "", // empty or with wrong prefix is not OK
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Errorf("empty policy_id not allowed: %v", err)
 	}
 }
 
-func TestStoredKey_validate_policyID_wrong_prefix(t *testing.T) {
+func TestKey_validate_policyID_wrong_prefix(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "key_01HABC12345678901234567890", // set but wrong prefix (key_ not pol_)
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "my-key",
+		PolicyId:       "key_01HABC12345678901234567890", // set but wrong prefix (key_ not pol_)
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Error("expected validation error for policy_id with wrong prefix (key_ instead of pol_)")
 	}
 }
 
-func TestStoredKey_validate_providerInstanceID_not_valid_when_empty(t *testing.T) {
+func TestKey_validate_providerInstanceID_not_valid_when_empty(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "", // empty or with wrong prefix is not OK
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "my-key",
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Errorf("empty provider_instance_id not allowed: %v", err)
 	}
 }
 
-func TestStoredKey_validate_providerInstanceID_wrong_prefix(t *testing.T) {
+func TestKey_validate_providerInstanceID_wrong_prefix(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "pol_01HABC12345678901234567890", // set but wrong prefix (pol_ not prv_)
-		CurrentVersion:     1,
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "my-key",
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 1,
 	}
 	if err := v.Validate(k); err == nil {
 		t.Error("expected validation error for provider_instance_id with wrong prefix (pol_ instead of prv_)")
 	}
 }
 
-func TestStoredKey_validate_currentVersion_zero(t *testing.T) {
+func TestKey_validate_currentVersion_zero(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
-		CurrentVersion:     0, // violates gte: 1
+	k := &storepb.Key{
+		PublicId:       "key_01HXYZ12345678901234567890",
+		Name:           "my-key",
+		PolicyId:       "pol_01HXYZ12345678901234567890",
+		CurrentVersion: 0, // violates gte: 1
 	}
 	if err := v.Validate(k); err == nil {
 		t.Error("expected validation error for current_version = 0 (must be >= 1)")
 	}
 }
 
-func TestStoredKey_validate_currentVersion_empty(t *testing.T) {
+func TestKey_validate_currentVersion_empty(t *testing.T) {
 	v := validator(t)
-	k := &storepb.StoredKey{
-		PublicId:           "key_01HXYZ12345678901234567890",
-		Name:               "my-key",
-		PolicyId:           "pol_01HXYZ12345678901234567890",
-		ProviderInstanceId: "prv_01HXYZ12345678901234567890",
+	k := &storepb.Key{
+		PublicId: "key_01HXYZ12345678901234567890",
+		Name:     "my-key",
+		PolicyId: "pol_01HXYZ12345678901234567890",
 		// CurrentVersion is zero value (0) which violates gte: 1
 	}
 	if err := v.Validate(k); err == nil {
@@ -330,73 +320,73 @@ func TestStoredKey_validate_currentVersion_empty(t *testing.T) {
 	}
 }
 
-func TestStoredKeyVersion_validate_valid(t *testing.T) {
+func TestKeyVersion_validate_valid(t *testing.T) {
 	v := validator(t)
-	kv := &storepb.StoredKeyVersion{
-		VersionId:     "ver_01HXYZ12345678901234567890",
-		KeyId:         "key_01HXYZ12345678901234567890",
-		VersionNumber: 1,
-		Hmac:          []byte("mac"),
+	kv := &storepb.KeyVersion{
+		PublicId: "ver_01HXYZ12345678901234567890",
+		KeyId:    "key_01HXYZ12345678901234567890",
+		Version:  1,
+		Digest:   []byte("mac"),
 	}
 	if err := v.Validate(kv); err != nil {
-		t.Errorf("expected valid StoredKeyVersion to pass: %v", err)
+		t.Errorf("expected valid KeyVersion to pass: %v", err)
 	}
 }
 
-func TestStoredKeyVersion_validate_wrongVersionPrefix(t *testing.T) {
+func TestKeyVersion_validate_wrongVersionPrefix(t *testing.T) {
 	v := validator(t)
-	kv := &storepb.StoredKeyVersion{
-		VersionId:     "key_01HXYZ12345678901234567890", // wrong prefix
-		KeyId:         "key_01HXYZ12345678901234567890",
-		VersionNumber: 1,
+	kv := &storepb.KeyVersion{
+		PublicId: "key_01HXYZ12345678901234567890", // wrong prefix
+		KeyId:    "key_01HXYZ12345678901234567890",
+		Version:  1,
 	}
 	if err := v.Validate(kv); err == nil {
 		t.Error("expected validation error for version_id with wrong prefix (key_ instead of ver_)")
 	}
 }
 
-func TestStoredKeyVersion_validate_wrongKeyIDPrefix(t *testing.T) {
+func TestKeyVersion_validate_wrongKeyIDPrefix(t *testing.T) {
 	v := validator(t)
-	kv := &storepb.StoredKeyVersion{
-		VersionId:     "ver_01HXYZ12345678901234567890",
-		KeyId:         "ver_01HXYZ12345678901234567890", // wrong prefix
-		VersionNumber: 1,
+	kv := &storepb.KeyVersion{
+		PublicId: "ver_01HXYZ12345678901234567890",
+		KeyId:    "ver_01HXYZ12345678901234567890", // wrong prefix
+		Version:  1,
 	}
 	if err := v.Validate(kv); err == nil {
 		t.Error("expected validation error for key_id with wrong prefix (ver_ instead of key_)")
 	}
 }
 
-func TestStoredKeyVersion_validate_versionNumberZero(t *testing.T) {
+func TestKeyVersion_validate_VersionZero(t *testing.T) {
 	v := validator(t)
-	kv := &storepb.StoredKeyVersion{
-		VersionId:     "ver_01HXYZ12345678901234567890",
-		KeyId:         "key_01HXYZ12345678901234567890",
-		VersionNumber: 0, // violates gte: 1
+	kv := &storepb.KeyVersion{
+		PublicId: "ver_01HXYZ12345678901234567890",
+		KeyId:    "key_01HXYZ12345678901234567890",
+		Version:  0, // violates gte: 1
 	}
 	if err := v.Validate(kv); err == nil {
 		t.Error("expected validation error for version_number = 0 (must be >= 1)")
 	}
 }
 
-func TestStoredKeyVersion_validate_versionNumber_empty(t *testing.T) {
+func TestKeyVersion_validate_Version_empty(t *testing.T) {
 	v := validator(t)
-	kv := &storepb.StoredKeyVersion{
-		VersionId: "ver_01HXYZ12345678901234567890",
-		KeyId:     "key_01HXYZ12345678901234567890",
-		// VersionNumber is zero value (0) which violates gte: 1
+	kv := &storepb.KeyVersion{
+		PublicId: "ver_01HXYZ12345678901234567890",
+		KeyId:    "key_01HXYZ12345678901234567890",
+		// Version is zero value (0) which violates gte: 1
 	}
 	if err := v.Validate(kv); err == nil {
 		t.Error("expected validation error for empty version_number (zero value violates gte: 1)")
 	}
 }
 
-func TestStoredKeyVersion_validate_wrappingKeyID_wrongPrefix(t *testing.T) {
+func TestKeyVersion_validate_wrappingKeyID_wrongPrefix(t *testing.T) {
 	v := validator(t)
-	kv := &storepb.StoredKeyVersion{
-		VersionId:     "ver_01HXYZ12345678901234567890",
+	kv := &storepb.KeyVersion{
+		PublicId:      "ver_01HXYZ12345678901234567890",
 		KeyId:         "key_01HXYZ12345678901234567890",
-		VersionNumber: 1,
+		Version:       1,
 		WrappingKeyId: "ses_01HABC12345678901234567890", // wrong prefix for a key reference
 	}
 	if err := v.Validate(kv); err == nil {
