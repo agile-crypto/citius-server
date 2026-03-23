@@ -1,0 +1,981 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Post-quantum signatures. CycloneDX naming: ml-dsa-{parameterset} or slh-dsa-{hash}-{parameterset}",
+  "templates": {
+    "ml-dsa-44": {
+      "templateId": "ml-dsa-44",
+      "displayName": "ML-DSA-44",
+      "description": "Module-Lattice Digital Signature, NIST Level 2 (128-bit). FIPS 204. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_2",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_2",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.17",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "mlDsa": {
+          "parameterSet": "ML_DSA_44",
+          "hedged": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 204"
+      ]
+    },
+    "ml-dsa-65": {
+      "templateId": "ml-dsa-65",
+      "displayName": "ML-DSA-65",
+      "description": "Module-Lattice Digital Signature, NIST Level 3 (192-bit). FIPS 204. Recommended. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.18",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "mlDsa": {
+          "parameterSet": "ML_DSA_65",
+          "hedged": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 204"
+      ]
+    },
+    "ml-dsa-87": {
+      "templateId": "ml-dsa-87",
+      "displayName": "ML-DSA-87",
+      "description": "Module-Lattice Digital Signature, NIST Level 5 (256-bit). FIPS 204. Highest security. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.19",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "mlDsa": {
+          "parameterSet": "ML_DSA_87",
+          "hedged": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 204"
+      ]
+    },
+    "slh-dsa-sha2-128s": {
+      "templateId": "slh-dsa-sha2-128s",
+      "displayName": "SLH-DSA-SHA2-128s",
+      "description": "Stateless Hash-based DSA, SHA2, 128-bit security, small signatures. FIPS 205. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.20",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "slhDsa": {
+          "hashType": "SLH_DSA_SHA2",
+          "parameterSet": "SLH_DSA_128S"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 205"
+      ]
+    },
+    "slh-dsa-sha2-128f": {
+      "templateId": "slh-dsa-sha2-128f",
+      "displayName": "SLH-DSA-SHA2-128f",
+      "description": "Stateless Hash-based DSA, SHA2, 128-bit security, fast signing. FIPS 205. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.21",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "slhDsa": {
+          "hashType": "SLH_DSA_SHA2",
+          "parameterSet": "SLH_DSA_128F"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 205"
+      ]
+    },
+    "slh-dsa-shake-256s": {
+      "templateId": "slh-dsa-shake-256s",
+      "displayName": "SLH-DSA-SHAKE-256s",
+      "description": "Stateless Hash-based DSA, SHAKE, 256-bit security, small signatures. FIPS 205. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.28",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "slhDsa": {
+          "hashType": "SLH_DSA_SHAKE",
+          "parameterSet": "SLH_DSA_256S"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 205"
+      ]
+    },
+    "_comment_prehashed": "======== PQC PREHASHED SIGNATURE TEMPLATES ========",
+    "_comment_prehashed_desc": "Templates for signing pre-computed digests with PQC algorithms. Use DigestSign/DigestVerify APIs.",
+    "ml-dsa-44-prehashed": {
+      "templateId": "ml-dsa-44-prehashed",
+      "displayName": "ML-DSA-44-Prehashed",
+      "description": "ML-DSA-44 for pre-computed digests. Caller provides digest, service signs directly. FIPS 204. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_2",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_2",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.17",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "mlDsa": {
+          "parameterSet": "ML_DSA_44",
+          "hedged": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 204"
+      ]
+    },
+    "ml-dsa-65-prehashed": {
+      "templateId": "ml-dsa-65-prehashed",
+      "displayName": "ML-DSA-65-Prehashed",
+      "description": "ML-DSA-65 for pre-computed digests. Recommended PQC prehashed signature. FIPS 204. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.18",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "mlDsa": {
+          "parameterSet": "ML_DSA_65",
+          "hedged": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 204"
+      ]
+    },
+    "ml-dsa-87-prehashed": {
+      "templateId": "ml-dsa-87-prehashed",
+      "displayName": "ML-DSA-87-Prehashed",
+      "description": "ML-DSA-87 for pre-computed digests. Highest security PQC prehashed signature. FIPS 204. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.19",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "mlDsa": {
+          "parameterSet": "ML_DSA_87",
+          "hedged": false
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 204"
+      ]
+    },
+    "slh-dsa-sha2-128s-prehashed": {
+      "templateId": "slh-dsa-sha2-128s-prehashed",
+      "displayName": "SLH-DSA-SHA2-128s-Prehashed",
+      "description": "SLH-DSA SHA2-128s for pre-computed digests. Small signatures, moderate speed. FIPS 205. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.20",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "slhDsa": {
+          "hashType": "SLH_DSA_SHA2",
+          "parameterSet": "SLH_DSA_128S"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 205"
+      ]
+    },
+    "slh-dsa-sha2-128f-prehashed": {
+      "templateId": "slh-dsa-sha2-128f-prehashed",
+      "displayName": "SLH-DSA-SHA2-128f-Prehashed",
+      "description": "SLH-DSA SHA2-128f for pre-computed digests. Fast signing, larger signatures. FIPS 205. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_1",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.21",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "slhDsa": {
+          "hashType": "SLH_DSA_SHA2",
+          "parameterSet": "SLH_DSA_128F"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 205"
+      ]
+    },
+    "slh-dsa-shake-256s-prehashed": {
+      "templateId": "slh-dsa-shake-256s-prehashed",
+      "displayName": "SLH-DSA-SHAKE-256s-Prehashed",
+      "description": "SLH-DSA SHAKE-256s for pre-computed digests. Highest security, small signatures. FIPS 205. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.3.28",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "slhDsa": {
+          "hashType": "SLH_DSA_SHAKE",
+          "parameterSet": "SLH_DSA_256S"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 205"
+      ]
+    }
+  }
+}

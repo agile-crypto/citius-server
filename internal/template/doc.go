@@ -2,14 +2,29 @@
 // interface for algorithm template management.
 //
 // Domain type:
-//   - Template is a plain Go struct (no proto embedding, no storage).
-//     Templates are immutable value objects loaded from YAML at startup.
-//     They define which algorithms are available, their security properties,
-//     and scope-based selection criteria.
+//   - Template wraps *api.TemplateInfo — a pragmatic trade-off, NOT the
+//     same DDD pattern as key.Key / policy.Policy / provider.Instance.
+//     Those types wrap storage protos (caas.storage.v1) at the Repository
+//     boundary. Template wraps an API-surface proto (caas.crypto.v1)
+//     because TemplateInfo has 15+ deeply nested algorithm/scope types
+//     that would be costly to replicate as Go structs for zero behavioral
+//     benefit. Templates are immutable reference data loaded from
+//     proto-JSON at startup, never persisted to durable storage.
+//   - Proto() exposes the embedded TemplateInfo (not "StoredTemplate" —
+//     there is no storage proto for templates).
+//   - Proto types do NOT escape beyond this package boundary: all other
+//     packages interact with Template through domain-typed accessors
+//     and core.ScopeSpec.
 //
 // Interface:
 //   - Registry (domain service): Register, Get, List, and Select.
 //     Select picks the best template for a given ScopeSpec, honouring
 //     policy constraints and preferred properties.
+//
+// Proto -> Domain conversion:
+//   - scopeSpecFromProto (unexported) converts *api.ScopeSpecification →
+//     core.ScopeSpec for internal use by Select. This is NOT an
+//     Anti-Corruption Layer — it is a localised conversion that
+//     interprets the template's own proto capabilities in domain terms.
 
 package template

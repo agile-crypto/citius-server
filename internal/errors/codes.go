@@ -61,6 +61,9 @@ func IsKeyNotFound(err error) bool { return hasCode(err, CodeKeyNotFound) }
 // IsPolicyNotFound reports whether err was caused by a missing policy.
 func IsPolicyNotFound(err error) bool { return hasCode(err, CodePolicyNotFound) }
 
+// IsProviderNotFound reports whether err was caused by a missing provider.
+func IsProviderNotFound(err error) bool { return hasCode(err, CodeProviderNotFound) }
+
 // IsPolicyViolation reports whether err was caused by a policy denial.
 func IsPolicyViolation(err error) bool { return hasCode(err, CodePolicyViolation) }
 
