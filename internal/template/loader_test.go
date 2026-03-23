@@ -1,0 +1,174 @@
+package template_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+
+	"github.com/hashicorp/vault/sdk/logical"
+	api "github.ibm.com/citius/citius-server/gen/go/types"
+	"github.ibm.com/citius/citius-server/internal/template"
+)
+
+// catalogPath returns the absolute path to the standard_algorithms.json catalog.
+func catalogPath() string {
+	_, currentFile, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(currentFile), "..", "..", "proto", "standard_algorithms.json")
+}
+
+// readCatalog reads the standard_algorithms.json file for test helpers.
+func readCatalog(t *testing.T) []byte {
+	t.Helper()
+	data, err := os.ReadFile(catalogPath())
+	if err != nil {
+		t.Fatalf("read catalog: %v", err)
+	}
+	return data
+}
+
+// newTestRegistry creates a VaultRegistry backed by in-memory storage for tests.
+func newTestRegistry(t *testing.T) template.Registry {
+	t.Helper()
+	r, err := template.NewVaultRegistry(context.Background(), &logical.InmemStorage{})
+	if err != nil {
+		t.Fatalf("NewVaultRegistry: %v", err)
+	}
+	return r
+}
+
+func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
+	r := newTestRegistry(t)
+	err := template.LoadStandardCatalog(catalogPath(), r)
+	if err != nil {
+		t.Fatalf("LoadStandardCatalog: %v", err)
+	}
+
+	ctx := context.Background()
+
+	// ── Verify ecdsa-p256-sha256-der loaded correctly ──
+	ecdsa, err := r.Get(ctx, "ecdsa-p256-sha256-der")
+	if err != nil {
+		t.Fatalf("Get ecdsa: %v", err)
+	}
+	if ecdsa.GetStatus() != api.TemplateStatus_TEMPLATE_STATUS_ACTIVE {
+		t.Errorf("ecdsa: expected TEMPLATE_STATUS_ACTIVE, got %v", ecdsa.GetStatus())
+	}
+	ecdsaAlg := ecdsa.GetAlgorithm().GetEcdsa()
+	if ecdsaAlg == nil {
+		t.Fatal("ecdsa-p256-sha256-der: expected ECDSA AlgorithmDetails")
+	}
+	if ecdsaAlg.GetCurve() != api.EllipticCurve_ELLIPTIC_CURVE_P256 {
+		t.Errorf("ecdsa curve: got %v want ELLIPTIC_CURVE_P256", ecdsaAlg.GetCurve())
+	}
+	if ecdsaAlg.GetHash() != api.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+		t.Errorf("ecdsa hash: got %v want HASH_ALGORITHM_SHA256", ecdsaAlg.GetHash())
+	}
+	// Verify scope: signature/standard
+	ecdsaScopes := ecdsa.GetScopedCapabilities()
+	if len(ecdsaScopes) == 0 {
+		t.Fatal("ecdsa: expected at least one scoped capability")
+	}
+	sigScope := ecdsaScopes[0].GetScope().GetSignature()
+	if sigScope == nil {
+		t.Fatal("ecdsa: expected signature scope specification")
+	}
+	if sigScope.GetScope() != api.SignatureScope_SIGNATURE_SCOPE_STANDARD {
+		t.Errorf("ecdsa scope: got %v want SIGNATURE_SCOPE_STANDARD", sigScope.GetScope())
+	}
+	// Verify security: fips_approved=true (inside scope security)
+	ecdsaSec := sigScope.GetSecurity()
+	if ecdsaSec == nil {
+		t.Fatal("ecdsa: expected UniversalSecurityProperties in scope")
+	}
+	if ecdsaSec.FipsApproved == nil || !*ecdsaSec.FipsApproved {
+		t.Error("ecdsa: expected fips_approved=true in scope security")
+	}
+
+	// ── Verify ml-dsa-65 loaded correctly ──
+	mldsa, err := r.Get(ctx, "ml-dsa-65")
+	if err != nil {
+		t.Fatalf("Get mldsa: %v", err)
+	}
+	mldsaAlg := mldsa.GetAlgorithm().GetMlDsa()
+	if mldsaAlg == nil {
+		t.Fatal("ml-dsa-65: expected ML-DSA AlgorithmDetails")
+	}
+	if mldsaAlg.GetParameterSet() != api.MlDsaParameterSet_ML_DSA_65 {
+		t.Errorf("mldsa parameter_set: got %v want ML_DSA_65", mldsaAlg.GetParameterSet())
+	}
+	// Verify scope: signature/standard
+	mldsaScopes := mldsa.GetScopedCapabilities()
+	if len(mldsaScopes) == 0 {
+		t.Fatal("ml-dsa-65: expected at least one scoped capability")
+	}
+	mldsaSigScope := mldsaScopes[0].GetScope().GetSignature()
+	if mldsaSigScope == nil {
+		t.Fatal("ml-dsa-65: expected signature scope specification")
+	}
+	if mldsaSigScope.GetScope() != api.SignatureScope_SIGNATURE_SCOPE_STANDARD {
+		t.Errorf("ml-dsa-65 scope: got %v want SIGNATURE_SCOPE_STANDARD", mldsaSigScope.GetScope())
+	}
+	// Verify security: quantum_safe=true AND fips_approved=true
+	mldsaSec := mldsaSigScope.GetSecurity()
+	if mldsaSec == nil {
+		t.Fatal("ml-dsa-65: expected UniversalSecurityProperties in scope")
+	}
+	if mldsaSec.QuantumSafe == nil || !*mldsaSec.QuantumSafe {
+		t.Error("ml-dsa-65: expected quantum_safe=true in scope security")
+	}
+	if mldsaSec.FipsApproved == nil || !*mldsaSec.FipsApproved {
+		t.Error("ml-dsa-65: expected fips_approved=true in scope security")
+	}
+}
+
+func TestLoadStandardCatalog_loadsAllTemplates(t *testing.T) {
+	r := newTestRegistry(t)
+	err := template.LoadStandardCatalog(catalogPath(), r)
+	if err != nil {
+		t.Fatalf("LoadStandardCatalog: %v", err)
+	}
+
+	templates := r.List(context.Background())
+	if len(templates) == 0 {
+		t.Fatal("expected at least 1 template from standard catalog")
+	}
+	t.Logf("loaded %d templates from standard catalog", len(templates))
+}
+
+func TestLoadStandardCatalog_fileNotFound(t *testing.T) {
+	r := newTestRegistry(t)
+	err := template.LoadStandardCatalog("/nonexistent/path/catalog.json", r)
+	if err == nil {
+		t.Fatal("expected error for missing file")
+	}
+}
+
+func TestParseStandardCatalog_invalidJSON(t *testing.T) {
+	_, err := template.ParseStandardCatalog([]byte(`{invalid json`))
+	if err == nil {
+		t.Fatal("expected error for invalid JSON")
+	}
+}
+
+func TestParseStandardCatalog_emptyCatalog(t *testing.T) {
+	catalog, err := template.ParseStandardCatalog([]byte(`{}`))
+	if err != nil {
+		t.Fatalf("ParseStandardCatalog empty: %v", err)
+	}
+	if len(catalog.GetTemplates()) != 0 {
+		t.Errorf("expected 0 templates from empty catalog, got %d", len(catalog.GetTemplates()))
+	}
+}
+
+func TestParseStandardCatalog_hasVersion(t *testing.T) {
+	catalog, err := template.ParseStandardCatalog(readCatalog(t))
+	if err != nil {
+		t.Fatalf("ParseStandardCatalog: %v", err)
+	}
+	if catalog.GetVersion() == "" {
+		t.Error("expected non-empty catalog version")
+	}
+	t.Logf("catalog version: %s", catalog.GetVersion())
+}

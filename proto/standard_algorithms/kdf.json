@@ -1,0 +1,326 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Key Derivation Functions. CycloneDX naming: {algorithm}-{hash}-{outputlen} or {algorithm}-{variant}-{memory}-{iterations}-{parallelism}",
+  "templates": {
+    "hkdf-sha256-32": {
+      "templateId": "hkdf-sha256-32",
+      "displayName": "HKDF-SHA256-32",
+      "description": "HKDF using SHA-256, 32-byte (256-bit) output. Recommended for key expansion.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_EXTRACT_EXPAND",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "memoryHard": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "hkdf": {
+          "hash": "HASH_ALGORITHM_SHA256",
+          "extract": true,
+          "expand": true,
+          "outputLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 5869",
+        "NIST SP 800-56C"
+      ]
+    },
+    "hkdf-sha384-48": {
+      "templateId": "hkdf-sha384-48",
+      "displayName": "HKDF-SHA384-48",
+      "description": "HKDF using SHA-384, 48-byte (384-bit) output. Higher security level.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_EXTRACT_EXPAND",
+              "security": {
+                "securityStrengthBits": 384,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "memoryHard": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "hkdf": {
+          "hash": "HASH_ALGORITHM_SHA384",
+          "extract": true,
+          "expand": true,
+          "outputLength": 48
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 5869",
+        "NIST SP 800-56C"
+      ]
+    },
+    "hkdf-sha512-64": {
+      "templateId": "hkdf-sha512-64",
+      "displayName": "HKDF-SHA512-64",
+      "description": "HKDF using SHA-512, 64-byte (512-bit) output. Maximum security level.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_EXTRACT_EXPAND",
+              "security": {
+                "securityStrengthBits": 512,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "memoryHard": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "hkdf": {
+          "hash": "HASH_ALGORITHM_SHA512",
+          "extract": true,
+          "expand": true,
+          "outputLength": 64
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 5869",
+        "NIST SP 800-56C"
+      ]
+    },
+    "pbkdf2-sha256-600000-32": {
+      "templateId": "pbkdf2-sha256-600000-32",
+      "displayName": "PBKDF2-SHA256-600K",
+      "description": "PBKDF2 using SHA-256, 600,000 iterations, 32-byte output. OWASP 2023 recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_PASSWORD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "memoryHard": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.5.12",
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "pbkdf2": {
+          "hash": "HASH_ALGORITHM_SHA256",
+          "iterations": 600000,
+          "saltSizeBytes": 16,
+          "outputLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8018",
+        "NIST SP 800-132"
+      ]
+    },
+    "pbkdf2-sha512-210000-64": {
+      "templateId": "pbkdf2-sha512-210000-64",
+      "displayName": "PBKDF2-SHA512-210K",
+      "description": "PBKDF2 using SHA-512, 210,000 iterations, 64-byte output. OWASP 2023 recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_PASSWORD",
+              "security": {
+                "securityStrengthBits": 512,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "memoryHard": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.5.12",
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "pbkdf2": {
+          "hash": "HASH_ALGORITHM_SHA512",
+          "iterations": 210000,
+          "saltSizeBytes": 16,
+          "outputLength": 64
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8018",
+        "NIST SP 800-132"
+      ]
+    },
+    "argon2id-65536-3-4": {
+      "templateId": "argon2id-65536-3-4",
+      "displayName": "Argon2id-64M-3-4",
+      "description": "Argon2id with 64 MiB memory, 3 iterations, 4 parallelism. OWASP recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_PASSWORD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "memoryHard": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "argon2": {
+          "variant": "ARGON2_VARIANT_ID",
+          "version": 19,
+          "memoryKib": 65536,
+          "iterations": 3,
+          "parallelism": 4,
+          "saltSizeBytes": 16,
+          "outputLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 9106"
+      ]
+    },
+    "argon2i-65536-4-4": {
+      "templateId": "argon2i-65536-4-4",
+      "displayName": "Argon2i-64M-4-4",
+      "description": "Argon2i (side-channel resistant) with 64 MiB memory, 4 iterations, 4 parallelism.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kdf": {
+              "scope": "KDF_SCOPE_PASSWORD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "memoryHard": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DERIVE_KEY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_KDF",
+        "argon2": {
+          "variant": "ARGON2_VARIANT_I",
+          "version": 19,
+          "memoryKib": 65536,
+          "iterations": 4,
+          "parallelism": 4,
+          "saltSizeBytes": 16,
+          "outputLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 9106"
+      ]
+    }
+  }
+}

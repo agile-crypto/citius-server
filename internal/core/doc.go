@@ -4,7 +4,8 @@
 //   - Operation, WriteOp      - typed enums for crypto and storage operations
 //   - KeyCreationSpec          - cross-aggregate DTO for CreateKey
 //   - ImportKeySpec            - cross-aggregate DTO for ImportKey
-//   - ScopeSpec                - scope for template selection
+//   - Primitive, Scope          - typed enums for cryptographic primitives and scope variants
+//   - ScopeSpec                - (Primitive, Scope) pair for template selection
 //   - KeyMaterial              - raw key bytes container
 //   - VetForWriter             - pre-write validation interface
 //   - NewID(prefix)            - prefixed ULID generator
