@@ -20,7 +20,10 @@ func newTestKey(publicID, name string, scopeSpec *core.ScopeSpec) (*Key, error) 
 // helper: create a key+version in the store (for tests that need setup).
 func mustCreateKey(t *testing.T, r Repository, publicID, name string, scope string) {
 	t.Helper()
-	scopeSpec := &core.ScopeSpec{ScopeType: scope}
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.Primitive(scope),
+		Scope:     core.SignatureScopeStandard,
+	}
 	if err := r.CreateKey(context.Background(), publicID, "template-id", "software", "policy-test", scopeSpec, []byte("fake-key-bytes"), WithName(name)); err != nil {
 		t.Fatalf("mustCreateKey(%s): %v", publicID, err)
 	}
@@ -43,7 +46,10 @@ func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 
-	scopeSpec := &core.ScopeSpec{ScopeType: "signature"}
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	}
 	initialVersionNbr := uint32(1)
 	if err := r.CreateKey(ctx, "key_01HXYZ", "template-id", "software", "policy-test", scopeSpec, []byte("fake-key-bytes"),
 		WithName("signing-key"), WithInitialVersion(initialVersionNbr)); err != nil {
@@ -68,7 +74,10 @@ func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	scopeSpec := &core.ScopeSpec{ScopeType: "signature"}
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	}
 	if err := r.CreateKey(ctx, "key_01HXYZ", "template-id", "software", "policy-test", scopeSpec, []byte("fake-key-bytes"), WithName("signing-key")); err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
@@ -96,7 +105,10 @@ func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 func Test_VaultRepository_CreateKey_duplicate_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	scopeSpec := &core.ScopeSpec{ScopeType: "signature"}
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	}
 	_ = r.CreateKey(ctx, "key_01HXYZ", "template-id", "software", "policy-test", scopeSpec, []byte("fake-key-bytes"), WithName("signing-key"))
 	err := r.CreateKey(ctx, "key_01HXYZ", "template-id2", "software", "policy-test2", scopeSpec, []byte("fake-key-bytes2"), WithName("signing-key2"))
 	if err == nil {
@@ -267,7 +279,10 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 
 func Test_VaultRepository_UpdateKey_notFound_returnsError(t *testing.T) {
 	r := repoFn()
-	k, err := newTestKey("id", "signing-key", &core.ScopeSpec{ScopeType: "signature"})
+	k, err := newTestKey("id", "signing-key", &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	})
 	require.NoError(t, err, "error when creating key")
 	err = r.UpdateKey(context.Background(), k)
 	require.NotNil(t, err)
@@ -374,7 +389,10 @@ func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			ctx := context.Background()
 			km := []byte("fake-key-bytes")
-			err := r.CreateKey(ctx, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{ScopeType: "signature"}, km, WithInitialVersion(0))
+			err := r.CreateKey(ctx, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{
+				Primitive: core.PrimitiveSignature,
+				Scope:     core.SignatureScopeStandard,
+			}, km, WithInitialVersion(0))
 			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyId, err)
 			v0, err := r.GetCurrentVersion(ctx, tc.keyId)
 			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyId, err)

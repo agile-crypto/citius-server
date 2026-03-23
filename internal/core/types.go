@@ -61,23 +61,6 @@ type VetForWriter interface {
 	VetForWrite(ctx context.Context, op WriteOp) error
 }
 
-// ScopeSpec identifies a cryptographic scope for template selection.
-// Currently uses a plain string ScopeType (e.g., "signature", "aead").
-// TODO: expand to carry the full ScopeSpecification proto fields
-// (typed scope enums, security properties, additional_properties).
-type ScopeSpec struct {
-	ScopeType string // e.g., "signature", "aead", "mac", "kem", "kdf", "hash", "key_wrapping"
-}
-
-// TODO: Define mapping scope -> primitive
-func (s *ScopeSpec) Primitive() string {
-	return "TODO"
-}
-
-func (s *ScopeSpec) Serialize() ([]byte, error) {
-	return []byte(s.ScopeType), nil
-}
-
 // ImportKeySpec carries the inputs for an ImportKey call across package boundaries.
 // Like KeyCreationSpec, it holds Go-native values resolved from the gRPC ImportKeyRequest.
 type ImportKeySpec struct {

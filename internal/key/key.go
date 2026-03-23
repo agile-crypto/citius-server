@@ -46,7 +46,7 @@ func newKey(ctx context.Context, id, policyId string, scopeSpec *core.ScopeSpec,
 		// if no name is provided, default to id
 		opts.withName = id
 	}
-	sp, err := scopeSpec.Serialize()
+	sp, err := scopeSpec.Serialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -54,7 +54,7 @@ func newKey(ctx context.Context, id, policyId string, scopeSpec *core.ScopeSpec,
 		PublicId:           id,
 		Name:               opts.withName,
 		PolicyId:           policyId,
-		Primitive:          scopeSpec.Primitive(),
+		Primitive:          scopeSpec.Primitive.String(),
 		ScopeSpecification: sp,
 		CurrentVersion:     currentKeyVersion,
 		Labels:             opts.withLabels,
