@@ -1,6 +1,10 @@
 package key
 
-import "sync"
+import (
+	"sync"
+
+	"github.ibm.com/citius/citius-server/gen/go/store"
+)
 
 // getOpts - iterate the inbound Options and return a struct
 func getOpts(opt ...Option) options {
@@ -18,12 +22,29 @@ type Option func(*options)
 
 // options = how options are represented
 type options struct {
-	withLock *sync.RWMutex
+	withLock            *sync.RWMutex
+	withTemplateId      string
+	withStatus          store.KeyStatus
+	withLabels          map[string]string
+	withName            string
+	withWrappingKeyId   string
+	withPublicId        string
+	withDigest          []byte
+	withDigestAlgorithm string
+	withCurrentVersion  uint32
+	withInitialVersion  uint32
+	withVetForWrite     bool
 }
 
 func getDefaultOptions() options {
 	return options{
-		withLock: &sync.RWMutex{},
+		withLock:            &sync.RWMutex{},
+		withStatus:          store.KeyStatus_KEY_STATUS_UNSPECIFIED,
+		withLabels:          make(map[string]string),
+		withDigestAlgorithm: "HMAC-SHA256",
+		withCurrentVersion:  0,
+		withVetForWrite:     true, // default: vet for write
+		withInitialVersion:  1,
 	}
 }
 
@@ -31,5 +52,63 @@ func getDefaultOptions() options {
 func WithLock(lock *sync.RWMutex) Option {
 	return func(o *options) {
 		o.withLock = lock
+	}
+}
+
+// WithTemplateId provides an optional template ID.
+func WithTemplateId(templateId string) Option {
+	return func(o *options) {
+		o.withTemplateId = templateId
+	}
+}
+
+// WithStatus provides an optional status.
+func WithStatus(status store.KeyStatus) Option {
+	return func(o *options) {
+		o.withStatus = status
+	}
+}
+
+// WithLabels provides optional labels.
+func WithLabels(labels map[string]string) Option {
+	return func(o *options) {
+		o.withLabels = labels
+	}
+}
+
+// WithName provides an optional name for a key
+func WithName(name string) Option {
+	return func(o *options) {
+		o.withName = name
+	}
+}
+
+func WithWrappingKeyId(wrappingKeyId string) Option {
+	return func(o *options) {
+		o.withWrappingKeyId = wrappingKeyId
+	}
+}
+
+func WithKeyVersionId(versionId string) Option {
+	return func(o *options) {
+		o.withPublicId = versionId
+	}
+}
+
+func WithCurrentVersion(version uint32) Option {
+	return func(o *options) {
+		o.withCurrentVersion = version
+	}
+}
+
+func WithInitialVersion(version uint32) Option {
+	return func(o *options) {
+		o.withInitialVersion = version
+	}
+}
+
+func WithVetForWrite(vet bool) Option {
+	return func(o *options) {
+		o.withVetForWrite = vet
 	}
 }

@@ -30,6 +30,39 @@ func NewKey(stored *storepb.Key) *Key {
 	return &Key{Key: stored}
 }
 
+func newKey(ctx context.Context, id, policyId string, scopeSpec *core.ScopeSpec, currentKeyVersion uint32, opt ...Option) (*Key, error) {
+	const op = "key.newKey"
+	if id == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "id is required")
+	}
+	if policyId == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "policyId is required")
+	}
+	if scopeSpec == nil {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "scopeSpec is required")
+	}
+	opts := getOpts(opt...)
+	if opts.withName == "" {
+		// if no name is provided, default to id
+		opts.withName = id
+	}
+	sp, err := scopeSpec.Serialize()
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	k := &storepb.Key{
+		PublicId:           id,
+		Name:               opts.withName,
+		PolicyId:           policyId,
+		Primitive:          scopeSpec.Primitive(),
+		ScopeSpecification: sp,
+		CurrentVersion:     currentKeyVersion,
+		Labels:             opts.withLabels,
+		Status:             opts.withStatus,
+	}
+	return &Key{Key: k}, nil
+}
+
 // Clone returns a deep copy of the Key.
 func (k *Key) Clone() *Key {
 	return &Key{Key: proto.Clone(k.Key).(*storepb.Key)}

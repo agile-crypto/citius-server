@@ -10,7 +10,7 @@ import (
 )
 
 func TestKeyVersion_VetForWrite_Create_happyPath(t *testing.T) {
-	v := key.NewVersion(&storepb.KeyVersion{
+	v := key.NewKeyVersion(&storepb.KeyVersion{
 		PublicId:   "ver_01HXYZ",
 		KeyId:      "key_01HXYZ",
 		Version:    1,
@@ -23,7 +23,7 @@ func TestKeyVersion_VetForWrite_Create_happyPath(t *testing.T) {
 }
 
 func TestKeyVersion_VetForWrite_Create_missingKeyId(t *testing.T) {
-	v := key.NewVersion(&storepb.KeyVersion{
+	v := key.NewKeyVersion(&storepb.KeyVersion{
 		PublicId:   "ver_01HXYZ",
 		ProviderId: "software",
 		Digest:     []byte("mac"),
@@ -35,7 +35,7 @@ func TestKeyVersion_VetForWrite_Create_missingKeyId(t *testing.T) {
 }
 
 func TestKeyVersion_VetForWrite_Create_missingProviderId(t *testing.T) {
-	v := key.NewVersion(&storepb.KeyVersion{
+	v := key.NewKeyVersion(&storepb.KeyVersion{
 		PublicId: "ver_01HXYZ",
 		KeyId:    "key_01HXYZ",
 		Digest:   []byte("mac"),
@@ -47,7 +47,7 @@ func TestKeyVersion_VetForWrite_Create_missingProviderId(t *testing.T) {
 }
 
 func TestKeyVersion_Clone_independent(t *testing.T) {
-	original := key.NewVersion(&storepb.KeyVersion{
+	original := key.NewKeyVersion(&storepb.KeyVersion{
 		PublicId: "ver_01HXYZ",
 		KeyId:    "key_01HXYZ",
 	})
@@ -58,7 +58,7 @@ func TestKeyVersion_Clone_independent(t *testing.T) {
 }
 
 func TestKeyVersion_Version_accessor(t *testing.T) {
-	v := key.NewVersion(&storepb.KeyVersion{Version: 3})
+	v := key.NewKeyVersion(&storepb.KeyVersion{Version: 3})
 	if v.KeyVersion.Version != 3 {
 		t.Errorf("Version(): got %d want 3", v.GetVersion())
 	}
