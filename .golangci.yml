@@ -1,73 +1,66 @@
-# golangci-lint configuration for CaaS Server
-
+version: "2"
 run:
-  timeout: 5m
   modules-download-mode: readonly
-
 linters:
-  disable-all: true
+  default: none
   enable:
-    # Core correctness
-    - govet
-    - staticcheck
+    - cyclop
     - errcheck
+    - errorlint
+    - exhaustive
+    - gocognit
+    - gosec
+    - govet
     - ineffassign
-    - typecheck
+    - misspell
+    - nilerr
+    - revive
+    - staticcheck
     - unused
-
-    # Formatting
+  settings:
+    cyclop:
+      max-complexity: 15
+    exhaustive:
+      default-signifies-exhaustive: true
+    gocognit:
+      min-complexity: 20
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    revive:
+      rules:
+        - name: exported
+        - name: var-naming
+        - name: receiver-naming
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters:
+          - cyclop
+          - errcheck
+          - gosec
+        path: _test\.go
+    paths:
+      - gen
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
     - gofmt
     - goimports
-
-    # Style & naming
-    - revive
-    - misspell
-
-    # Security
-    - gosec
-
-    # Proto enum completeness
-    - exhaustive
-
-    # Error handling
-    - nilerr
-    - errorlint
-
-    # Complexity
-    - cyclop
-    - gocognit
-
-linters-settings:
-  exhaustive:
-    default-signifies-exhaustive: true
-
-  cyclop:
-    max-complexity: 15
-
-  gocognit:
-    min-complexity: 20
-
-  revive:
-    rules:
-      - name: exported
-      - name: var-naming
-      - name: receiver-naming
-
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment  # too noisy for proto-embedding structs
-
-issues:
-  exclude-rules:
-    # Test files are exempt from errcheck, gosec, and cyclop
-    - path: "_test\\.go"
-      linters:
-        - errcheck
-        - gosec
-        - cyclop
-
-  exclude-dirs:
-    # Exclude generated code and vendor
-    - gen
-    - vendor
+  exclusions:
+    generated: lax
+    paths:
+      - gen
+      - vendor
+      - third_party$
+      - builtin$
+      - examples$
