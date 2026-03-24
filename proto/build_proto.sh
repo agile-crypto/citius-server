@@ -50,6 +50,12 @@ if ! command -v protoc-gen-go-grpc &> /dev/null; then
     MISSING_TOOLS=1
 fi
 
+if ! command -v protoc-go-inject-tag &> /dev/null; then
+    echo -e "${YELLOW}Missing: protoc-go-inject-tag not found (needed for injecting go tags)${NC}"
+    echo "Install with: go install github.com/favadi/protoc-go-inject-tag@latest"
+    MISSING_TOOLS=1
+fi
+
 # Optional: gRPC-Gateway (for REST support)
 if ! command -v protoc-gen-grpc-gateway &> /dev/null; then
     echo -e "${YELLOW}Optional: protoc-gen-grpc-gateway not found (needed for REST gateway)${NC}"
@@ -89,6 +95,10 @@ buf dep update
 # Generate code using buf (resolves buf/validate and other BSR dependencies)
 echo -e "${YELLOW}Running buf generate...${NC}"
 buf generate
+
+# Inject go tags for storage protos
+echo -e "${YELLOW}Injecting go tags for storage protos in $GO_OUT...${NC}"
+protoc-go-inject-tag -input "$GO_OUT/store/*.pb.go" 
 
 echo -e "\n${GREEN}Build completed successfully!${NC}\n"
 echo -e "${YELLOW}Generated files:${NC}"

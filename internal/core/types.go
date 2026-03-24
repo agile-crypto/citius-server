@@ -1,6 +1,8 @@
 package core
 
-import "context"
+import (
+	"context"
+)
 
 // Operation string constants for cryptographic operations.
 // Used in PolicyEngine.ValidateOperation(ctx, policyName, operation, templateID, providerID)

@@ -1,50 +1,69 @@
-package key_test
+package key
 
 import (
 	"context"
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/key"
 )
 
 // helper: create a valid Key domain object.
-func newTestKey(publicID, name, templateID string) *key.Key {
-	return key.NewKey(&storepb.StoredKey{
-		PublicId:   publicID,
-		Name:       name,
-		TemplateId: templateID,
-		Status:     storepb.KeyStatus_KEY_STATUS_ACTIVE,
-	})
+func newTestKey(publicID, name string, scopeSpec *core.ScopeSpec) (*Key, error) {
+	return newKey(context.Background(), publicID, "policy-test", scopeSpec, 1, WithName(name))
 }
 
-// helper: create a valid KeyVersion domain object.
-func newTestKeyVersion(versionID, keyID string, providerName string) *key.KeyVersion {
-	return key.NewVersion(&storepb.StoredKeyVersion{
-		VersionId:         versionID,
-		KeyId:             keyID,
-		ProviderName:      providerName,
-		PlaintextMaterial: []byte("fake-key-bytes"),
-		Hmac:              []byte("fake-hmac"),
-		PublicKeyBytes:    []byte("fake-pub-key"),
-	})
+func mustNewCreateKeyInputs(
+	t *testing.T,
+	ctx context.Context,
+	publicID, name, templateID, providerID, policyID string,
+	scopeSpec *core.ScopeSpec,
+	initialVersion uint32,
+	keyMaterial []byte,
+	status storepb.KeyStatus,
+) (*Key, *KeyVersion) {
+	t.Helper()
+	k, err := newKey(ctx, publicID, policyID, scopeSpec, initialVersion, WithName(name), WithStatus(status))
+	if err != nil {
+		t.Fatalf("newKey(%s): %v", publicID, err)
+	}
+	v, err := newKeyVersion(
+		ctx,
+		defaultKeyVersionId(publicID, initialVersion),
+		publicID,
+		templateID,
+		providerID,
+		initialVersion,
+		keyMaterial,
+		WithStatus(status),
+	)
+	if err != nil {
+		t.Fatalf("newKeyVersion(%s,%d): %v", publicID, initialVersion, err)
+	}
+	return k, v
 }
 
 // helper: create a key+version in the store (for tests that need setup).
-func mustCreateKey(t *testing.T, r key.Repository, publicID, name, templateID string) {
+func mustCreateKey(t *testing.T, r Repository, publicID, name string, scope string) {
 	t.Helper()
-	k := newTestKey(publicID, name, templateID)
-	v := newTestKeyVersion("ver_"+publicID, publicID, "software")
-	if err := r.CreateKey(context.Background(), k, v); err != nil {
+	ctx := context.Background()
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.Primitive(scope),
+		Scope:     core.SignatureScopeStandard,
+	}
+	k, v := mustNewCreateKeyInputs(t, ctx, publicID, name, "template-id", "software", "policy-test", scopeSpec, 1, []byte("fake-key-bytes"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	if err := r.CreateKey(ctx, k, v, WithInitialVersion(1)); err != nil {
 		t.Fatalf("mustCreateKey(%s): %v", publicID, err)
 	}
 }
 
-var repoFn = func() key.Repository {
+var repoFn = func() Repository {
 	storage := &logical.InmemStorage{}
-	r, err := key.NewVaultRepository(context.Background(), storage)
+	r, err := NewVaultRepository(context.Background(), storage)
 	if err != nil {
 		panic("failed to create VaultRepository: " + err.Error())
 	}
@@ -58,10 +77,14 @@ var repoFn = func() key.Repository {
 func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
-	v := newTestKeyVersion("ver_01", "key_01HXYZ", "software")
 
-	if err := r.CreateKey(ctx, k, v); err != nil {
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	}
+	initialVersionNbr := uint32(1)
+	k, v := mustNewCreateKeyInputs(t, ctx, "key_01HXYZ", "signing-key", "template-id", "software", "policy-test", scopeSpec, initialVersionNbr, []byte("fake-key-bytes"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	if err := r.CreateKey(ctx, k, v, WithInitialVersion(initialVersionNbr)); err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
@@ -69,36 +92,68 @@ func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetKey: %v", err)
 	}
-	if got.PublicID() != "key_01HXYZ" {
-		t.Errorf("PublicID: got %q want %q", got.PublicID(), "key_01HXYZ")
+	if got.PublicId != "key_01HXYZ" {
+		t.Errorf("PublicID: got %q want %q", got.PublicId, "key_01HXYZ")
 	}
-	if got.Name() != "signing-key" {
-		t.Errorf("Name: got %q want %q", got.Name(), "signing-key")
+	if got.Name != "signing-key" {
+		t.Errorf("Name: got %q want %q", got.Name, "signing-key")
 	}
-	if got.StoredKey().GetCurrentVersion() != 1 {
-		t.Errorf("CurrentVersion: got %d want 1", got.StoredKey().GetCurrentVersion())
+	if got.CurrentVersion != initialVersionNbr {
+		t.Errorf("CurrentVersion: got %d want %d", got.CurrentVersion, initialVersionNbr)
 	}
 }
 
 func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
-	v := newTestKeyVersion("ver_01", "key_01HXYZ", "software")
-	_ = r.CreateKey(ctx, k, v)
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	}
+	k, v := mustNewCreateKeyInputs(t, ctx, "key_01HXYZ", "signing-key", "template-id", "software", "policy-test", scopeSpec, 1, []byte("fake-key-bytes"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	if err := r.CreateKey(ctx, k, v, WithInitialVersion(1)); err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
 
 	got, err := r.GetVersion(ctx, "key_01HXYZ", 1)
 	if err != nil {
 		t.Fatalf("GetVersion(1): %v", err)
 	}
-	if got.StoredKeyVersion().GetVersionNumber() != 1 {
-		t.Errorf("VersionNumber: got %d want 1", got.StoredKeyVersion().GetVersionNumber())
-	}
-	if !got.StoredKeyVersion().GetIsCurrent() {
-		t.Error("initial version should be marked is_current")
+	if got.Version != 1 {
+		t.Errorf("VersionNumber: got %d want 1", got.Version)
 	}
 }
 
+func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
+	testCases := []struct {
+		name       string
+		keyId      string
+		wantStatus storepb.KeyStatus
+	}{
+		{"default_status", "kc01", storepb.KeyStatus_KEY_STATUS_ACTIVE},
+		{"explicit_active", "kc02", storepb.KeyStatus_KEY_STATUS_ACTIVE},
+		{"explicit_compromised", "kc03", storepb.KeyStatus_KEY_STATUS_COMPROMISED},
+	}
+	r := repoFn()
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			ctx := context.Background()
+			km := []byte("fake-key-bytes")
+			k, v := mustNewCreateKeyInputs(t, ctx, tc.keyId, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{
+				Primitive: core.PrimitiveSignature,
+				Scope:     core.SignatureScopeStandard,
+			}, 0, km, tc.wantStatus)
+			err := r.CreateKey(ctx, k, v, WithInitialVersion(0))
+			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyId, err)
+			v0, err := r.GetCurrentVersion(ctx, tc.keyId)
+			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyId, err)
+			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
+			assert.Equal(tc.wantStatus, v0.GetStatus(), "version should have expected status")
+		})
+	}
+
+}
 func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetKey(context.Background(), "key_doesnotexist")
@@ -113,13 +168,14 @@ func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 func Test_VaultRepository_CreateKey_duplicate_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	k := newTestKey("key_01HXYZ", "original", "ecdsa-p256-sha256")
-	v := newTestKeyVersion("ver_01", "key_01HXYZ", "software")
-	_ = r.CreateKey(ctx, k, v)
-
-	k2 := newTestKey("key_01HXYZ", "duplicate", "ecdsa-p256-sha256")
-	v2 := newTestKeyVersion("ver_02", "key_01HXYZ", "software")
-	err := r.CreateKey(ctx, k2, v2)
+	scopeSpec := &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	}
+	k1, v1 := mustNewCreateKeyInputs(t, ctx, "key_01HXYZ", "signing-key", "template-id", "software", "policy-test", scopeSpec, 1, []byte("fake-key-bytes"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	_ = r.CreateKey(ctx, k1, v1, WithInitialVersion(1))
+	k2, v2 := mustNewCreateKeyInputs(t, ctx, "key_01HXYZ", "signing-key2", "template-id2", "software", "policy-test2", scopeSpec, 1, []byte("fake-key-bytes2"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	err := r.CreateKey(ctx, k2, v2, WithInitialVersion(1))
 	if err == nil {
 		t.Fatal("expected error for duplicate key")
 	}
@@ -128,36 +184,18 @@ func Test_VaultRepository_CreateKey_duplicate_returnsError(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_CreateKey_nilKey_returnsError(t *testing.T) {
-	r := repoFn()
-	v := newTestKeyVersion("ver_01", "key_01", "software")
-	err := r.CreateKey(context.Background(), nil, v)
-	if err == nil {
-		t.Fatal("expected error for nil key")
-	}
-}
-
-func Test_VaultRepository_CreateKey_nilVersion_returnsError(t *testing.T) {
-	r := repoFn()
-	k := newTestKey("key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
-	err := r.CreateKey(context.Background(), k, nil)
-	if err == nil {
-		t.Fatal("expected error for nil initialVersion")
-	}
-}
-
 func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
 	// Mutating the returned key should NOT affect the stored copy.
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01HXYZ", "original", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01HXYZ", "original", "signature")
 
 	got, _ := r.GetKey(ctx, "key_01HXYZ")
-	got.StoredKey().Name = "mutated"
+	got.Name = "mutated"
 
 	got2, _ := r.GetKey(ctx, "key_01HXYZ")
-	if got2.Name() != "original" {
-		t.Errorf("stored key was mutated: got %q want %q", got2.Name(), "original")
+	if got2.Name != "original" {
+		t.Errorf("stored key was mutated: got %q want %q", got2.Name, "original")
 	}
 }
 
@@ -168,7 +206,7 @@ func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
 func Test_VaultRepository_DeleteKey_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01HXYZ", "k", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01HXYZ", "k", "signature")
 
 	if err := r.DeleteKey(ctx, "key_01HXYZ"); err != nil {
 		t.Fatalf("DeleteKey: %v", err)
@@ -180,24 +218,39 @@ func Test_VaultRepository_DeleteKey_success(t *testing.T) {
 }
 
 func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
+	assert, require := assert.New(t), require.New(t)
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01HXYZ", "k", "ecdsa-p256-sha256")
-	// Add a second version so we verify both are cleaned up.
-	_ = r.AddVersion(ctx, "key_01HXYZ", newTestKeyVersion("ver_02", "key_01HXYZ", "software"))
-
-	if err := r.DeleteKey(ctx, "key_01HXYZ"); err != nil {
-		t.Fatalf("DeleteKey: %v", err)
+	kid := "key_01HXYZ"
+	mustCreateKey(t, r, kid, "k", "signature")
+	v, err := r.GetCurrentVersion(ctx, kid)
+	if err != nil {
+		t.Errorf("unexpected error while getting current version of key %s", kid)
 	}
+	v2 := v.Clone()
+	v2.Version = v.Version + 1
+	v2.PublicId = "ver_02"
+	vNext, err := newKeyVersion(ctx, defaultKeyVersionId(kid, 2), kid, "template", "software", 2, []byte("key_version_1"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	require.NoError(err, "error creating key version 2")
+	if err := r.AddVersion(ctx, vNext); err != nil {
+		t.Fatalf("AddVersion: %v", err)
+	}
+	vNext2, err := newKeyVersion(ctx, defaultKeyVersionId(kid, 3), kid, "template", "software", 3, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	require.NoError(err, "error creating key version 3")
+	err = r.AddVersion(ctx, vNext2)
+	require.NoError(err, "got error when adding second version")
+	k, err := r.GetKey(ctx, kid)
+	require.NoErrorf(err, "error when getting key with id=%s", kid)
+	assert.Equal(uint32(v2.Version+1), k.CurrentVersion, "current version should be 2")
+	err = r.DeleteKey(ctx, "key_01HXYZ")
+	require.NoError(err, "DeleteKey should not return error")
+	_, err = r.GetKey(ctx, "key_01HXYZ")
+	require.True(errors.IsKeyNotFound(err), "expected KeyNotFound after delete, got: %v", err)
 	// Both versions should be gone.
-	_, err := r.GetVersion(ctx, "key_01HXYZ", 1)
-	if err == nil {
-		t.Error("expected error fetching version 1 after cascading delete")
-	}
+	_, err = r.GetVersion(ctx, "key_01HXYZ", 1)
+	require.True(errors.IsKeyNotFound(err), "expected VersionNotFound for version 1 after cascading delete")
 	_, err = r.GetVersion(ctx, "key_01HXYZ", 2)
-	if err == nil {
-		t.Error("expected error fetching version 2 after cascading delete")
-	}
+	require.True(errors.IsKeyNotFound(err), "expected VersionNotFound for version 2 after cascading delete")
 }
 
 func Test_VaultRepository_DeleteKey_notFound_returnsError(t *testing.T) {
@@ -218,7 +271,7 @@ func Test_VaultRepository_DeleteKey_notFound_returnsError(t *testing.T) {
 func Test_VaultRepository_ListKeys_all(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01", "k1", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01", "k1", "signature")
 	mustCreateKey(t, r, "key_02", "k2", "ml-dsa-65")
 
 	keys, err := r.ListKeys(ctx)
@@ -230,7 +283,7 @@ func Test_VaultRepository_ListKeys_all(t *testing.T) {
 	}
 	// Verify full Key objects are returned, not just names.
 	for _, k := range keys {
-		if k.PublicID() == "" {
+		if k.PublicId == "" {
 			t.Error("ListKeys returned key with empty PublicID")
 		}
 	}
@@ -239,9 +292,9 @@ func Test_VaultRepository_ListKeys_all(t *testing.T) {
 func Test_VaultRepository_ListKeys_multipleKeys(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01", "k1", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01", "k1", "signature")
 	mustCreateKey(t, r, "key_02", "k2", "ml-dsa-65")
-	mustCreateKey(t, r, "key_03", "k3", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_03", "k3", "signature")
 
 	keys, err := r.ListKeys(ctx)
 	if err != nil {
@@ -270,13 +323,13 @@ func Test_VaultRepository_ListKeys_empty(t *testing.T) {
 func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01HXYZ", "signing-key", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01HXYZ", "signing-key", "signature")
 
 	// Build an updated Key with new status.
-	updated := key.NewKey(&storepb.StoredKey{
+	updated := NewKey(&storepb.Key{
 		PublicId:       "key_01HXYZ",
 		Name:           "signing-key",
-		TemplateId:     "ecdsa-p256-sha256",
+		Primitive:      "signature",
 		Status:         storepb.KeyStatus_KEY_STATUS_SUSPENDED,
 		CurrentVersion: 1,
 	})
@@ -288,21 +341,21 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetKey after update: %v", err)
 	}
-	if got.StoredKey().GetStatus() != storepb.KeyStatus_KEY_STATUS_SUSPENDED {
-		t.Errorf("status: got %v want SUSPENDED", got.StoredKey().GetStatus())
+	if got.GetStatus() != storepb.KeyStatus_KEY_STATUS_SUSPENDED {
+		t.Errorf("status: got %v want SUSPENDED", got.GetStatus())
 	}
 }
 
 func Test_VaultRepository_UpdateKey_notFound_returnsError(t *testing.T) {
 	r := repoFn()
-	k := newTestKey("key_missing", "signing-key", "ecdsa-p256-sha256")
-	err := r.UpdateKey(context.Background(), k)
-	if err == nil {
-		t.Fatal("expected error for updating non-existent key")
-	}
-	if !errors.IsKeyNotFound(err) {
-		t.Errorf("expected KeyNotFound, got: %v", err)
-	}
+	k, err := newTestKey("id", "signing-key", &core.ScopeSpec{
+		Primitive: core.PrimitiveSignature,
+		Scope:     core.SignatureScopeStandard,
+	})
+	require.NoError(t, err, "error when creating key")
+	err = r.UpdateKey(context.Background(), k)
+	require.NotNil(t, err)
+	require.Truef(t, errors.IsKeyNotFound(err), "expected KeyNotFound, got: %v", err)
 }
 
 func Test_VaultRepository_UpdateKey_nil_returnsError(t *testing.T) {
@@ -320,32 +373,27 @@ func Test_VaultRepository_UpdateKey_nil_returnsError(t *testing.T) {
 func Test_VaultRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01", "k", "signature")
 
-	v2 := newTestKeyVersion("ver_02", "key_01", "software")
-	if err := r.AddVersion(ctx, "key_01", v2); err != nil {
-		t.Fatalf("AddVersion: %v", err)
-	}
+	v, err := newKeyVersion(ctx, defaultKeyVersionId("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	require.NoError(t, err, "error creating key version input")
+	err = r.AddVersion(ctx, v)
+	require.NoErrorf(t, err, "error when adding version (%s,%d)", "key_01", 2)
 
 	got, err := r.GetVersion(ctx, "key_01", 2)
-	if err != nil {
-		t.Fatalf("GetVersion(2): %v", err)
-	}
-	if got.StoredKeyVersion().GetVersionId() != "ver_02" {
-		t.Errorf("VersionId: got %q want %q", got.StoredKeyVersion().GetVersionId(), "ver_02")
-	}
-	if got.StoredKeyVersion().GetVersionNumber() != 2 {
-		t.Errorf("VersionNumber: got %d want 2", got.StoredKeyVersion().GetVersionNumber())
-	}
+	require.NoErrorf(t, err, "error when getting version (%s,%d)", "key_01", 2)
+	assert.Equal(t, "key_01", got.KeyId)
+	assert.Equal(t, uint32(2), got.Version)
 }
 
 func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01", "k", "signature")
 
-	v2 := newTestKeyVersion("ver_02", "key_01", "software")
-	if err := r.AddVersion(ctx, "key_01", v2); err != nil {
+	v, err := newKeyVersion(ctx, defaultKeyVersionId("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	require.NoError(t, err, "error creating key version input")
+	if err := r.AddVersion(ctx, v); err != nil {
 		t.Fatalf("AddVersion: %v", err)
 	}
 
@@ -353,11 +401,11 @@ func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetVersion(1): %v", err)
 	}
-	if got.StoredKeyVersion().GetVersionNumber() != 1 {
-		t.Errorf("VersionNumber: got %d want 1", got.StoredKeyVersion().GetVersionNumber())
+	if got.Version != 1 {
+		t.Errorf("VersionNumber: got %d want 1", got.Version)
 	}
-	if got.StoredKeyVersion().GetVersionNumber() != 1 {
-		t.Errorf("VersionNumber: got %d want 1", got.StoredKeyVersion().GetVersionNumber())
+	if got.Version != 1 {
+		t.Errorf("VersionNumber: got %d want 1", got.Version)
 	}
 }
 
@@ -375,53 +423,67 @@ func Test_VaultRepository_GetVersion_notFound(t *testing.T) {
 func Test_VaultRepository_AddVersion_returnsClone(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256")
+	mustCreateKey(t, r, "key_01", "k", "signature")
 
 	// Fetch version 1 (created by CreateKey) and mutate the returned clone.
 	got, _ := r.GetVersion(ctx, "key_01", 1)
-	got.StoredKeyVersion().ProviderName = "mutated"
+	got.ProviderId = "mutated"
 
 	// Re-fetch — should still have original value.
 	got2, _ := r.GetVersion(ctx, "key_01", 1)
-	if got2.StoredKeyVersion().GetProviderName() != "software" {
+	if got2.ProviderId != "software" {
 		t.Error("GetVersion should return a clone — stored value was mutated")
-	}
-}
-
-func Test_VaultRepository_AddVersion_assignsIncrementingVersionNumber(t *testing.T) {
-	r := repoFn()
-	ctx := context.Background()
-	mustCreateKey(t, r, "key_01", "k", "ecdsa-p256-sha256") // creates version 1
-
-	_ = r.AddVersion(ctx, "key_01", newTestKeyVersion("ver_02", "key_01", "software"))
-	_ = r.AddVersion(ctx, "key_01", newTestKeyVersion("ver_03", "key_01", "software"))
-
-	v3, err := r.GetVersion(ctx, "key_01", 3)
-	if err != nil {
-		t.Fatalf("GetVersion(3): %v", err)
-	}
-	if v3.StoredKeyVersion().GetVersionNumber() != 3 {
-		t.Errorf("VersionNumber: got %d want 3", v3.StoredKeyVersion().GetVersionNumber())
-	}
-	if !v3.StoredKeyVersion().GetIsCurrent() {
-		t.Error("latest version should be marked is_current")
-	}
-
-	// Previous version should no longer be current.
-	v2, _ := r.GetVersion(ctx, "key_01", 2)
-	if v2.StoredKeyVersion().GetIsCurrent() {
-		t.Error("version 2 should not be marked is_current after version 3 added")
 	}
 }
 
 func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 	r := repoFn()
-	v := newTestKeyVersion("ver_01", "key_missing", "software")
-	err := r.AddVersion(context.Background(), "key_missing", v)
+	ctx := context.Background()
+	v, err := newKeyVersion(ctx, defaultKeyVersionId("key_missing", 1), "key_missing", "template", "software", 1, []byte("key_material"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	require.NoError(t, err, "error creating key version input")
+	err = r.AddVersion(ctx, v)
 	if err == nil {
 		t.Fatal("expected error for adding version to non-existent key")
 	}
 	if !errors.IsKeyNotFound(err) {
 		t.Errorf("expected KeyNotFound, got: %v", err)
 	}
+}
+
+func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
+	testCases := []struct {
+		keyId              string
+		additionalVersions int
+	}{
+		{"key_01", 1},
+		{"key_02", 3},
+		{"key_03", 25},
+	}
+	r := repoFn()
+	for _, tc := range testCases {
+		t.Run(tc.keyId, func(t *testing.T) {
+			assert, require := assert.New(t), require.New(t)
+			ctx := context.Background()
+			km := []byte("fake-key-bytes")
+			k, v := mustNewCreateKeyInputs(t, ctx, tc.keyId, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{
+				Primitive: core.PrimitiveSignature,
+				Scope:     core.SignatureScopeStandard,
+			}, 0, km, storepb.KeyStatus_KEY_STATUS_ACTIVE)
+			err := r.CreateKey(ctx, k, v, WithInitialVersion(0))
+			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyId, err)
+			v0, err := r.GetCurrentVersion(ctx, tc.keyId)
+			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyId, err)
+			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
+			for i := 1; i < tc.additionalVersions; i++ {
+				nextVersion, err := newKeyVersion(ctx, defaultKeyVersionId(tc.keyId, uint32(i)), tc.keyId, "template", "software", uint32(i), km, WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+				require.NoErrorf(err, "newKeyVersion error for version %d of key %s: %v", i, tc.keyId, err)
+				err = r.AddVersion(ctx, nextVersion)
+				require.NoErrorf(err, "AddVersion error for version %d of key %s: %v", i, tc.keyId, err)
+				current, err := r.GetCurrentVersion(ctx, tc.keyId)
+				require.NoErrorf(err, "GetCurrentVersion error after adding version %d for key %s: %v", i, tc.keyId, err)
+				assert.Equal(uint32(i), current.Version, "current version should be updated to %d after adding new version", i)
+			}
+		})
+	}
+
 }

@@ -1,5 +1,12 @@
 package core
 
+import (
+	"context"
+	"encoding/json"
+
+	"github.ibm.com/citius/citius-server/internal/errors"
+)
+
 // Primitive identifies a cryptographic primitive family.
 // Each Primitive maps 1:1 to a ScopeSpecification oneof field in common.proto.
 type Primitive string
@@ -16,6 +23,10 @@ const (
 	PrimitiveSymmetricCipher Primitive = "symmetric_cipher"
 	PrimitiveGenericSecret   Primitive = "generic_secret"
 )
+
+func (p Primitive) String() string {
+	return string(p)
+}
 
 // Scope identifies a specific operational variant within a Primitive.
 // Each value corresponds to one value of a per-primitive scope enum in
@@ -157,4 +168,13 @@ func (s ScopeSpec) IsZero() bool {
 // HasSecurityFilter reports whether this ScopeSpec has any security filter set.
 func (s ScopeSpec) HasSecurityFilter() bool {
 	return s.FIPSApproved != nil || s.QuantumSafe != nil
+}
+
+func (s *ScopeSpec) Serialize(ctx context.Context) ([]byte, error) {
+	const op = "core.(ScopeSpec).Serialize"
+	res, err := json.Marshal(s)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return res, nil
 }

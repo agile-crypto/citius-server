@@ -1,6 +1,8 @@
 package key
 
-import "context"
+import (
+	"context"
+)
 
 // Repository defines the persistence contract for the Key aggregate.
 //
@@ -9,9 +11,8 @@ import "context"
 // create a KeyVersion without an associated Key (enforced by CreateKey).
 type Repository interface {
 
-	// CreateKey atomically persists a new Key AND its initial KeyVersion.
-	// The store should assign version_number = 1, set is_current = true, and
-	// populate the Key's current_version field.
+	// Atomically persists a key along with its initial current version in storage. The
+	// version number of the initial version must match the current version of the key.
 	//
 	// Returns CodeAlreadyExists if a key with the same PublicID already exists.
 	//
@@ -21,12 +22,15 @@ type Repository interface {
 	//
 	// This enforces the aggregate invariant: no Key can exist without at
 	// least one KeyVersion.
-	CreateKey(ctx context.Context, k *Key, initialVersion *KeyVersion) error
+	//
+	// Allowed options:
+	//   - withVetForWrite (optional): defaults to true
+	CreateKey(ctx context.Context, key *Key, initialVersion *KeyVersion, opt ...Option) error
 
 	// ── Key metadata reads ──
 
 	// GetKey retrieves a key by public ID (metadata only, no material).
-	GetKey(ctx context.Context, publicID string) (*Key, error)
+	GetKey(ctx context.Context, id string) (*Key, error)
 
 	// ListKeys returns all stored keys as full domain objects.
 	ListKeys(ctx context.Context) ([]*Key, error)
@@ -34,22 +38,22 @@ type Repository interface {
 	// ── Key metadata updates (lifecycle, policy) ──
 
 	// UpdateKey replaces the stored key metadata. The key must already exist.
-	UpdateKey(ctx context.Context, k *Key) error
+	UpdateKey(ctx context.Context, k *Key, opt ...Option) error
 
 	// ── Aggregate deletion ──
 
 	// DeleteKey removes a key AND all its associated versions (cascade).
-	DeleteKey(ctx context.Context, publicID string) error
+	DeleteKey(ctx context.Context, id string) error
 
 	// ── Version operations (parent Key must exist) ──
+	// Stores a key version. The parent key must already exist. By default,
+	// this current version will be set to be the new current version of the parent
+	// key. The version number must be exactly 1 greater than the current
+	// version of the parent key.
+	//
 	// Only the key orchestrator calls these. External access to key material
 	// goes through KeyOrchestrator.GetKeyWithMaterial(), which enforces
 	// lifecycle checks (IsTerminal, CanPerformCrypto).
-
-	// AddVersion atomically stores a new KeyVersion and increments the
-	// parent Key's current_version field. The store assigns version_number
-	// and sets is_current; the caller must populate all other fields
-	// (version_id, key_id, material, hmac, provider_name).
 	//
 	// Used by RotateKey to add subsequent versions to an existing key.
 	// For the first version, use CreateKey instead.
@@ -60,9 +64,14 @@ type Repository interface {
 	//
 	// This prevents race conditions in RotateKey/TransformKey by generating
 	// the version number and updating atomically.
-	AddVersion(ctx context.Context, keyName string, version *KeyVersion) error
+	//
+	// Allowed options:
+	//   - withVetForWrite (optional): defaults to true
+	AddVersion(ctx context.Context, version *KeyVersion, opt ...Option) error
 
 	// GetVersion retrieves a specific version of a key by version number.
-	// Pass versionNum=0 to retrieve the latest (current) version.
-	GetVersion(ctx context.Context, keyName string, versionNum uint32) (*KeyVersion, error)
+	GetVersion(ctx context.Context, keyId string, versionNum uint32) (*KeyVersion, error)
+
+	// Retrieves the current version of a key by public ID.
+	GetCurrentVersion(ctx context.Context, keyId string) (*KeyVersion, error)
 }
