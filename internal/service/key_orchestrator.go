@@ -19,7 +19,7 @@ type KeyOrchestrator interface {
 	// GetKeyWithMaterial fetches the key AND a specific version's material.
 	// Used internally by CryptoOrchestrator — not exposed over gRPC directly.
 	// Pass version=0 for latest version.
-	GetKeyWithMaterial(ctx context.Context, name string, version uint32) (*key.Key, *key.KeyVersion, error)
+	GetKeyWithMaterial(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
 
 	RotateKey(ctx context.Context, name string) (*key.Key, error)
 	SuspendKey(ctx context.Context, name string) error

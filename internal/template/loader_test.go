@@ -38,16 +38,8 @@ func newTestRegistry(t *testing.T) template.Registry {
 	return r
 }
 
-func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
-	r := newTestRegistry(t)
-	err := template.LoadStandardCatalog(catalogPath(), r)
-	if err != nil {
-		t.Fatalf("LoadStandardCatalog: %v", err)
-	}
-
-	ctx := context.Background()
-
-	// ── Verify ecdsa-p256-sha256-der loaded correctly ──
+func verifyEcdsaP256Template(t *testing.T, r template.Registry, ctx context.Context) {
+	t.Helper()
 	ecdsa, err := r.Get(ctx, "ecdsa-p256-sha256-der")
 	if err != nil {
 		t.Fatalf("Get ecdsa: %v", err)
@@ -65,7 +57,6 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	if ecdsaAlg.GetHash() != api.HashAlgorithm_HASH_ALGORITHM_SHA256 {
 		t.Errorf("ecdsa hash: got %v want HASH_ALGORITHM_SHA256", ecdsaAlg.GetHash())
 	}
-	// Verify scope: signature/standard
 	ecdsaScopes := ecdsa.GetScopedCapabilities()
 	if len(ecdsaScopes) == 0 {
 		t.Fatal("ecdsa: expected at least one scoped capability")
@@ -77,7 +68,6 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	if sigScope.GetScope() != api.SignatureScope_SIGNATURE_SCOPE_STANDARD {
 		t.Errorf("ecdsa scope: got %v want SIGNATURE_SCOPE_STANDARD", sigScope.GetScope())
 	}
-	// Verify security: fips_approved=true (inside scope security)
 	ecdsaSec := sigScope.GetSecurity()
 	if ecdsaSec == nil {
 		t.Fatal("ecdsa: expected UniversalSecurityProperties in scope")
@@ -85,8 +75,10 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	if ecdsaSec.FipsApproved == nil || !*ecdsaSec.FipsApproved {
 		t.Error("ecdsa: expected fips_approved=true in scope security")
 	}
+}
 
-	// ── Verify ml-dsa-65 loaded correctly ──
+func verifyMlDsa65Template(t *testing.T, r template.Registry, ctx context.Context) {
+	t.Helper()
 	mldsa, err := r.Get(ctx, "ml-dsa-65")
 	if err != nil {
 		t.Fatalf("Get mldsa: %v", err)
@@ -98,7 +90,6 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	if mldsaAlg.GetParameterSet() != api.MlDsaParameterSet_ML_DSA_65 {
 		t.Errorf("mldsa parameter_set: got %v want ML_DSA_65", mldsaAlg.GetParameterSet())
 	}
-	// Verify scope: signature/standard
 	mldsaScopes := mldsa.GetScopedCapabilities()
 	if len(mldsaScopes) == 0 {
 		t.Fatal("ml-dsa-65: expected at least one scoped capability")
@@ -110,7 +101,6 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	if mldsaSigScope.GetScope() != api.SignatureScope_SIGNATURE_SCOPE_STANDARD {
 		t.Errorf("ml-dsa-65 scope: got %v want SIGNATURE_SCOPE_STANDARD", mldsaSigScope.GetScope())
 	}
-	// Verify security: quantum_safe=true AND fips_approved=true
 	mldsaSec := mldsaSigScope.GetSecurity()
 	if mldsaSec == nil {
 		t.Fatal("ml-dsa-65: expected UniversalSecurityProperties in scope")
@@ -121,6 +111,17 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	if mldsaSec.FipsApproved == nil || !*mldsaSec.FipsApproved {
 		t.Error("ml-dsa-65: expected fips_approved=true in scope security")
 	}
+}
+
+func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
+	r := newTestRegistry(t)
+	err := template.LoadStandardCatalog(catalogPath(), r)
+	if err != nil {
+		t.Fatalf("LoadStandardCatalog: %v", err)
+	}
+	ctx := context.Background()
+	verifyEcdsaP256Template(t, r, ctx)
+	verifyMlDsa65Template(t, r, ctx)
 }
 
 func TestLoadStandardCatalog_loadsAllTemplates(t *testing.T) {

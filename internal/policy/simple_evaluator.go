@@ -8,7 +8,7 @@ import (
 )
 
 // SimpleRulesEvaluator implements RulesEvaluator for JSON schema v1.
-// It uses PolicyRules (from rules.go) internally and has no state.
+// It uses Rules (from rules.go) internally and has no state.
 //
 // Evaluation rules:
 //   - Absent section (nil) = no restriction (allow all)

@@ -30,12 +30,12 @@ func NewKey(stored *storepb.Key) *Key {
 	return &Key{Key: stored}
 }
 
-func newKey(ctx context.Context, id, policyId string, scopeSpec *core.ScopeSpec, currentKeyVersion uint32, opt ...Option) (*Key, error) {
+func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpec, currentKeyVersion uint32, opt ...Option) (*Key, error) {
 	const op = "key.newKey"
 	if id == "" {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "id is required")
 	}
-	if policyId == "" {
+	if policyID == "" {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "policyId is required")
 	}
 	if scopeSpec == nil {
@@ -53,7 +53,7 @@ func newKey(ctx context.Context, id, policyId string, scopeSpec *core.ScopeSpec,
 	k := &storepb.Key{
 		PublicId:           id,
 		Name:               opts.withName,
-		PolicyId:           policyId,
+		PolicyId:           policyID,
 		Primitive:          scopeSpec.Primitive.String(),
 		ScopeSpecification: sp,
 		CurrentVersion:     currentKeyVersion,
@@ -93,6 +93,8 @@ func (k *Key) VetForWrite(ctx context.Context, op core.WriteOp) error {
 		if k.GetName() == "" {
 			return errors.New(ctx, opCreate, errors.CodeInvalidArgument, "name is required for update")
 		}
+	case core.OpDelete:
+		// No additional validation required for delete.
 	}
 	return nil
 }

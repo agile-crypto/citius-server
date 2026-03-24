@@ -6,10 +6,10 @@ import (
 	"github.ibm.com/citius/citius-server/internal/core"
 )
 
-// PolicyEvaluator validates operations and key creation against stored policies.
+// Evaluator validates operations and key creation against stored policies.
 // This is the interface that KeyOrchestrator and CryptoOrchestrator should depend on.
 // Denial IS the error — methods return nil on allow, typed error on deny.
-type PolicyEvaluator interface {
+type Evaluator interface {
 	// ValidateOperation checks whether a crypto operation is allowed under the named policy.
 	// Use ValidateKeyCreation for pre-checking CreateKey operations with client-supplied specifications.
 	// Returns nil if allowed; returns a typed error (with denial reason) if denied.
@@ -24,9 +24,9 @@ type PolicyEvaluator interface {
 	AllowedTemplates(ctx context.Context, policyName string, scopeSpec core.ScopeSpec) ([]string, error)
 }
 
-// PolicyManager handles policy CRUD lifecycle.
+// Manager handles policy CRUD lifecycle.
 // This is the interface that the policy gRPC handler should depend on.
-type PolicyManager interface {
+type Manager interface {
 	CreatePolicy(ctx context.Context, p *Policy) (*Policy, error)
 	GetPolicy(ctx context.Context, name string) (*Policy, error)
 	UpdatePolicy(ctx context.Context, p *Policy) error
@@ -36,9 +36,9 @@ type PolicyManager interface {
 
 // Engine is the full policy interface. Enforcer implements this.
 // Consumers should prefer the narrow interface they actually need:
-//   - KeyOrchestrator/CryptoOrchestrator => PolicyEvaluator
-//   - Policy gRPC handler => PolicyManager (and optionally PolicyEvaluator for EvaluatePolicy)
+//   - KeyOrchestrator/CryptoOrchestrator => Evaluator
+//   - Policy gRPC handler => Manager (and optionally Evaluator for EvaluatePolicy)
 type Engine interface {
-	PolicyEvaluator
-	PolicyManager
+	Evaluator
+	Manager
 }

@@ -9,7 +9,7 @@ import (
 // ============================================================================
 
 func TestParseRules_emptyBytes_returnsEmptyRules(t *testing.T) {
-	// nil or empty bytes → empty PolicyRules (all sections nil, version empty)
+	// nil or empty bytes => empty Rules (all sections nil, version empty)
 	rules, err := ParseRules(nil)
 	if err != nil {
 		t.Fatalf("ParseRules(nil): %v", err)
@@ -99,14 +99,14 @@ func TestParseRules_unknownFieldsIgnored(t *testing.T) {
 // ============================================================================
 
 func TestValidate_emptyRules_ok(t *testing.T) {
-	rules := &PolicyRules{}
+	rules := &Rules{}
 	if err := rules.Validate(); err != nil {
 		t.Errorf("Validate empty rules: %v", err)
 	}
 }
 
 func TestValidate_validOperations_ok(t *testing.T) {
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version: "1",
 		AllowedOperations: &OperationRule{
 			KeyOperations: []string{"sign", "verify", "encrypt", "decrypt"},
@@ -118,7 +118,7 @@ func TestValidate_validOperations_ok(t *testing.T) {
 }
 
 func TestValidate_unknownOperation_error(t *testing.T) {
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version: "1",
 		AllowedOperations: &OperationRule{
 			KeyOperations: []string{"sign", "teleport"}, // "teleport" is not a known operation
@@ -131,7 +131,7 @@ func TestValidate_unknownOperation_error(t *testing.T) {
 
 func TestValidate_emptyAllowedTemplates_ok(t *testing.T) {
 	// Empty slice = deny all templates (valid, intentional hard deny)
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version:          "1",
 		AllowedTemplates: []string{},
 	}
@@ -142,7 +142,7 @@ func TestValidate_emptyAllowedTemplates_ok(t *testing.T) {
 
 func TestValidate_emptyTemplateID_error(t *testing.T) {
 	// A template ID that is an empty string is invalid
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ecdsa-p256-sha256", ""},
 	}
@@ -154,7 +154,7 @@ func TestValidate_emptyTemplateID_error(t *testing.T) {
 func TestValidate_securityRequirements_ok(t *testing.T) {
 	fips := true
 	block := true
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version: "1",
 		SecurityRequirements: &SecurityRequirementRule{
 			FIPSApproved:    &fips,
@@ -167,8 +167,8 @@ func TestValidate_securityRequirements_ok(t *testing.T) {
 }
 
 func TestValidate_invalidVersion_error(t *testing.T) {
-	// Only "1" is supported for M1
-	rules := &PolicyRules{
+	// Only "1" is supported for the moment
+	rules := &Rules{
 		Version: "99",
 	}
 	if err := rules.Validate(); err == nil {
@@ -178,7 +178,7 @@ func TestValidate_invalidVersion_error(t *testing.T) {
 
 func TestValidate_versionEmptyWithSections_error(t *testing.T) {
 	// If rules have any sections, version must be specified
-	rules := &PolicyRules{
+	rules := &Rules{
 		AllowedTemplates: []string{"ecdsa-p256-sha256"},
 	}
 	if err := rules.Validate(); err == nil {
@@ -187,7 +187,7 @@ func TestValidate_versionEmptyWithSections_error(t *testing.T) {
 }
 
 func TestValidate_allKeyOperations_ok(t *testing.T) {
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version: "1",
 		AllowedOperations: &OperationRule{
 			KeyOperations: []string{
@@ -204,7 +204,7 @@ func TestValidate_allKeyOperations_ok(t *testing.T) {
 
 func TestValidate_emptyKeyOperations_ok(t *testing.T) {
 	// Empty key_operations = deny all operations (valid, intentional)
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version: "1",
 		AllowedOperations: &OperationRule{
 			KeyOperations: []string{},
@@ -216,7 +216,7 @@ func TestValidate_emptyKeyOperations_ok(t *testing.T) {
 }
 
 func TestValidate_versionOnlyNoSections_ok(t *testing.T) {
-	rules := &PolicyRules{
+	rules := &Rules{
 		Version: "1",
 	}
 	if err := rules.Validate(); err != nil {

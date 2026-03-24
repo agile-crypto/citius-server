@@ -25,15 +25,15 @@ func mustNewCreateKeyInputs(
 	initialVersion uint32,
 	keyMaterial []byte,
 	status storepb.KeyStatus,
-) (*Key, *KeyVersion) {
+) (*Key, *Version) {
 	t.Helper()
 	k, err := newKey(ctx, publicID, policyID, scopeSpec, initialVersion, WithName(name), WithStatus(status))
 	if err != nil {
 		t.Fatalf("newKey(%s): %v", publicID, err)
 	}
-	v, err := newKeyVersion(
+	v, err := newVersion(
 		ctx,
-		defaultKeyVersionId(publicID, initialVersion),
+		defaultKeyVersionID(publicID, initialVersion),
 		publicID,
 		templateID,
 		providerID,
@@ -42,7 +42,7 @@ func mustNewCreateKeyInputs(
 		WithStatus(status),
 	)
 	if err != nil {
-		t.Fatalf("newKeyVersion(%s,%d): %v", publicID, initialVersion, err)
+		t.Fatalf("newVersion(%s,%d): %v", publicID, initialVersion, err)
 	}
 	return k, v
 }
@@ -127,7 +127,7 @@ func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
 func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
 	testCases := []struct {
 		name       string
-		keyId      string
+		keyID      string
 		wantStatus storepb.KeyStatus
 	}{
 		{"default_status", "kc01", storepb.KeyStatus_KEY_STATUS_ACTIVE},
@@ -140,14 +140,14 @@ func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			ctx := context.Background()
 			km := []byte("fake-key-bytes")
-			k, v := mustNewCreateKeyInputs(t, ctx, tc.keyId, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{
+			k, v := mustNewCreateKeyInputs(t, ctx, tc.keyID, tc.keyID, "template-id", "software", "policy-test", &core.ScopeSpec{
 				Primitive: core.PrimitiveSignature,
 				Scope:     core.SignatureScopeStandard,
 			}, 0, km, tc.wantStatus)
 			err := r.CreateKey(ctx, k, v, WithInitialVersion(0))
-			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyId, err)
-			v0, err := r.GetCurrentVersion(ctx, tc.keyId)
-			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyId, err)
+			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyID, err)
+			v0, err := r.GetCurrentVersion(ctx, tc.keyID)
+			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyID, err)
 			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
 			assert.Equal(tc.wantStatus, v0.GetStatus(), "version should have expected status")
 		})
@@ -230,12 +230,13 @@ func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	v2 := v.Clone()
 	v2.Version = v.Version + 1
 	v2.PublicId = "ver_02"
-	vNext, err := newKeyVersion(ctx, defaultKeyVersionId(kid, 2), kid, "template", "software", 2, []byte("key_version_1"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	vNext, err := newVersion(ctx, defaultKeyVersionID(kid, 2), kid, "template", "software", 2, []byte("key_version_1"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
 	require.NoError(err, "error creating key version 2")
-	if err := r.AddVersion(ctx, vNext); err != nil {
+	err = r.AddVersion(ctx, vNext)
+	if err != nil {
 		t.Fatalf("AddVersion: %v", err)
 	}
-	vNext2, err := newKeyVersion(ctx, defaultKeyVersionId(kid, 3), kid, "template", "software", 3, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	vNext2, err := newVersion(ctx, defaultKeyVersionID(kid, 3), kid, "template", "software", 3, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
 	require.NoError(err, "error creating key version 3")
 	err = r.AddVersion(ctx, vNext2)
 	require.NoError(err, "got error when adding second version")
@@ -375,7 +376,7 @@ func Test_VaultRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", "signature")
 
-	v, err := newKeyVersion(ctx, defaultKeyVersionId("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	v, err := newVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
 	require.NoError(t, err, "error creating key version input")
 	err = r.AddVersion(ctx, v)
 	require.NoErrorf(t, err, "error when adding version (%s,%d)", "key_01", 2)
@@ -391,9 +392,10 @@ func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", "signature")
 
-	v, err := newKeyVersion(ctx, defaultKeyVersionId("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	v, err := newVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
 	require.NoError(t, err, "error creating key version input")
-	if err := r.AddVersion(ctx, v); err != nil {
+	err = r.AddVersion(ctx, v)
+	if err != nil {
 		t.Fatalf("AddVersion: %v", err)
 	}
 
@@ -439,7 +441,7 @@ func Test_VaultRepository_AddVersion_returnsClone(t *testing.T) {
 func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	v, err := newKeyVersion(ctx, defaultKeyVersionId("key_missing", 1), "key_missing", "template", "software", 1, []byte("key_material"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	v, err := newVersion(ctx, defaultKeyVersionID("key_missing", 1), "key_missing", "template", "software", 1, []byte("key_material"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
 	require.NoError(t, err, "error creating key version input")
 	err = r.AddVersion(ctx, v)
 	if err == nil {
@@ -452,7 +454,7 @@ func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 
 func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
 	testCases := []struct {
-		keyId              string
+		keyID              string
 		additionalVersions int
 	}{
 		{"key_01", 1},
@@ -461,26 +463,26 @@ func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
 	}
 	r := repoFn()
 	for _, tc := range testCases {
-		t.Run(tc.keyId, func(t *testing.T) {
+		t.Run(tc.keyID, func(t *testing.T) {
 			assert, require := assert.New(t), require.New(t)
 			ctx := context.Background()
 			km := []byte("fake-key-bytes")
-			k, v := mustNewCreateKeyInputs(t, ctx, tc.keyId, tc.keyId, "template-id", "software", "policy-test", &core.ScopeSpec{
+			k, v := mustNewCreateKeyInputs(t, ctx, tc.keyID, tc.keyID, "template-id", "software", "policy-test", &core.ScopeSpec{
 				Primitive: core.PrimitiveSignature,
 				Scope:     core.SignatureScopeStandard,
 			}, 0, km, storepb.KeyStatus_KEY_STATUS_ACTIVE)
 			err := r.CreateKey(ctx, k, v, WithInitialVersion(0))
-			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyId, err)
-			v0, err := r.GetCurrentVersion(ctx, tc.keyId)
-			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyId, err)
+			require.NoErrorf(err, "CreateKey error for key %s: %v", tc.keyID, err)
+			v0, err := r.GetCurrentVersion(ctx, tc.keyID)
+			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyID, err)
 			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
 			for i := 1; i < tc.additionalVersions; i++ {
-				nextVersion, err := newKeyVersion(ctx, defaultKeyVersionId(tc.keyId, uint32(i)), tc.keyId, "template", "software", uint32(i), km, WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
-				require.NoErrorf(err, "newKeyVersion error for version %d of key %s: %v", i, tc.keyId, err)
+				nextVersion, err := newVersion(ctx, defaultKeyVersionID(tc.keyID, uint32(i)), tc.keyID, "template", "software", uint32(i), km, WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+				require.NoErrorf(err, "newVersion error for version %d of key %s: %v", i, tc.keyID, err)
 				err = r.AddVersion(ctx, nextVersion)
-				require.NoErrorf(err, "AddVersion error for version %d of key %s: %v", i, tc.keyId, err)
-				current, err := r.GetCurrentVersion(ctx, tc.keyId)
-				require.NoErrorf(err, "GetCurrentVersion error after adding version %d for key %s: %v", i, tc.keyId, err)
+				require.NoErrorf(err, "AddVersion error for version %d of key %s: %v", i, tc.keyID, err)
+				current, err := r.GetCurrentVersion(ctx, tc.keyID)
+				require.NoErrorf(err, "GetCurrentVersion error after adding version %d for key %s: %v", i, tc.keyID, err)
 				assert.Equal(uint32(i), current.Version, "current version should be updated to %d after adding new version", i)
 			}
 		})

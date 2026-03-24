@@ -6,9 +6,9 @@ import (
 
 // Repository defines the persistence contract for the Key aggregate.
 //
-// Key is the aggregate root; KeyVersion is an entity within that aggregate.
+// Key is the aggregate root; Version is an entity within that aggregate.
 // The repository exposes aggregate-level operations - there is no way to
-// create a KeyVersion without an associated Key (enforced by CreateKey).
+// create a Version without an associated Key (enforced by CreateKey).
 type Repository interface {
 
 	// Atomically persists a key along with its initial current version in storage. The
@@ -21,11 +21,11 @@ type Repository interface {
 	//   - SQL store: single transaction (INSERT key + INSERT version)
 	//
 	// This enforces the aggregate invariant: no Key can exist without at
-	// least one KeyVersion.
+	// least one Version.
 	//
 	// Allowed options:
 	//   - withVetForWrite (optional): defaults to true
-	CreateKey(ctx context.Context, key *Key, initialVersion *KeyVersion, opt ...Option) error
+	CreateKey(ctx context.Context, key *Key, initialVersion *Version, opt ...Option) error
 
 	// ── Key metadata reads ──
 
@@ -67,11 +67,11 @@ type Repository interface {
 	//
 	// Allowed options:
 	//   - withVetForWrite (optional): defaults to true
-	AddVersion(ctx context.Context, version *KeyVersion, opt ...Option) error
+	AddVersion(ctx context.Context, version *Version, opt ...Option) error
 
 	// GetVersion retrieves a specific version of a key by version number.
-	GetVersion(ctx context.Context, keyId string, versionNum uint32) (*KeyVersion, error)
+	GetVersion(ctx context.Context, keyID string, versionNum uint32) (*Version, error)
 
 	// Retrieves the current version of a key by public ID.
-	GetCurrentVersion(ctx context.Context, keyId string) (*KeyVersion, error)
+	GetCurrentVersion(ctx context.Context, keyID string) (*Version, error)
 }

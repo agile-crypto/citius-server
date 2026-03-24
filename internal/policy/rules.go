@@ -7,9 +7,9 @@ import (
 	"github.ibm.com/citius/citius-server/internal/core"
 )
 
-// PolicyRules is the parsed representation of StoredPolicy.rules_json.
+// Rules is the parsed representation of StoredPolicy.rules_json.
 // Zero proto imports — all fields use the same string vocabulary as core.*.
-type PolicyRules struct {
+type Rules struct {
 	Version                string                   `json:"version"`
 	AllowedTemplates       []string                 `json:"allowed_templates,omitempty"`
 	AllowedScopes          []ScopeRule              `json:"allowed_scopes,omitempty"`    // TODO parsed but not validated/evaluated
@@ -82,14 +82,14 @@ type MigrationRule struct {
 // ParseRules
 // ---------------------------------------------------------------------------
 
-// ParseRules deserializes raw JSON bytes into a PolicyRules struct.
-// nil or empty bytes return an empty PolicyRules (all sections nil).
+// ParseRules deserializes raw JSON bytes into a Rules struct.
+// nil or empty bytes return an empty Rules (all sections nil).
 // Unknown JSON fields are silently ignored (forward compatibility).
-func ParseRules(raw []byte) (*PolicyRules, error) {
+func ParseRules(raw []byte) (*Rules, error) {
 	if len(raw) == 0 {
-		return &PolicyRules{}, nil
+		return &Rules{}, nil
 	}
-	rules := &PolicyRules{}
+	rules := &Rules{}
 	if err := json.Unmarshal(raw, rules); err != nil {
 		return nil, fmt.Errorf("parse rules_json: %w", err)
 	}
@@ -130,7 +130,7 @@ var supportedVersions = map[string]bool{
 // security_requirements (bool fields — no string validation needed).
 //
 // TODO sections are silently skipped (no validation).
-func (r *PolicyRules) Validate() error {
+func (r *Rules) Validate() error {
 	// --- Version ---
 	if r.hasAnySections() && r.Version == "" {
 		return fmt.Errorf("version is required when policy has rule sections")
@@ -165,7 +165,7 @@ func (r *PolicyRules) Validate() error {
 }
 
 // hasAnySections reports whether any rule section is non-nil/non-empty.
-func (r *PolicyRules) hasAnySections() bool {
+func (r *Rules) hasAnySections() bool {
 	return len(r.AllowedTemplates) > 0 ||
 		len(r.AllowedScopes) > 0 ||
 		r.AllowedProviders != nil ||

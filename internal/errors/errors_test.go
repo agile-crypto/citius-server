@@ -32,7 +32,7 @@ func TestNew_setsFields(t *testing.T) {
 
 func TestNew_nilCtxOK(t *testing.T) {
 	// context is currently unused but required for future tracing
-	err := errors.New(nil, testOp, errors.CodeInternal, "boom")
+	err := errors.New(context.TODO(), testOp, errors.CodeInternal, "boom")
 	if err == nil {
 		t.Fatal("expected non-nil error")
 	}

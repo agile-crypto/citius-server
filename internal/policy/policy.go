@@ -44,6 +44,8 @@ func (p *Policy) VetForWrite(ctx context.Context, op core.WriteOp) error {
 		if p.stored.GetName() == "" {
 			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "name is required")
 		}
+	case core.OpDelete:
+		// No additional validation required for delete.
 	}
 	return nil
 }

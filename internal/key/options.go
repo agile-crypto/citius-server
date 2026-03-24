@@ -23,13 +23,12 @@ type Option func(*options)
 // options = how options are represented
 type options struct {
 	withLock            *sync.RWMutex
-	withTemplateId      string
+	withTemplateID      string
 	withStatus          store.KeyStatus
 	withLabels          map[string]string
 	withName            string
-	withWrappingKeyId   string
-	withPublicId        string
-	withDigest          []byte
+	withWrappingKeyID   string
+	withPublicID        string
 	withDigestAlgorithm string
 	withCurrentVersion  uint32
 	withInitialVersion  uint32
@@ -55,10 +54,10 @@ func WithLock(lock *sync.RWMutex) Option {
 	}
 }
 
-// WithTemplateId provides an optional template ID.
-func WithTemplateId(templateId string) Option {
+// WithTemplateID provides an optional template ID.
+func WithTemplateID(templateID string) Option {
 	return func(o *options) {
-		o.withTemplateId = templateId
+		o.withTemplateID = templateID
 	}
 }
 
@@ -83,15 +82,15 @@ func WithName(name string) Option {
 	}
 }
 
-func WithWrappingKeyId(wrappingKeyId string) Option {
+func WithWrappingKeyID(wrappingKeyID string) Option {
 	return func(o *options) {
-		o.withWrappingKeyId = wrappingKeyId
+		o.withWrappingKeyID = wrappingKeyID
 	}
 }
 
-func WithKeyVersionId(versionId string) Option {
+func WithKeyVersionID(versionID string) Option {
 	return func(o *options) {
-		o.withPublicId = versionId
+		o.withPublicID = versionID
 	}
 }
 

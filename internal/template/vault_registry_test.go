@@ -228,12 +228,6 @@ func registryWithBothTemplates(t *testing.T) template.Registry {
 // signatureScope matches any signature template regardless of scope variant.
 var signatureScope = core.ScopeSpec{Primitive: core.PrimitiveSignature}
 
-// signatureScopeStandard matches only standard signature templates.
-var signatureScopeStandard = core.ScopeSpec{
-	Primitive: core.PrimitiveSignature,
-	Scope:     core.SignatureScopeStandard,
-}
-
 func TestVaultRegistry_Select_byScope_noSecurityFilter(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	// No security filter and all templates eligible — both match scope.

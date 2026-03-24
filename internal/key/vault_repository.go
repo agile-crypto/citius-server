@@ -94,18 +94,18 @@ func (r *VaultRepository) getKey(ctx context.Context, id string) (*Key, error) {
 	return NewKey(storedKey), nil
 }
 
-func (r *VaultRepository) getKeyVersion(ctx context.Context, keyId string, version uint32) (*KeyVersion, error) {
+func (r *VaultRepository) getKeyVersion(ctx context.Context, keyID string, version uint32) (*Version, error) {
 	const op errors.Op = "key.(VaultRepository).getKeyVersion"
 	storedVersion := &storepb.KeyVersion{}
-	err := get(ctx, r.keyVersions, versionKey(keyId, version), storedVersion)
+	err := get(ctx, r.keyVersions, versionKey(keyID, version), storedVersion)
 	if err != nil {
 		if errors.IsKeyNotFound(err) {
 			return nil, errors.New(ctx, op, errors.CodeKeyNotFound,
-				fmt.Sprintf("Key version not found (keyId=%s,version=%d)", keyId, version))
+				fmt.Sprintf("Key version not found (keyId=%s,version=%d)", keyID, version))
 		}
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return NewKeyVersion(storedVersion), nil
+	return NewVersion(storedVersion), nil
 }
 
 // set create and update time
@@ -154,21 +154,21 @@ func (r *VaultRepository) deleteKey(ctx context.Context, id string) error {
 	return r.keys.Delete(ctx, id)
 }
 
-func versionKey(keyId string, version uint32) string {
-	return versionKeyStr(keyId, fmt.Sprintf("%d", version))
+func versionKey(keyID string, version uint32) string {
+	return versionKeyStr(keyID, fmt.Sprintf("%d", version))
 }
 
-func versionKeyStr(keyId, version string) string {
-	return strings.Join([]string{keyId, version}, versionSep)
+func versionKeyStr(keyID, version string) string {
+	return strings.Join([]string{keyID, version}, versionSep)
 }
 
-func versionPrefix(keyId string) string {
-	return keyId + versionSep
+func versionPrefix(keyID string) string {
+	return keyID + versionSep
 }
 
 // set create and update time
 // fails if version already exists
-func (r *VaultRepository) putKeyVersion(ctx context.Context, value *KeyVersion, vetForWrite bool) error {
+func (r *VaultRepository) putKeyVersion(ctx context.Context, value *Version, vetForWrite bool) error {
 	const op = "key.(VaultRepository).putKeyVersion"
 	if vetForWrite {
 		if err := value.VetForWrite(ctx, core.OpCreate); err != nil {
@@ -188,31 +188,11 @@ func (r *VaultRepository) putKeyVersion(ctx context.Context, value *KeyVersion, 
 	return put(ctx, r.keyVersions, versionKey(value.KeyId, value.Version), value.KeyVersion)
 }
 
-// set update time but not create time
-// fails if version does not already exist
-func (r *VaultRepository) updateKeyVersion(ctx context.Context, value *KeyVersion, vetForWrite bool) error {
-	const op = "key.(VaultRepository).updateKeyVersion"
-	if vetForWrite {
-		if err := value.VetForWrite(ctx, core.OpUpdate); err != nil {
-			return errors.Wrap(ctx, op, err)
-		}
-	}
-	old, err := r.getKeyVersion(ctx, value.KeyId, value.Version)
-	if err != nil {
-		return errors.Wrap(ctx, op, err)
-	}
-	if old == nil {
-		return errors.New(ctx, op, errors.CodeKeyNotFound, "key version not found: (keyId: "+value.KeyId+", version: "+fmt.Sprintf("%d", value.Version)+")")
-	}
-	value.UpdateTime = timestamppb.Now()
-	return put(ctx, r.keyVersions, versionKey(value.KeyId, value.Version), value.KeyVersion)
+func (r *VaultRepository) deleteKeyVersion(ctx context.Context, keyID string, version uint32) error {
+	return r.keyVersions.Delete(ctx, versionKey(keyID, version))
 }
 
-func (r *VaultRepository) deleteKeyVersion(ctx context.Context, keyId string, version uint32) error {
-	return r.keyVersions.Delete(ctx, versionKey(keyId, version))
-}
-
-func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersion *KeyVersion, opt ...Option) error {
+func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersion *Version, opt ...Option) error {
 	const op errors.Op = "key.(VaultRepository).CreateKey"
 	if key == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "key must not be nil")
@@ -317,7 +297,7 @@ func (r *VaultRepository) DeleteKey(ctx context.Context, id string) error {
 			"key not found: "+id)
 	}
 
-	if err := r.keys.Delete(ctx, id); err != nil {
+	if err = r.keys.Delete(ctx, id); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 
@@ -336,7 +316,7 @@ func (r *VaultRepository) DeleteKey(ctx context.Context, id string) error {
 // ── Version operations ──
 
 // fails if the version number does not match the current version + 1, or if the parent key does not exist
-func (r *VaultRepository) AddVersion(ctx context.Context, version *KeyVersion, opt ...Option) error {
+func (r *VaultRepository) AddVersion(ctx context.Context, version *Version, opt ...Option) error {
 	const op errors.Op = "key.(VaultRepository).AddVersion"
 	if version.KeyId == "" {
 		return errors.New(ctx, op, errors.CodeInvalidArgument,
@@ -365,32 +345,32 @@ func (r *VaultRepository) AddVersion(ctx context.Context, version *KeyVersion, o
 	}
 	err = r.updateKey(ctx, newKey, opts.withVetForWrite)
 	if err != nil {
-		r.deleteKeyVersion(ctx, version.KeyId, version.Version)
+		_ = r.deleteKeyVersion(ctx, version.KeyId, version.Version) // best-effort cleanup
 		return errors.Wrap(ctx, op, err)
 	}
 
 	return nil
 }
 
-func (r *VaultRepository) getCurrentVersionInternal(ctx context.Context, keyId string) (*KeyVersion, error) {
+func (r *VaultRepository) getCurrentVersionInternal(ctx context.Context, keyID string) (*Version, error) {
 	const op errors.Op = "key.(VaultRepository).getCurrentVersionInternal"
-	k, err := r.getKey(ctx, keyId)
+	k, err := r.getKey(ctx, keyID)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	v, err := r.getKeyVersion(ctx, keyId, k.CurrentVersion)
+	v, err := r.getKeyVersion(ctx, keyID, k.CurrentVersion)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return v, nil
 }
 
-func (r *VaultRepository) GetCurrentVersion(ctx context.Context, keyId string) (*KeyVersion, error) {
+func (r *VaultRepository) GetCurrentVersion(ctx context.Context, keyID string) (*Version, error) {
 	const op errors.Op = "key.(VaultRepository).GetCurrentVersion"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	v, err := r.getCurrentVersionInternal(ctx, keyId)
+	v, err := r.getCurrentVersionInternal(ctx, keyID)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -398,21 +378,21 @@ func (r *VaultRepository) GetCurrentVersion(ctx context.Context, keyId string) (
 
 }
 
-func (r *VaultRepository) getVersionInternal(ctx context.Context, keyId string, versionNumber uint32) (*KeyVersion, error) {
+func (r *VaultRepository) getVersionInternal(ctx context.Context, keyID string, versionNumber uint32) (*Version, error) {
 	const op errors.Op = "key.(VaultRepository).getVersionInternal"
 
-	v, err := r.getKeyVersion(ctx, keyId, versionNumber)
+	v, err := r.getKeyVersion(ctx, keyID, versionNumber)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return v, nil
 }
-func (r *VaultRepository) GetVersion(ctx context.Context, keyId string, versionNumber uint32) (*KeyVersion, error) {
+func (r *VaultRepository) GetVersion(ctx context.Context, keyID string, versionNumber uint32) (*Version, error) {
 	const op errors.Op = "key.(VaultRepository).GetVersion"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	v, err := r.getVersionInternal(ctx, keyId, versionNumber)
+	v, err := r.getVersionInternal(ctx, keyID, versionNumber)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}

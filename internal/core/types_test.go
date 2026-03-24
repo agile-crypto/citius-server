@@ -17,6 +17,12 @@ func TestKeyCreationSpec_hasRequiredFields(t *testing.T) {
 	if spec.Name == "" {
 		t.Error("Name field missing")
 	}
+	if spec.TemplateID == "" {
+		t.Error("TemplateID field missing")
+	}
+	if spec.PolicyID == "" {
+		t.Error("PolicyID field missing")
+	}
 }
 
 func TestOperation_stringConstants(t *testing.T) {
@@ -48,5 +54,8 @@ func TestKeyMaterial_hasFields(t *testing.T) {
 	}
 	if km.PublicKeyBytes == nil {
 		t.Error("PublicKeyBytes field missing")
+	}
+	if km.PrivateKeyBytes == nil {
+		t.Error("PrivateKeyBytes field missing")
 	}
 }
