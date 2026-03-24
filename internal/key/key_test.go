@@ -12,10 +12,11 @@ import (
 
 func TestKey_VetForWrite_Create_happyPath(t *testing.T) {
 	k := key.NewKey(&storepb.Key{
-		PublicId:  "key_01HXYZ",
-		Name:      "signing-key",
-		Primitive: "signature",
-		Status:    storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		PublicId:           "key_01HXYZ",
+		Name:               "signing-key",
+		Primitive:          "signature",
+		Status:             storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		ScopeSpecification: []byte(`{"primitive":"signature"}`),
 	})
 	if err := k.VetForWrite(context.Background(), core.OpCreate); err != nil {
 		t.Errorf("VetForWrite(Create): unexpected error: %v", err)
