@@ -268,31 +268,8 @@ func TestKey_validate_policyID_wrong_prefix(t *testing.T) {
 	}
 }
 
-func TestKey_validate_providerInstanceID_not_valid_when_empty(t *testing.T) {
-	v := validator(t)
-	k := &storepb.Key{
-		PublicId:       "key_01HXYZ12345678901234567890",
-		Name:           "my-key",
-		PolicyId:       "pol_01HXYZ12345678901234567890",
-		CurrentVersion: 1,
-	}
-	if err := v.Validate(k); err == nil {
-		t.Errorf("empty provider_instance_id not allowed: %v", err)
-	}
-}
-
-func TestKey_validate_providerInstanceID_wrong_prefix(t *testing.T) {
-	v := validator(t)
-	k := &storepb.Key{
-		PublicId:       "key_01HXYZ12345678901234567890",
-		Name:           "my-key",
-		PolicyId:       "pol_01HXYZ12345678901234567890",
-		CurrentVersion: 1,
-	}
-	if err := v.Validate(k); err == nil {
-		t.Error("expected validation error for provider_instance_id with wrong prefix (pol_ instead of prv_)")
-	}
-}
+// NOTE: Key proto does not have a provider_instance_id field.
+// Provider binding is on KeyVersion.provider_id, not on Key itself.
 
 func TestKey_validate_currentVersion_zero(t *testing.T) {
 	v := validator(t)
@@ -323,10 +300,11 @@ func TestKey_validate_currentVersion_empty(t *testing.T) {
 func TestKeyVersion_validate_valid(t *testing.T) {
 	v := validator(t)
 	kv := &storepb.KeyVersion{
-		PublicId: "ver_01HXYZ12345678901234567890",
-		KeyId:    "key_01HXYZ12345678901234567890",
-		Version:  1,
-		Digest:   []byte("mac"),
+		PublicId:   "ver_01HXYZ12345678901234567890",
+		KeyId:      "key_01HXYZ12345678901234567890",
+		Version:    1,
+		Digest:     []byte("mac"),
+		ProviderId: "prv_software",
 	}
 	if err := v.Validate(kv); err != nil {
 		t.Errorf("expected valid KeyVersion to pass: %v", err)
