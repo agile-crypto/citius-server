@@ -20,7 +20,8 @@ type Evaluator interface {
 	ValidateKeyCreation(ctx context.Context, policyName string, spec *core.KeyCreationSpec) error
 
 	// AllowedTemplates returns the template IDs permitted for the given scope by the named policy.
-	// Returns nil if the policy imposes no template restriction.
+	// Deny-by-default: absent section returns an empty non-nil slice (nothing allowed).
+	// Returns nil only when policyName is empty (bypass).
 	AllowedTemplates(ctx context.Context, policyName string, scopeSpec core.ScopeSpec) ([]string, error)
 }
 

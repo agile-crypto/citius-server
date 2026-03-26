@@ -172,9 +172,32 @@ func (r *Enforcer) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyC
 	return nil
 }
 
-// AllowedTemplates is a stub — returns nil (no restriction, all templates allowed).
-func (r *Enforcer) AllowedTemplates(_ context.Context, _ string, _ core.ScopeSpec) ([]string, error) {
-	return nil, nil
+// AllowedTemplates returns the template IDs the named policy explicitly permits.
+// Empty policyName => bypass (nil, nil). Under deny-by-default, a policy with
+// absent allowed_templates returns an empty non-nil slice (nothing allowed).
+// TODO: The scopeSpec parameter is accepted but ignored for now. Implement later.
+func (r *Enforcer) AllowedTemplates(ctx context.Context, policyName string,
+	_ core.ScopeSpec) ([]string, error) {
+	const op errors.Op = "policy.(Enforcer).AllowedTemplates"
+
+	// Empty policy name => bypass (no policy assigned)
+	if policyName == "" {
+		return nil, nil
+	}
+
+	p, err := r.store.GetPolicy(ctx, policyName)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	ids, err := r.evaluator.AllowedTemplateIDs(p.RulesJSON())
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	//TODO: need to filter by scope spec
+
+	return ids, nil
 }
 
 // Compile-time assertion - TODO: uncomment when all policy.Engine methods are implemented.
