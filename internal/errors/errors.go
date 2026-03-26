@@ -63,3 +63,9 @@ func As(err error, target **Error) bool {
 	// This is the only place in internal/errors that touches stdlib errors.
 	return stderrsAs(err, target)
 }
+
+// Is is a convenience alias for the stdlib errors.Is.
+// It reports whether any error in err's chain matches target.
+func Is(err, target error) bool {
+	return stderrsIs(err, target)
+}
