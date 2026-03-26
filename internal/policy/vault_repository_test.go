@@ -5,15 +5,12 @@ import (
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/policy"
 )
 
 func newTestPolicy(name string) *policy.Policy {
-	return policy.New(&storepb.StoredPolicy{
-		Name: name,
-	})
+	return policy.NewPolicy("", name, nil)
 }
 
 var repoFn = func() policy.Repository {

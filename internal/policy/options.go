@@ -12,10 +12,12 @@ func getOpts(opt ...Option) options {
 	return opts
 }
 
+// Option configures optional parameters for Policy or VaultRepository construction.
 type Option func(*options)
 
 type options struct {
-	withLock *sync.RWMutex
+	withLock   *sync.RWMutex
+	withLabels map[string]string
 }
 
 func getDefaultOptions() options {
@@ -24,9 +26,16 @@ func getDefaultOptions() options {
 	}
 }
 
-// WithLock provides an optional reference to a lock
+// WithLock provides an optional reference to a lock (used by VaultRepository).
 func WithLock(lock *sync.RWMutex) Option {
 	return func(o *options) {
 		o.withLock = lock
+	}
+}
+
+// WithLabels provides optional labels for a policy.
+func WithLabels(labels map[string]string) Option {
+	return func(o *options) {
+		o.withLabels = labels
 	}
 }

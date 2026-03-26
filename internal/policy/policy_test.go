@@ -4,23 +4,19 @@ import (
 	"context"
 	"testing"
 
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/policy"
 )
 
 func TestPolicy_VetForWrite_Create_happyPath(t *testing.T) {
-	p := policy.New(&storepb.StoredPolicy{
-		PublicId: "pol_01HXYZ",
-		Name:     "default-sig-policy",
-	})
+	p := policy.NewPolicy("pol_01HXYZ", "default-sig-policy", nil)
 	if err := p.VetForWrite(context.Background(), core.OpCreate); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
 
 func TestPolicy_VetForWrite_Create_missingName(t *testing.T) {
-	p := policy.New(&storepb.StoredPolicy{PublicId: "pol_01HXYZ"})
+	p := policy.NewPolicy("pol_01HXYZ", "", nil)
 	err := p.VetForWrite(context.Background(), core.OpCreate)
 	if err == nil {
 		t.Fatal("expected error for missing Name")
@@ -28,11 +24,9 @@ func TestPolicy_VetForWrite_Create_missingName(t *testing.T) {
 }
 
 func TestPolicy_Clone_independent(t *testing.T) {
-	p := policy.New(&storepb.StoredPolicy{
-		PublicId: "pol_01HXYZ",
-		Name:     "policy-1",
-		Labels:   map[string]string{"team": "security"},
-	})
+	p := policy.NewPolicy("pol_01HXYZ", "policy-1", nil,
+		policy.WithLabels(map[string]string{"team": "security"}),
+	)
 	c := p.Clone()
 	c.StoredPolicy().Labels["team"] = "platform"
 	if p.StoredPolicy().Labels["team"] != "security" {

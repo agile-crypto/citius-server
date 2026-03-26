@@ -14,7 +14,28 @@ type Policy struct {
 	stored *storepb.StoredPolicy
 }
 
-// New wraps a StoredPolicy.
+// NewPolicy creates a Policy from explicit domain parameters.
+// rulesJSON is the core representation of the policy's rules (may be nil for
+// an "open" policy with no restrictions). Optional fields such as labels are
+// set via functional options.
+//
+//	p := policy.NewPolicy("pol_01HXYZ", "default-sig-policy", rulesBytes,
+//	    policy.WithLabels(map[string]string{"team": "security"}),
+//	)
+func NewPolicy(publicID, name string, rulesJSON []byte, opt ...Option) *Policy {
+	opts := getOpts(opt...)
+	sp := &storepb.StoredPolicy{
+		PublicId:  publicID,
+		Name:      name,
+		RulesJson: rulesJSON,
+		Labels:    opts.withLabels,
+	}
+	return &Policy{stored: sp}
+}
+
+// New wraps an existing StoredPolicy proto into the domain type.
+// This is used for rehydration from storage — callers creating a new policy
+// should prefer NewPolicy(publicID, name, rulesJSON, opts...) instead.
 func New(stored *storepb.StoredPolicy) *Policy {
 	if stored == nil {
 		stored = &storepb.StoredPolicy{}
@@ -22,11 +43,16 @@ func New(stored *storepb.StoredPolicy) *Policy {
 	return &Policy{stored: stored}
 }
 
+// ---- Accessors ----
+
 func (p *Policy) StoredPolicy() *storepb.StoredPolicy { return p.stored }
 
 func (p *Policy) PublicID() string { return p.stored.GetPublicId() }
 
 func (p *Policy) Name() string { return p.stored.GetName() }
+
+// RulesJSON returns the raw rules_json bytes from the underlying StoredPolicy.
+func (p *Policy) RulesJSON() []byte { return p.stored.GetRulesJson() }
 
 // Callers should use Clone() before mutating.
 func (p *Policy) Clone() *Policy {
@@ -49,14 +75,5 @@ func (p *Policy) VetForWrite(ctx context.Context, op core.WriteOp) error {
 	}
 	return nil
 }
-
-// Behavioral Methods
-//
-// TODO: AllowsOperation(operation core.Operation) bool and AllowsTemplate(templateID string) bool
-// are deferred. StoredPolicy uses an opaque `rules_json` blob rather than discrete
-// AllowedOperations / AllowedAlgorithms repeated-string fields. These behavioural
-// methods will be implemented when the policy rules engine (PolicyEngine) parses
-// rules_json when implementing the PolicyEngine.
-// See proto/store/policy.proto.
 
 var _ core.VetForWriter = (*Policy)(nil)
