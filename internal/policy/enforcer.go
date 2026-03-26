@@ -40,6 +40,11 @@ func (r *Enforcer) CreatePolicy(ctx context.Context, p *Policy) (*Policy, error)
 	if err := p.VetForWrite(ctx, core.OpCreate); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
+	// Validate rules_json via evaluator
+	if err := r.evaluator.Validate(p.RulesJSON()); err != nil {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"invalid rules_json: "+err.Error())
+	}
 	// Check for duplicate
 	if _, err := r.store.GetPolicy(ctx, p.Name()); err == nil {
 		return nil, errors.New(ctx, op, errors.CodeAlreadyExists,
@@ -67,6 +72,11 @@ func (r *Enforcer) UpdatePolicy(ctx context.Context, p *Policy) error {
 	}
 	if err := p.VetForWrite(ctx, core.OpUpdate); err != nil {
 		return errors.Wrap(ctx, op, err)
+	}
+	// Validate rules_json via evaluator
+	if err := r.evaluator.Validate(p.RulesJSON()); err != nil {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			"invalid rules_json: "+err.Error())
 	}
 	// Verify policy exists before update
 	if _, err := r.store.GetPolicy(ctx, p.Name()); err != nil {
@@ -103,14 +113,61 @@ func (r *Enforcer) ListPolicies(ctx context.Context) ([]*Policy, error) {
 	return out, nil
 }
 
-// ---- Evaluation stubs (TODO: Implement them later) ----
+// ---- Evaluation ----
 
-// ValidateOperation is a stub - all operations are allowed.
-func (r *Enforcer) ValidateOperation(_ context.Context, _ string, _ core.Operation, _, _ string) error {
+// ValidateOperation checks whether a crypto operation is permitted by the named policy.
+// Empty policyName = bypass (no policy assigned yet). When a policy IS assigned,
+// deny-by-default applies: absent sections in rules_json mean deny, not allow.
+// Evaluation order: template => operation. MeetsSecurityRequirements is deferred
+// to the orchestrator layer which has access to TemplateSecurityInfo.
+func (r *Enforcer) ValidateOperation(ctx context.Context, policyName string,
+	operation core.Operation, templateID, providerID string) error {
+	const op errors.Op = "policy.(Enforcer).ValidateOperation"
+
+	// Empty policy name => bypass (no policy assigned yet)
+	if policyName == "" {
+		return nil
+	}
+
+	p, err := r.store.GetPolicy(ctx, policyName)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+
+	rulesJSON := p.RulesJSON()
+
+	// Check 1: Template allowed?
+	if templateID != "" {
+		var allowed bool
+		allowed, err = r.evaluator.AllowsTemplate(rulesJSON, templateID)
+		if err != nil {
+			return errors.Wrap(ctx, op, err)
+		}
+		if !allowed {
+			return errors.New(ctx, op, errors.CodePolicyViolation,
+				"template "+templateID+" not permitted by policy "+policyName)
+		}
+	}
+
+	// Check 2: Operation allowed?
+	allowed, err := r.evaluator.AllowsOperation(rulesJSON, operation)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	if !allowed {
+		return errors.New(ctx, op, errors.CodePolicyViolation,
+			"operation "+string(operation)+" not permitted by policy "+policyName)
+	}
+
+	// Check 3: MeetsSecurityRequirements — deferred to orchestrator layer.
+	// The orchestrator has the Template and can construct TemplateSecurityInfo.
+
 	return nil
 }
 
-// ValidateKeyCreation is a stub — all key creation is allowed.
+// ValidateKeyCreation is a stub for the moment — all key creation is allowed.
+// TODO: Key creation restrictions (min key size, extractable, rotation) are to be implemented
+// (key_configuration section in rules_json).
 func (r *Enforcer) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyCreationSpec) error {
 	return nil
 }
@@ -121,4 +178,4 @@ func (r *Enforcer) AllowedTemplates(_ context.Context, _ string, _ core.ScopeSpe
 }
 
 // Compile-time assertion - TODO: uncomment when all policy.Engine methods are implemented.
-// var _ Engine = (*Enforcer)(nil)
+var _ Engine = (*Enforcer)(nil)

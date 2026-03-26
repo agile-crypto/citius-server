@@ -18,11 +18,13 @@ type RulesEvaluator interface {
 	Validate(rulesJSON []byte) error
 
 	// AllowsOperation checks if the given operation is permitted by the rules.
-	// Returns (true, nil) if allowed, (false, nil) if denied, or (false, err) on parse error.
+	// Deny-by-default: absent section returns (false, nil).
+	// Returns (true, nil) if explicitly allowed, (false, nil) if denied, or (false, err) on parse error.
 	AllowsOperation(rulesJSON []byte, op core.Operation) (bool, error)
 
 	// AllowsTemplate checks if the given template ID is permitted by the rules.
-	// Returns (true, nil) if allowed, (false, nil) if denied, or (false, err) on parse error.
+	// Deny-by-default: absent section returns (false, nil).
+	// Returns (true, nil) if explicitly allowed, (false, nil) if denied, or (false, err) on parse error.
 	AllowsTemplate(rulesJSON []byte, templateID string) (bool, error)
 
 	// MeetsSecurityRequirements checks template security properties against
@@ -31,8 +33,8 @@ type RulesEvaluator interface {
 	MeetsSecurityRequirements(rulesJSON []byte, info TemplateSecurityInfo) error
 
 	// AllowedTemplateIDs returns the template IDs explicitly permitted by the rules.
-	// Returns nil if the rules impose no template restriction (absent/null section).
-	// Returns an empty non-nil slice if rules deny all templates.
+	// Deny-by-default: absent section returns an empty non-nil slice (nothing allowed).
+	// Returns a non-empty slice if the rules explicitly list allowed templates.
 	AllowedTemplateIDs(rulesJSON []byte) ([]string, error)
 }
 

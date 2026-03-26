@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/policy"
 )
@@ -16,7 +15,7 @@ func setupEnforcer(t *testing.T) *policy.Enforcer {
 	ctx := context.Background()
 	storage := &logical.InmemStorage{}
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
-	enforcer, err := policy.NewEnforcer(policyRepo, policy.NewNoopEvaluator())
+	enforcer, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -24,10 +23,7 @@ func setupEnforcer(t *testing.T) *policy.Enforcer {
 }
 
 func makePolicy(publicID, name string) *policy.Policy {
-	return policy.New(&storepb.StoredPolicy{
-		PublicId: publicID,
-		Name:     name,
-	})
+	return policy.NewPolicy(publicID, name, nil)
 }
 
 // ============================================================================
@@ -80,7 +76,7 @@ func TestEnforcer_CreatePolicy_nilPolicy_returnsError(t *testing.T) {
 func TestEnforcer_CreatePolicy_invalidPolicy_returnsError(t *testing.T) {
 	// Missing Name fails VetForWrite
 	e := setupEnforcer(t)
-	p := policy.New(&storepb.StoredPolicy{PublicId: "pol_01"}) // no name
+	p := policy.NewPolicy("pol_01", "", nil) // no name
 	_, err := e.CreatePolicy(context.Background(), p)
 	if err == nil {
 		t.Fatal("expected error for invalid policy")

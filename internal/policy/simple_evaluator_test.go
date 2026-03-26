@@ -44,24 +44,24 @@ func TestSimple_Validate_unknownOperation_error(t *testing.T) {
 // AllowsOperation
 // ============================================================================
 
-func TestSimple_AllowsOperation_noRules_allowAll(t *testing.T) {
+func TestSimple_AllowsOperation_noRules_denyAll(t *testing.T) {
 	ok, err := newSimple().AllowsOperation(nil, core.OperationSign)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if !ok {
-		t.Error("expected allow when rules are empty")
+	if ok {
+		t.Error("expected deny when rules are empty (deny-by-default)")
 	}
 }
 
-func TestSimple_AllowsOperation_absentSection_allowAll(t *testing.T) {
+func TestSimple_AllowsOperation_absentSection_denyAll(t *testing.T) {
 	raw := []byte(`{"version":"1","allowed_templates":["x"]}`)
 	ok, err := newSimple().AllowsOperation(raw, core.OperationSign)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if !ok {
-		t.Error("expected allow when allowed_operations is absent")
+	if ok {
+		t.Error("expected deny when allowed_operations is absent (deny-by-default)")
 	}
 }
 
@@ -102,24 +102,24 @@ func TestSimple_AllowsOperation_emptyKeyOps_denyAll(t *testing.T) {
 // AllowsTemplate
 // ============================================================================
 
-func TestSimple_AllowsTemplate_noRules_allowAll(t *testing.T) {
+func TestSimple_AllowsTemplate_noRules_denyAll(t *testing.T) {
 	ok, err := newSimple().AllowsTemplate(nil, "ecdsa-p256-sha256")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if !ok {
-		t.Error("expected allow when rules are empty")
+	if ok {
+		t.Error("expected deny when rules are empty (deny-by-default)")
 	}
 }
 
-func TestSimple_AllowsTemplate_absentSection_allowAll(t *testing.T) {
+func TestSimple_AllowsTemplate_absentSection_denyAll(t *testing.T) {
 	raw := []byte(`{"version":"1","allowed_operations":{"key_operations":["sign"]}}`)
 	ok, err := newSimple().AllowsTemplate(raw, "ecdsa-p256-sha256")
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if !ok {
-		t.Error("expected allow when allowed_templates is absent")
+	if ok {
+		t.Error("expected deny when allowed_templates is absent (deny-by-default)")
 	}
 }
 
@@ -219,24 +219,30 @@ func TestSimple_MeetsSecurity_fipsAndBlockDeprecated_both(t *testing.T) {
 // AllowedTemplateIDs
 // ============================================================================
 
-func TestSimple_AllowedTemplateIDs_noRules_nil(t *testing.T) {
+func TestSimple_AllowedTemplateIDs_noRules_emptySlice(t *testing.T) {
 	ids, err := newSimple().AllowedTemplateIDs(nil)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if ids != nil {
-		t.Errorf("expected nil, got %v", ids)
+	if ids == nil {
+		t.Error("expected non-nil empty slice, got nil")
+	}
+	if len(ids) != 0 {
+		t.Errorf("expected 0, got %d", len(ids))
 	}
 }
 
-func TestSimple_AllowedTemplateIDs_absentSection_nil(t *testing.T) {
+func TestSimple_AllowedTemplateIDs_absentSection_emptySlice(t *testing.T) {
 	raw := []byte(`{"version":"1","allowed_operations":{"key_operations":["sign"]}}`)
 	ids, err := newSimple().AllowedTemplateIDs(raw)
 	if err != nil {
 		t.Fatalf("error: %v", err)
 	}
-	if ids != nil {
-		t.Errorf("expected nil, got %v", ids)
+	if ids == nil {
+		t.Error("expected non-nil empty slice, got nil")
+	}
+	if len(ids) != 0 {
+		t.Errorf("expected 0, got %d", len(ids))
 	}
 }
 
