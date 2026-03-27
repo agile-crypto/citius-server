@@ -3,7 +3,6 @@ package crypto
 import (
 	messages "github.ibm.com/citius/citius-server/gen/go/messages"
 	types "github.ibm.com/citius/citius-server/gen/go/types"
-	"github.ibm.com/citius/citius-server/internal/key"
 )
 
 // SignRequest carries the inputs for a Sign operation at the orchestrator level.
@@ -115,8 +114,12 @@ type UnwrapKeyRequest struct {
 }
 
 // UnwrapKeyResult carries the outputs of an UnwrapKey operation.
+// The orchestrator is responsible for creating a key.Key aggregate from the
+// unwrapped material and persisting it via key.Repository.
 type UnwrapKeyResult struct {
-	UnwrappedKey *key.Key
+	UnwrappedKeyMaterial []byte                   // raw key bytes returned by the provider
+	Algorithm            string                   // algorithm of the unwrapped key
+	Output               *messages.ProviderOutput // provider-generated output
 }
 
 // DeriveKeyRequest carries the inputs for a DeriveKey operation.

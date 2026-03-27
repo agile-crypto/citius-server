@@ -5,9 +5,11 @@ linters:
   default: none
   enable:
     - cyclop
+    - depguard
     - errcheck
     - errorlint
     - exhaustive
+    - forbidigo
     - gocognit
     - gosec
     - govet
@@ -20,8 +22,146 @@ linters:
   settings:
     cyclop:
       max-complexity: 15
+    depguard:
+      rules:
+        # ── Leaf-package strict rules ──────────────────────────────
+        # core/ is the shared-vocabulary leaf.  See core/doc.go.
+        core-is-leaf:
+          list-mode: strict
+          files:
+            - '**/internal/core/**/*.go'
+            - '!$test'
+          allow:
+            - $gostd
+            - github.ibm.com/citius/citius-server/internal/errors
+            - github.com/oklog/ulid/v2
+        # errors/ is the absolute leaf — stdlib + gRPC status codes.
+        errors-is-leaf:
+          list-mode: strict
+          files:
+            - '**/internal/errors/**/*.go'
+            - '!$test'
+          allow:
+            - $gostd
+            - google.golang.org/grpc/codes
+        # ── Sibling bounded-context isolation ─────────────────────
+        # Each domain package lists the internal packages it must NOT import.
+        policy-no-siblings:
+          list-mode: lax
+          files:
+            - '**/internal/policy/**/*.go'
+          deny:
+            - pkg: github.ibm.com/citius/citius-server/internal/key
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/template
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/provider
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/crypto
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/service
+              desc: domain must not import service layer
+            - pkg: github.ibm.com/citius/citius-server/internal/app
+              desc: domain must not import app layer
+            - pkg: github.ibm.com/citius/citius-server/internal/storage
+              desc: domain must not import storage
+        key-no-siblings:
+          list-mode: lax
+          files:
+            - '**/internal/key/**/*.go'
+          deny:
+            - pkg: github.ibm.com/citius/citius-server/internal/policy
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/template
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/provider
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/crypto
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/service
+              desc: domain must not import service layer
+            - pkg: github.ibm.com/citius/citius-server/internal/app
+              desc: domain must not import app layer
+            - pkg: github.ibm.com/citius/citius-server/internal/storage
+              desc: domain must not import storage
+        provider-no-siblings:
+          list-mode: lax
+          files:
+            - '**/internal/provider/**/*.go'
+          deny:
+            - pkg: github.ibm.com/citius/citius-server/internal/policy
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/key
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/template
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/crypto
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/service
+              desc: domain must not import service layer
+            - pkg: github.ibm.com/citius/citius-server/internal/app
+              desc: domain must not import app layer
+            - pkg: github.ibm.com/citius/citius-server/internal/storage
+              desc: domain must not import storage
+        template-no-siblings:
+          list-mode: lax
+          files:
+            - '**/internal/template/**/*.go'
+          deny:
+            - pkg: github.ibm.com/citius/citius-server/internal/policy
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/key
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/provider
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/crypto
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/service
+              desc: domain must not import service layer
+            - pkg: github.ibm.com/citius/citius-server/internal/app
+              desc: domain must not import app layer
+            - pkg: github.ibm.com/citius/citius-server/internal/storage
+              desc: domain must not import storage
+        # crypto/ is a shared-vocabulary leaf (VOs for crypto operations + Session aggregate).
+        # It must not import any sibling domain package.
+        crypto-no-siblings:
+          list-mode: lax
+          files:
+            - '**/internal/crypto/**/*.go'
+          deny:
+            - pkg: github.ibm.com/citius/citius-server/internal/policy
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/key
+              desc: sibling bounded context - use []byte for key material in VOs
+            - pkg: github.ibm.com/citius/citius-server/internal/template
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/provider
+              desc: sibling bounded context
+            - pkg: github.ibm.com/citius/citius-server/internal/service
+              desc: domain must not import service layer
+            - pkg: github.ibm.com/citius/citius-server/internal/app
+              desc: domain must not import app layer
+            - pkg: github.ibm.com/citius/citius-server/internal/storage
+              desc: domain must not import storage
+        # ── Test-dependency fence ─────────────────────────────────
+        no-test-deps-in-prod:
+          list-mode: lax
+          files:
+            - '!$test'
+          deny:
+            - pkg: github.com/stretchr/testify
+              desc: testify is test-only
     exhaustive:
       default-signifies-exhaustive: true
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^fmt\.Print.*$'
+          msg: use structured logging instead of fmt.Print
+        - pattern: '^os\.Exit$'
+          msg: return errors; os.Exit belongs in main() only
+        - pattern: '^log\.(Fatal|Panic).*$'
+          msg: use error returns; no log.Fatal in library code
     gocognit:
       min-complexity: 20
     govet:
@@ -33,6 +173,14 @@ linters:
         - name: exported
         - name: var-naming
         - name: receiver-naming
+        - name: deep-exit
+        - name: dot-imports
+        - name: import-alias-naming
+          arguments:
+            - '^[a-z][a-z0-9]*$'
+        - name: filename-format
+          arguments:
+            - '^[_a-z][_a-z0-9]*\.go$'
   exclusions:
     generated: lax
     presets:
@@ -44,6 +192,7 @@ linters:
       - linters:
           - cyclop
           - errcheck
+          - forbidigo
           - gosec
         path: _test\.go
     paths:
