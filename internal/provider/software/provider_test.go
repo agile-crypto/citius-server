@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
-	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/provider"
 	"github.ibm.com/citius/citius-server/internal/provider/software"
@@ -105,26 +104,6 @@ func TestProvider_ExportPublicKey_returnsNotImplemented(t *testing.T) {
 // ============================================================================
 // Stub Method Tests (return CodeNotImplemented for now)
 // ============================================================================
-
-func TestProvider_GenerateKey_stub_returnsNotImplemented(t *testing.T) {
-	p := software.New()
-	_, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
-		Algorithm: &types.AlgorithmDetails{
-			Algorithm: &types.AlgorithmDetails_Ecdsa{
-				Ecdsa: &types.EcdsaParams{
-					Curve: types.EllipticCurve_ELLIPTIC_CURVE_P256,
-					Hash:  types.HashAlgorithm_HASH_ALGORITHM_SHA256,
-				},
-			},
-		},
-	})
-	if err == nil {
-		t.Fatal("expected error from stub GenerateKey")
-	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
-	}
-}
 
 func TestProvider_Sign_stub_returnsNotImplemented(t *testing.T) {
 	p := software.New()

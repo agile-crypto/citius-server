@@ -4,8 +4,10 @@ package software
 
 import (
 	"context"
+	"fmt"
 
 	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/provider"
 )
@@ -42,11 +44,42 @@ func (p *Provider) ExportPublicKey(ctx context.Context, _ *providerpb.ExportPubl
 		"ExportPublicKey not supported: provider is stateless, orchestrator has the key bytes")
 }
 
-// GenerateKey stub - TODO: Implement
-func (p *Provider) GenerateKey(ctx context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
-	const op errors.Op = "software.Provider.GenerateKey"
-	return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-		"GenerateKey not yet implemented")
+// GenerateKey generates a key pair for the given algorithm and returns the key material.
+// The provider is stateless — key material is returned to the caller (orchestrator) for storage.
+func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
+	const op errors.Op = "software.(Provider).GenerateKey"
+
+	var (
+		pubDER  []byte
+		privDER []byte
+		err     error
+	)
+
+	// Dispatch on the typed AlgorithmDetails oneof.
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+				"only P-256 curve supported")
+		}
+		pubDER, privDER, err = generateECDSAP256Key(ctx)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+	case *types.AlgorithmDetails_MlDsa:
+		_ = alg // TODO: Implement
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			"ml-dsa key generation not yet implemented")
+	default:
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+
+	// Return key material to caller — provider is stateless, orchestrator stores the bytes.
+	return &providerpb.GenerateKeyResponse{
+		PublicKeyBytes: pubDER,
+		KeyMaterial:    privDER,
+	}, nil
 }
 
 // Sign stub - TODO: Implement
