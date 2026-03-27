@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 
+	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 	"github.ibm.com/citius/citius-server/internal/provider"
 )
 
@@ -36,28 +37,40 @@ func (p *Provider) SupportedAlgorithms() []string {
 }
 
 // GenerateKey returns synthetic deterministic bytes — no real key material.
-func (p *Provider) GenerateKey(_ context.Context, _ provider.GenerateKeyRequest) (provider.GenerateKeyResult, error) {
-	return provider.GenerateKeyResult{
-		PublicKeyBytes:  []byte("LOOPBACK_PUB"),
-		PrivateKeyBytes: []byte("LOOPBACK_PRIV"),
+func (p *Provider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
+	return &providerpb.GenerateKeyResponse{
+		PublicKeyBytes: []byte("LOOPBACK_PUB"),
+		KeyMaterial:    []byte("LOOPBACK_PRIV"),
 	}, nil
 }
 
 // DestroyKey is a no-op for the loopback provider.
-func (p *Provider) DestroyKey(_ context.Context, _ string) error { return nil }
+func (p *Provider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
+	return &providerpb.DestroyKeyResponse{}, nil
+}
 
-// ExportPublicKey returns deterministic public key bytes based on the keyID.
-func (p *Provider) ExportPublicKey(_ context.Context, keyID string) ([]byte, error) {
-	return []byte("LOOPBACK_PUB_" + keyID), nil
+// ExportPublicKey returns deterministic public key bytes.
+func (p *Provider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
+	return &providerpb.ExportPublicKeyResponse{
+		PublicKeyBytes: []byte("LOOPBACK_PUB"),
+	}, nil
 }
 
 // Sign echoes the input as the "signature".
 // This makes round-trip testing trivial: Verify succeeds when signature == input.
-func (p *Provider) Sign(_ context.Context, req provider.SignRequest) (provider.SignResult, error) {
-	return provider.SignResult{Signature: req.Input}, nil
+func (p *Provider) Sign(_ context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	return &providerpb.SignResponse{Signature: req.GetInput()}, nil
 }
 
 // Verify returns valid=true when signature == input (the loopback invariant from Sign).
-func (p *Provider) Verify(_ context.Context, req provider.VerifyRequest) (provider.VerifyResult, error) {
-	return provider.VerifyResult{Valid: bytes.Equal(req.Signature, req.Input)}, nil
+func (p *Provider) Verify(_ context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	return &providerpb.VerifyResponse{
+		Valid: bytes.Equal(req.GetSignature(), req.GetInput()),
+	}, nil
 }
+
+// Compile-time assertions.
+var (
+	_ provider.Backend                     = (*Provider)(nil)
+	_ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
+)

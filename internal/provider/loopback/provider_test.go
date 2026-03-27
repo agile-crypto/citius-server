@@ -5,6 +5,7 @@ import (
 	"context"
 	"testing"
 
+	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/provider"
 	"github.ibm.com/citius/citius-server/internal/provider/loopback"
@@ -61,30 +62,30 @@ func TestProvider_SupportedAlgorithms_returnsBothM1Algorithms(t *testing.T) {
 
 func TestProvider_GenerateKey_returnsSyntheticBytes(t *testing.T) {
 	p := loopback.New()
-	req := provider.GenerateKeyRequest{Algorithm: ecdsaP256Details()}
+	req := &providerpb.GenerateKeyRequest{Algorithm: ecdsaP256Details()}
 	result, err := p.GenerateKey(context.Background(), req)
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	if len(result.PublicKeyBytes) == 0 {
+	if len(result.GetPublicKeyBytes()) == 0 {
 		t.Error("expected non-empty public key bytes")
 	}
-	if len(result.PrivateKeyBytes) == 0 {
-		t.Error("expected non-empty private key bytes")
+	if len(result.GetKeyMaterial()) == 0 {
+		t.Error("expected non-empty key material")
 	}
 }
 
 func TestProvider_Sign_echoesInput(t *testing.T) {
 	p := loopback.New()
 	payload := []byte("hello world")
-	req := provider.SignRequest{
+	req := &providerpb.SignRequest{
 		Input: payload,
 	}
 	result, err := p.Sign(context.Background(), req)
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
-	if !bytes.Equal(result.Signature, payload) {
+	if !bytes.Equal(result.GetSignature(), payload) {
 		t.Errorf("Sign: signature should equal payload for loopback provider")
 	}
 }
@@ -92,7 +93,7 @@ func TestProvider_Sign_echoesInput(t *testing.T) {
 func TestProvider_Verify_matchingInputAndSignature_returnsTrue(t *testing.T) {
 	p := loopback.New()
 	payload := []byte("test message")
-	req := provider.VerifyRequest{
+	req := &providerpb.VerifyRequest{
 		Input:     payload,
 		Signature: payload, // loopback: sig == input
 	}
@@ -100,14 +101,14 @@ func TestProvider_Verify_matchingInputAndSignature_returnsTrue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
-	if !result.Valid {
+	if !result.GetValid() {
 		t.Error("Verify: expected valid=true when signature == input")
 	}
 }
 
 func TestProvider_Verify_mismatchedSignature_returnsFalse(t *testing.T) {
 	p := loopback.New()
-	req := provider.VerifyRequest{
+	req := &providerpb.VerifyRequest{
 		Input:     []byte("original"),
 		Signature: []byte("tampered"),
 	}
@@ -115,14 +116,14 @@ func TestProvider_Verify_mismatchedSignature_returnsFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
-	if result.Valid {
+	if result.GetValid() {
 		t.Error("Verify: expected valid=false for mismatched signature")
 	}
 }
 
 func TestProvider_Verify_emptySignature_returnsFalse(t *testing.T) {
 	p := loopback.New()
-	req := provider.VerifyRequest{
+	req := &providerpb.VerifyRequest{
 		Input:     []byte("data"),
 		Signature: nil,
 	}
@@ -130,7 +131,7 @@ func TestProvider_Verify_emptySignature_returnsFalse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
-	if result.Valid {
+	if result.GetValid() {
 		t.Error("Verify: expected valid=false for nil signature")
 	}
 }
@@ -140,28 +141,28 @@ func TestProvider_SignThenVerify_roundtrip(t *testing.T) {
 	ctx := context.Background()
 	payload := []byte("round-trip test")
 
-	signResult, err := p.Sign(ctx, provider.SignRequest{
+	signResult, err := p.Sign(ctx, &providerpb.SignRequest{
 		Input: payload,
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
 
-	verifyResult, err := p.Verify(ctx, provider.VerifyRequest{
+	verifyResult, err := p.Verify(ctx, &providerpb.VerifyRequest{
 		Input:     payload,
-		Signature: signResult.Signature,
+		Signature: signResult.GetSignature(),
 	})
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
 	}
-	if !verifyResult.Valid {
+	if !verifyResult.GetValid() {
 		t.Error("round-trip: Sign then Verify should return valid=true")
 	}
 }
 
 func TestProvider_DestroyKey_succeeds(t *testing.T) {
 	p := loopback.New()
-	err := p.DestroyKey(context.Background(), "any-key-id")
+	_, err := p.DestroyKey(context.Background(), &providerpb.DestroyKeyRequest{KeyMaterial: []byte("any")})
 	if err != nil {
 		t.Errorf("DestroyKey: unexpected error %v", err)
 	}
@@ -169,17 +170,17 @@ func TestProvider_DestroyKey_succeeds(t *testing.T) {
 
 func TestProvider_ExportPublicKey_returnsDeterministicBytes(t *testing.T) {
 	p := loopback.New()
-	keyID := "test-key-123"
-	pubKey, err := p.ExportPublicKey(context.Background(), keyID)
+	req := &providerpb.ExportPublicKeyRequest{KeyMaterial: []byte("test-key-123")}
+	resp, err := p.ExportPublicKey(context.Background(), req)
 	if err != nil {
 		t.Fatalf("ExportPublicKey: %v", err)
 	}
-	if len(pubKey) == 0 {
+	if len(resp.GetPublicKeyBytes()) == 0 {
 		t.Error("expected non-empty public key bytes")
 	}
-	// Should be deterministic for the same keyID
-	pubKey2, _ := p.ExportPublicKey(context.Background(), keyID)
-	if !bytes.Equal(pubKey, pubKey2) {
-		t.Error("ExportPublicKey should be deterministic for same keyID")
+	// Should be deterministic for the same request
+	resp2, _ := p.ExportPublicKey(context.Background(), req)
+	if !bytes.Equal(resp.GetPublicKeyBytes(), resp2.GetPublicKeyBytes()) {
+		t.Error("ExportPublicKey should be deterministic for same request")
 	}
 }
