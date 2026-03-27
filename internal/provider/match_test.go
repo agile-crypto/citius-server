@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/provider"
 )
@@ -16,18 +17,20 @@ type capableProvider struct {
 
 func (c *capableProvider) Name() string { return c.name }
 func (c *capableProvider) Type() string { return "stub" }
-func (c *capableProvider) GenerateKey(_ context.Context, _ provider.GenerateKeyRequest) (provider.GenerateKeyResult, error) {
-	return provider.GenerateKeyResult{}, nil
-}
-func (c *capableProvider) DestroyKey(_ context.Context, _ string) error { return nil }
-func (c *capableProvider) ExportPublicKey(_ context.Context, _ string) ([]byte, error) {
+func (c *capableProvider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	return nil, nil
 }
-func (c *capableProvider) Sign(_ context.Context, _ provider.SignRequest) (provider.SignResult, error) {
-	return provider.SignResult{}, nil
+func (c *capableProvider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
+	return nil, nil
 }
-func (c *capableProvider) Verify(_ context.Context, _ provider.VerifyRequest) (provider.VerifyResult, error) {
-	return provider.VerifyResult{}, nil
+func (c *capableProvider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
+	return nil, nil
+}
+func (c *capableProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	return nil, nil
+}
+func (c *capableProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	return nil, nil
 }
 
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
@@ -137,18 +140,20 @@ type minimalProvider struct{ provName string }
 
 func (m *minimalProvider) Name() string { return m.provName }
 func (m *minimalProvider) Type() string { return "minimal" }
-func (m *minimalProvider) GenerateKey(_ context.Context, _ provider.GenerateKeyRequest) (provider.GenerateKeyResult, error) {
-	return provider.GenerateKeyResult{}, nil
-}
-func (m *minimalProvider) DestroyKey(_ context.Context, _ string) error { return nil }
-func (m *minimalProvider) ExportPublicKey(_ context.Context, _ string) ([]byte, error) {
+func (m *minimalProvider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	return nil, nil
 }
-func (m *minimalProvider) Sign(_ context.Context, _ provider.SignRequest) (provider.SignResult, error) {
-	return provider.SignResult{}, nil
+func (m *minimalProvider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
+	return nil, nil
 }
-func (m *minimalProvider) Verify(_ context.Context, _ provider.VerifyRequest) (provider.VerifyResult, error) {
-	return provider.VerifyResult{}, nil
+func (m *minimalProvider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
+	return nil, nil
+}
+func (m *minimalProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	return nil, nil
+}
+func (m *minimalProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	return nil, nil
 }
 
 var _ provider.Backend = (*minimalProvider)(nil)
