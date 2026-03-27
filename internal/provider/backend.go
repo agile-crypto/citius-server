@@ -1,93 +1,61 @@
+// Package provider defines the Backend interface — the Go-side contract
+// that every crypto provider must implement.
+//
+// Request and response types are the proto-generated messages from
+// gen/go/provider (proto/provider/*.proto).  This ensures 1:1 type identity
+// with the gRPC wire format — no translation layer, no drift.
+//
+// Proto mapping:
+//
+//	Backend.GenerateKey     → KeyOrchestrationService.GenerateKey
+//	Backend.DestroyKey      → KeyOrchestrationService.DestroyKey
+//	Backend.ExportPublicKey → KeyOrchestrationService.ExportPublicKey
+//	Backend.Sign            → CryptoService.Sign
+//	Backend.Verify          → CryptoService.Verify
 package provider
 
 import (
 	"context"
 
-	messages "github.ibm.com/citius/citius-server/gen/go/messages"
-	types "github.ibm.com/citius/citius-server/gen/go/types"
+	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 )
 
-type GenerateKeyRequest struct {
-	KeyID     string
-	Algorithm *types.AlgorithmDetails
-}
-
-type GenerateKeyResult struct {
-	PrivateKeyBytes []byte // opaque key material (proto: key_material); provider-interpreted
-	PublicKeyBytes  []byte // DER-encoded SubjectPublicKeyInfo (asymmetric only; proto: public_key_bytes)
-}
-
-// SignRequest carries the inputs for a provider Sign call.
-type SignRequest struct {
-	KeyID     string                  // for audit/logging (not used for key lookup)
-	KeyBytes  []byte                  // opaque key material (private key bytes)
-	Input     []byte                  // data to sign (raw, unhashed — provider hashes internally)
-	Algorithm *types.AlgorithmDetails // typed algorithm for dispatch (from template)
-
-	// Scope-based context for domain separation — exactly one must be non-nil.
-	// Passed through unchanged from the orchestrator (which received it from the API request).
-	NoContext     *types.NoParams               // ECDSA, RSA-PSS, DSA
-	DomainContext *types.SignatureDomainContext // EdDSA, ML-DSA, SLH-DSA
-	VendorContext *types.VendorSignatureContext // vendor/custom
-}
-
-// SignResult carries the outputs of a provider Sign call.
-// Output: provider MUST set algorithm_output oneof (NoAlgorithmOutput for signing)
-// plus encoding format. Unset Output is treated as a provider bug — core rejects.
-type SignResult struct {
-	Signature []byte
-	Algorithm *types.AlgorithmDetails  // echo back for verification context
-	Output    *messages.ProviderOutput // NoAlgorithmOutput + encoding
-}
-
-type VerifyRequest struct {
-	KeyID     string // for audit/logging
-	KeyBytes  []byte // opaque key material (public key bytes)
-	Input     []byte // original message (unhashed)
-	Signature []byte
-	Algorithm *types.AlgorithmDetails // typed algorithm for dispatch (from template)
-
-	// Scope must match the scope used during signing.
-	NoContext     *types.NoParams
-	DomainContext *types.SignatureDomainContext
-	VendorContext *types.VendorSignatureContext
-}
-
-type VerifyResult struct {
-	Valid     bool
-	Algorithm *types.AlgorithmDetails
-	Output    *messages.ProviderOutput // provider-generated output
-}
-
-// Backend is the Go interface that every crypto backend must implement.
-// It is the core-side abstraction over the provider gRPC services
-// (KeyOrchestrationService + CryptoService from the proto definitions).
+// Backend is the Go interface that every crypto provider must implement.
 //
-// Proto mapping:
+// Method signatures use proto-generated request/response types from
+// gen/go/provider, ensuring 1:1 correspondence with the gRPC service
+// contracts (KeyOrchestrationService + CryptoService).
 //
-//	GenerateKey    → KeyOrchestrationService.GenerateKey
-//	DestroyKey     → KeyOrchestrationService.DestroyKey
-//	ExportPublicKey → KeyOrchestrationService.ExportPublicKey
-//	Sign           → CryptoService.Sign (full-message, provider hashes internally)
-//	Verify         → CryptoService.Verify
+// For in-process Go providers (software, loopback): implement directly.
+// For out-of-process gRPC providers: a thin adapter wraps the gRPC client
+// stubs into this interface (forwarding proto messages 1:1).
 //
-// TODO: DigestSign, DigestVerify, Encrypt, Decrypt
-// are proto-defined but not yet on the Go Backend.
+// Key material sovereignty: GenerateKeyResponse.key_material is opaque to
+// the core.  The orchestrator stores it as-is and passes it back in
+// SignRequest.key_material / VerifyRequest.key_material.  Only the provider
+// that generated the material knows how to interpret it.
+//
+// Name() and Type() are Go-level identity methods that correspond to
+// ProviderIdentityService.GetInfo() in the full gRPC flow.  They exist
+// as convenience methods for the in-process registry.
 type Backend interface {
 	Name() string
 	Type() string
-	GenerateKey(ctx context.Context, req GenerateKeyRequest) (GenerateKeyResult, error)
-	DestroyKey(ctx context.Context, keyID string) error
-	ExportPublicKey(ctx context.Context, keyID string) ([]byte, error)
-	Sign(ctx context.Context, req SignRequest) (SignResult, error)
-	Verify(ctx context.Context, req VerifyRequest) (VerifyResult, error)
+	GenerateKey(ctx context.Context, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error)
+	DestroyKey(ctx context.Context, req *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error)
+	ExportPublicKey(ctx context.Context, req *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error)
+	Sign(ctx context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error)
+	Verify(ctx context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error)
 }
 
-// AlgorithmCapabilityProvider is an optional interface that provider implementations
-// can implement to expose their supported algorithm IDs.
+// AlgorithmCapabilityProvider is an optional interface that provider
+// implementations can implement to expose their supported algorithm IDs.
 //
-// Providers that do NOT implement AlgorithmCapabilityProvider are gracefully skipped
-// during template-based matching.
+// This is currently a simplification of ProviderIdentityService.GetCapabilities().
+// TODO: this will be replaced by the full GetCapabilities RPC.
+//
+// Providers that do NOT implement AlgorithmCapabilityProvider are gracefully
+// skipped during template-based matching.
 type AlgorithmCapabilityProvider interface {
 	SupportedAlgorithms() []string
 }
