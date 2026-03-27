@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/provider"
 )
@@ -22,20 +23,20 @@ func (s *stubProvider) Type() string {
 	}
 	return "stub"
 }
-func (s *stubProvider) GenerateKey(_ context.Context, _ provider.GenerateKeyRequest) (provider.GenerateKeyResult, error) {
-	return provider.GenerateKeyResult{}, errors.New(context.Background(), "stub.GenerateKey", errors.CodeNotImplemented, "stub")
+func (s *stubProvider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
+	return nil, errors.New(context.Background(), "stub.GenerateKey", errors.CodeNotImplemented, "stub")
 }
-func (s *stubProvider) DestroyKey(_ context.Context, _ string) error {
-	return errors.New(context.Background(), "stub.DestroyKey", errors.CodeNotImplemented, "stub")
+func (s *stubProvider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
+	return nil, errors.New(context.Background(), "stub.DestroyKey", errors.CodeNotImplemented, "stub")
 }
-func (s *stubProvider) ExportPublicKey(_ context.Context, _ string) ([]byte, error) {
+func (s *stubProvider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
 	return nil, errors.New(context.Background(), "stub.ExportPublicKey", errors.CodeNotImplemented, "stub")
 }
-func (s *stubProvider) Sign(_ context.Context, _ provider.SignRequest) (provider.SignResult, error) {
-	return provider.SignResult{}, errors.New(context.Background(), "stub.Sign", errors.CodeNotImplemented, "stub")
+func (s *stubProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	return nil, errors.New(context.Background(), "stub.Sign", errors.CodeNotImplemented, "stub")
 }
-func (s *stubProvider) Verify(_ context.Context, _ provider.VerifyRequest) (provider.VerifyResult, error) {
-	return provider.VerifyResult{}, errors.New(context.Background(), "stub.Verify", errors.CodeNotImplemented, "stub")
+func (s *stubProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	return nil, errors.New(context.Background(), "stub.Verify", errors.CodeNotImplemented, "stub")
 }
 
 // Compile-time assertion
