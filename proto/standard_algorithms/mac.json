@@ -1,0 +1,277 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Message Authentication Codes. CycloneDX naming: {algorithm}-{hash} or {algorithm}-{securitybits}-{outputbits}",
+  "templates": {
+    "hmac-sha256-256": {
+      "templateId": "hmac-sha256-256",
+      "displayName": "HMAC-SHA256",
+      "description": "HMAC using SHA-256, 256-bit output. Most widely used.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "mac": {
+              "scope": "MAC_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_GENERATE_MAC",
+            "CRYPTO_OPERATION_VERIFY_MAC"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true,
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.2.9",
+        "primitive": "CRYPTO_PRIMITIVE_MAC",
+        "hmac": {
+          "hash": "HASH_ALGORITHM_SHA256"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 2104",
+        "FIPS 198-1"
+      ]
+    },
+    "hmac-sha384-384": {
+      "templateId": "hmac-sha384-384",
+      "displayName": "HMAC-SHA384",
+      "description": "HMAC using SHA-384, 384-bit output.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "mac": {
+              "scope": "MAC_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 384,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_GENERATE_MAC",
+            "CRYPTO_OPERATION_VERIFY_MAC"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true,
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.2.10",
+        "primitive": "CRYPTO_PRIMITIVE_MAC",
+        "hmac": {
+          "hash": "HASH_ALGORITHM_SHA384"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 2104",
+        "FIPS 198-1"
+      ]
+    },
+    "hmac-sha512-512": {
+      "templateId": "hmac-sha512-512",
+      "displayName": "HMAC-SHA512",
+      "description": "HMAC using SHA-512, 512-bit output. Maximum security.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "mac": {
+              "scope": "MAC_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 512,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_GENERATE_MAC",
+            "CRYPTO_OPERATION_VERIFY_MAC"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true,
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.2.11",
+        "primitive": "CRYPTO_PRIMITIVE_MAC",
+        "hmac": {
+          "hash": "HASH_ALGORITHM_SHA512"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 2104",
+        "FIPS 198-1"
+      ]
+    },
+    "hmac-sha3-256-256": {
+      "templateId": "hmac-sha3-256-256",
+      "displayName": "HMAC-SHA3-256",
+      "description": "HMAC using SHA3-256, 256-bit output.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "mac": {
+              "scope": "MAC_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_GENERATE_MAC",
+            "CRYPTO_OPERATION_VERIFY_MAC"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true,
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.2.14",
+        "primitive": "CRYPTO_PRIMITIVE_MAC",
+        "hmac": {
+          "hash": "HASH_ALGORITHM_SHA3_256"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 198-1",
+        "FIPS 202"
+      ]
+    },
+    "kmac-128-256": {
+      "templateId": "kmac-128-256",
+      "displayName": "KMAC128-256",
+      "description": "KECCAK MAC with 128-bit security, 256-bit output. Based on SHA-3.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "mac": {
+              "scope": "MAC_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_GENERATE_MAC",
+            "CRYPTO_OPERATION_VERIFY_MAC"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true,
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.2.19",
+        "primitive": "CRYPTO_PRIMITIVE_MAC",
+        "kmac": {
+          "variant": 128,
+          "outputBits": 256
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "NIST SP 800-185"
+      ]
+    },
+    "kmac-256-512": {
+      "templateId": "kmac-256-512",
+      "displayName": "KMAC256-512",
+      "description": "KECCAK MAC with 256-bit security, 512-bit output. Based on SHA-3.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "mac": {
+              "scope": "MAC_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_GENERATE_MAC",
+            "CRYPTO_OPERATION_VERIFY_MAC"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "prf": true,
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.2.20",
+        "primitive": "CRYPTO_PRIMITIVE_MAC",
+        "kmac": {
+          "variant": 256,
+          "outputBits": 512
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "NIST SP 800-185"
+      ]
+    }
+  }
+}

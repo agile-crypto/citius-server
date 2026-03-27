@@ -1,0 +1,418 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Hybrid/composite algorithms for PQ transition. CycloneDX naming: hybrid-{classical}-{pqc}-{combiner}",
+  "templates": {
+    "hybrid-x25519-mlkem768-concat": {
+      "templateId": "hybrid-x25519-mlkem768-concat",
+      "displayName": "X25519+ML-KEM-768",
+      "description": "Hybrid KEM: X25519 (128-bit classical) + ML-KEM-768 (Level 3 PQ), concatenation combiner.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kem": {
+              "scope": "KEM_SCOPE_HYBRID",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCAPSULATE",
+            "CRYPTO_OPERATION_DECAPSULATE"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "keyAgreement": {
+              "scope": "KEY_AGREEMENT_SCOPE_HYBRID",
+              "security": {
+                "securityStrengthBits": 128,
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "forwardSecrecy": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_KEY_AGREEMENT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.6.1.4.1.22554.5.6.1",
+        "primitive": "CRYPTO_PRIMITIVE_COMBINER",
+        "hybrid": {
+          "combinerStrategy": "COMBINER_CONCATENATION",
+          "components": [
+            {
+              "algorithm": {
+                "oid": "1.3.101.110",
+                "primitive": "CRYPTO_PRIMITIVE_KEY_AGREE",
+                "x25519": {}
+              },
+              "label": "classical",
+              "order": 1
+            },
+            {
+              "algorithm": {
+                "oid": "2.16.840.1.101.3.4.4.2",
+                "primitive": "CRYPTO_PRIMITIVE_KEM",
+                "mlKem": {
+                  "parameterSet": "ML_KEM_768"
+                }
+              },
+              "label": "pqc",
+              "order": 2
+            }
+          ],
+          "totalKeySizeBits": 800
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "draft-ietf-tls-hybrid-design",
+        "draft-ounsworth-pq-composite-kem"
+      ]
+    },
+    "hybrid-x448-mlkem1024-concat": {
+      "templateId": "hybrid-x448-mlkem1024-concat",
+      "displayName": "X448+ML-KEM-1024",
+      "description": "Hybrid KEM: X448 (224-bit classical) + ML-KEM-1024 (Level 5 PQ), concatenation combiner.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "kem": {
+              "scope": "KEM_SCOPE_HYBRID",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCAPSULATE",
+            "CRYPTO_OPERATION_DECAPSULATE"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "keyAgreement": {
+              "scope": "KEY_AGREEMENT_SCOPE_HYBRID",
+              "security": {
+                "securityStrengthBits": 224,
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "forwardSecrecy": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_KEY_AGREEMENT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "owCca": true
+            },
+            "practical": {
+              "confidentiality": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.6.1.4.1.22554.5.6.5",
+        "primitive": "CRYPTO_PRIMITIVE_COMBINER",
+        "hybrid": {
+          "combinerStrategy": "COMBINER_CONCATENATION",
+          "components": [
+            {
+              "algorithm": {
+                "oid": "1.3.101.111",
+                "primitive": "CRYPTO_PRIMITIVE_KEY_AGREE",
+                "x448": {}
+              },
+              "label": "classical",
+              "order": 1
+            },
+            {
+              "algorithm": {
+                "oid": "2.16.840.1.101.3.4.4.3",
+                "primitive": "CRYPTO_PRIMITIVE_KEM",
+                "mlKem": {
+                  "parameterSet": "ML_KEM_1024"
+                }
+              },
+              "label": "pqc",
+              "order": 2
+            }
+          ],
+          "totalKeySizeBits": 1568
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "draft-ietf-tls-hybrid-design",
+        "draft-ounsworth-pq-composite-kem"
+      ]
+    },
+    "hybrid-ecdsa-p256-mldsa65-concat": {
+      "templateId": "hybrid-ecdsa-p256-mldsa65-concat",
+      "displayName": "ECDSA-P256+ML-DSA-65",
+      "description": "Hybrid signature: ECDSA P-256 (128-bit) + ML-DSA-65 (Level 3), concatenation combiner.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.6.1.4.1.22554.5.6.2",
+        "primitive": "CRYPTO_PRIMITIVE_COMBINER",
+        "hybrid": {
+          "combinerStrategy": "COMBINER_CONCATENATION",
+          "components": [
+            {
+              "algorithm": {
+                "oid": "1.2.840.10045.4.3.2",
+                "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+                "ecdsa": {
+                  "curve": "ELLIPTIC_CURVE_P256",
+                  "hash": "HASH_ALGORITHM_SHA256",
+                  "signatureFormat": "SIGNATURE_FORMAT_DER"
+                }
+              },
+              "label": "classical",
+              "order": 1
+            },
+            {
+              "algorithm": {
+                "oid": "2.16.840.1.101.3.4.3.18",
+                "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+                "mlDsa": {
+                  "parameterSet": "ML_DSA_65"
+                }
+              },
+              "label": "pqc",
+              "order": 2
+            }
+          ],
+          "totalKeySizeBits": 256
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "draft-ounsworth-pq-composite-sigs"
+      ]
+    },
+    "hybrid-ed25519-mldsa65-concat": {
+      "templateId": "hybrid-ed25519-mldsa65-concat",
+      "displayName": "Ed25519+ML-DSA-65",
+      "description": "Hybrid signature: Ed25519 (128-bit) + ML-DSA-65 (Level 3), concatenation combiner.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.6.1.4.1.22554.5.6.3",
+        "primitive": "CRYPTO_PRIMITIVE_COMBINER",
+        "hybrid": {
+          "combinerStrategy": "COMBINER_CONCATENATION",
+          "components": [
+            {
+              "algorithm": {
+                "oid": "1.3.101.112",
+                "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+                "ed25519": {
+                  "variant": "ED25519_VARIANT_PURE"
+                }
+              },
+              "label": "classical",
+              "order": 1
+            },
+            {
+              "algorithm": {
+                "oid": "2.16.840.1.101.3.4.3.18",
+                "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+                "mlDsa": {
+                  "parameterSet": "ML_DSA_65"
+                }
+              },
+              "label": "pqc",
+              "order": 2
+            }
+          ],
+          "totalKeySizeBits": 256
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "draft-ounsworth-pq-composite-sigs"
+      ]
+    },
+    "hybrid-rsa3072-mldsa65-concat": {
+      "templateId": "hybrid-rsa3072-mldsa65-concat",
+      "displayName": "RSA-3072+ML-DSA-65",
+      "description": "Hybrid signature: RSA-3072 (128-bit) + ML-DSA-65 (Level 3), concatenation combiner.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
+                "quantumSafe": true,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.6.1.4.1.22554.5.6.4",
+        "primitive": "CRYPTO_PRIMITIVE_COMBINER",
+        "hybrid": {
+          "combinerStrategy": "COMBINER_CONCATENATION",
+          "components": [
+            {
+              "algorithm": {
+                "oid": "1.2.840.113549.1.1.10",
+                "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+                "rsaPss": {
+                  "keySizeBits": 3072,
+                  "hash": "HASH_ALGORITHM_SHA256",
+                  "mgf": "MGF_MGF1",
+                  "mgfHash": "HASH_ALGORITHM_SHA256",
+                  "saltLength": 32
+                }
+              },
+              "label": "classical",
+              "order": 1
+            },
+            {
+              "algorithm": {
+                "oid": "2.16.840.1.101.3.4.3.18",
+                "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+                "mlDsa": {
+                  "parameterSet": "ML_DSA_65"
+                }
+              },
+              "label": "pqc",
+              "order": 2
+            }
+          ],
+          "totalKeySizeBits": 3072
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "draft-ounsworth-pq-composite-sigs"
+      ]
+    }
+  }
+}

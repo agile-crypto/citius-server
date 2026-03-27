@@ -1,15 +1,23 @@
-// Package core is the core abstraction layer for the cryptographic service.
+// Package core is the shared vocabulary leaf for the cryptographic service.
 //
-// This package defines cross-domain interfaces (Storage, KeyOrchestrator,
-// CryptoOrchestrator, PolicyEngine, TemplateRegistry, ProviderRegistry,
-// ProviderInstance, ProviderInstanceManager), factory types, shared value types,
-// and the Service facade that wires all subsystems together.
+// This package defines value types shared across all domain aggregates:
+//   - Operation, WriteOp      - typed enums for crypto and storage operations
+//   - KeyCreationSpec          - cross-aggregate DTO for CreateKey
+//   - ImportKeySpec            - cross-aggregate DTO for ImportKey
+//   - Primitive, Scope          - typed enums for cryptographic primitives and scope variants
+//   - ScopeSpec                - (Primitive, Scope) pair for template selection
+//   - KeyMaterial              - raw key bytes container
+//   - VetForWriter             - pre-write validation interface
+//   - NewID(prefix)            - prefixed ULID generator
 //
 // Import policy:
-//   - internal/core/ MUST NOT import any concrete implementation package
-//     (internal/key/, internal/policy/, etc.) except via interfaces.
-//   - internal/core/ MUST NOT import generated code from gen/ at the interface boundary.
-//   - internal/core/ MUST NOT import google.golang.org/grpc except in
-//     internal/errors/codes.go for the GRPCCode() mapper.
-//   - All domain-specific packages communicate through interfaces defined here.
+//   - internal/core/ MUST NOT import any domain package
+//     (internal/key/, internal/policy/, internal/service/, etc.).
+//   - internal/core/ MUST NOT import generated code from gen/.
+//   - internal/core/ imports only internal/errors (absolute leaf).
+//   - Every domain package imports core as its shared vocabulary.
+//
+// Application service interfaces (KeyOrchestrator, CryptoOrchestrator) live
+// in internal/service/. The Service facade and factory types live in
+// internal/app/.
 package core

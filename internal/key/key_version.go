@@ -1,0 +1,86 @@
+package key
+
+import (
+	"context"
+	"fmt"
+
+	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	"github.ibm.com/citius/citius-server/internal/core"
+	"github.ibm.com/citius/citius-server/internal/errors"
+	"google.golang.org/protobuf/proto"
+)
+
+// Version is the domain representation of one version of a Key's material.
+// It belongs to the Key aggregate: key.Orchestrator creates and reads versions;
+// external callers access material only through KeyOrchestrator.GetKeyWithMaterial.
+type Version struct {
+	*storepb.KeyVersion
+}
+
+// NewVersion wraps a KeyVersion.
+// TODO: Remove
+func NewVersion(stored *storepb.KeyVersion) *Version {
+	if stored == nil {
+		stored = &storepb.KeyVersion{}
+	}
+	return &Version{KeyVersion: stored}
+}
+
+func defaultKeyVersionID(keyID string, version uint32) string {
+	return fmt.Sprintf("%s%s%d", keyID, versionSep, version)
+}
+
+func newVersion(ctx context.Context, publicID, keyID, templateID, providerID string, version uint32, keyMaterial []byte, opt ...Option) (*Version, error) {
+	const op = "key.newKeyVersion"
+	opts := getOpts(opt...)
+	if len(keyMaterial) == 0 {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "key material is required")
+	}
+	if providerID == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "provider ID is required")
+	}
+	if templateID == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "template ID is required")
+	}
+	if keyID == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "key ID is required")
+	}
+
+	kv := &storepb.KeyVersion{
+		PublicId:      publicID,
+		KeyId:         keyID,
+		Version:       version,
+		ProviderId:    providerID,
+		TemplateId:    templateID,
+		KeyMaterial:   keyMaterial,
+		WrappingKeyId: opts.withWrappingKeyID,
+		Status:        opts.withStatus,
+	}
+	return NewVersion(kv), nil
+
+}
+
+// Callers should use Clone() before mutating.
+func (v *Version) Clone() *Version {
+	return &Version{KeyVersion: proto.Clone(v.KeyVersion).(*storepb.KeyVersion)}
+}
+
+// VetForWrite validates the KeyVersion for the given storage operation.
+func (v *Version) VetForWrite(ctx context.Context, op core.WriteOp) error {
+	const opVet errors.Op = "key.(KeyVersion).VetForWrite"
+	if op == core.OpCreate {
+		if v.GetPublicId() == "" {
+			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "version_id is required")
+		}
+		if v.GetKeyId() == "" {
+			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "key_id is required")
+		}
+		if v.GetProviderId() == "" {
+			return errors.New(ctx, opVet, errors.CodeInvalidArgument, "provider_id is required")
+		}
+	}
+	return nil
+}
+
+// Compile-time assertion.
+var _ core.VetForWriter = (*Version)(nil)

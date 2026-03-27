@@ -1,0 +1,1013 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Classical digital signatures. CycloneDX naming: {algorithm}-{curve|keysize}-{hash}[-{format}]",
+  "templates": {
+    "ecdsa-p256-sha256-der": {
+      "templateId": "ecdsa-p256-sha256-der",
+      "displayName": "ECDSA-P256-SHA256",
+      "description": "ECDSA using NIST P-256 curve with SHA-256, DER-encoded signatures. NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.10045.4.3.2",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_P256",
+          "hash": "HASH_ALGORITHM_SHA256",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 186-5",
+        "ANSI X9.62"
+      ]
+    },
+    "ecdsa-p384-sha384-der": {
+      "templateId": "ecdsa-p384-sha384-der",
+      "displayName": "ECDSA-P384-SHA384",
+      "description": "ECDSA using NIST P-384 curve with SHA-384, DER-encoded signatures. NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.10045.4.3.3",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_P384",
+          "hash": "HASH_ALGORITHM_SHA384",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 186-5",
+        "ANSI X9.62"
+      ]
+    },
+    "ecdsa-p521-sha512-der": {
+      "templateId": "ecdsa-p521-sha512-der",
+      "displayName": "ECDSA-P521-SHA512",
+      "description": "ECDSA using NIST P-521 curve with SHA-512, DER-encoded signatures. NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.10045.4.3.4",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_P521",
+          "hash": "HASH_ALGORITHM_SHA512",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 186-5",
+        "ANSI X9.62"
+      ]
+    },
+    "ecdsa-secp256k1-sha256-der": {
+      "templateId": "ecdsa-secp256k1-sha256-der",
+      "displayName": "ECDSA-secp256k1-SHA256",
+      "description": "ECDSA using secp256k1 curve with SHA-256. Used in Bitcoin/Ethereum.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.132.0.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_SECP256K1",
+          "hash": "HASH_ALGORITHM_SHA256",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "SEC 2"
+      ]
+    },
+    "ed25519-pure": {
+      "templateId": "ed25519-pure",
+      "displayName": "Ed25519",
+      "description": "Edwards-curve DSA using Curve25519, pure variant. High performance, deterministic.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.101.112",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ed25519": {
+          "variant": "ED25519_VARIANT_PURE"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8032",
+        "FIPS 186-5"
+      ]
+    },
+    "ed25519ph": {
+      "templateId": "ed25519ph",
+      "displayName": "Ed25519ph",
+      "description": "Ed25519 prehashed variant. Allows signing large messages with external hashing.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.101.114",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ed25519": {
+          "variant": "ED25519_VARIANT_PH"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8032"
+      ]
+    },
+    "ed25519ctx": {
+      "templateId": "ed25519ctx",
+      "displayName": "Ed25519ctx",
+      "description": "Ed25519 with context variant. Allows domain separation via context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.101.112",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ed25519": {
+          "variant": "ED25519_VARIANT_CTX"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8032"
+      ]
+    },
+    "ed448-pure": {
+      "templateId": "ed448-pure",
+      "displayName": "Ed448",
+      "description": "Edwards-curve DSA using Curve448, pure variant. Higher security than Ed25519. Supports optional context string.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 224,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        },
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
+              "security": {
+                "securityStrengthBits": 224,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": true,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.101.113",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ed448": {
+          "variant": "ED448_VARIANT_PURE"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8032"
+      ]
+    },
+    "rsa-pss-2048-sha256-32": {
+      "templateId": "rsa-pss-2048-sha256-32",
+      "displayName": "RSA-PSS-2048-SHA256",
+      "description": "RSA-PSS with 2048-bit key, SHA-256, 32-byte salt. NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 112,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPss": {
+          "keySizeBits": 2048,
+          "hash": "HASH_ALGORITHM_SHA256",
+          "mgf": "MGF_MGF1",
+          "mgfHash": "HASH_ALGORITHM_SHA256",
+          "saltLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "PKCS#1 v2.2",
+        "RFC 8017",
+        "FIPS 186-5"
+      ]
+    },
+    "rsa-pss-3072-sha256-32": {
+      "templateId": "rsa-pss-3072-sha256-32",
+      "displayName": "RSA-PSS-3072-SHA256",
+      "description": "RSA-PSS with 3072-bit key, SHA-256, 32-byte salt. Recommended minimum for long-term.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPss": {
+          "keySizeBits": 3072,
+          "hash": "HASH_ALGORITHM_SHA256",
+          "mgf": "MGF_MGF1",
+          "mgfHash": "HASH_ALGORITHM_SHA256",
+          "saltLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "PKCS#1 v2.2",
+        "RFC 8017",
+        "FIPS 186-5"
+      ]
+    },
+    "rsa-pss-4096-sha384-48": {
+      "templateId": "rsa-pss-4096-sha384-48",
+      "displayName": "RSA-PSS-4096-SHA384",
+      "description": "RSA-PSS with 4096-bit key, SHA-384, 48-byte salt. High security.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 152,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPss": {
+          "keySizeBits": 4096,
+          "hash": "HASH_ALGORITHM_SHA384",
+          "mgf": "MGF_MGF1",
+          "mgfHash": "HASH_ALGORITHM_SHA384",
+          "saltLength": 48
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "PKCS#1 v2.2",
+        "RFC 8017",
+        "FIPS 186-5"
+      ]
+    },
+    "rsa-pkcs1v15-2048-sha256": {
+      "templateId": "rsa-pkcs1v15-2048-sha256",
+      "displayName": "RSA-PKCS1v15-2048-SHA256",
+      "description": "RSA PKCS#1 v1.5 with 2048-bit key, SHA-256. Legacy, prefer RSA-PSS.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 112,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_SIGN",
+            "CRYPTO_OPERATION_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.11",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPkcs1v15": {
+          "keySizeBits": 2048,
+          "hash": "HASH_ALGORITHM_SHA256"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "deprecationNotice": "Prefer RSA-PSS for new applications",
+      "standards": [
+        "PKCS#1 v1.5",
+        "RFC 8017"
+      ]
+    },
+    "_comment_prehashed": "======== PREHASHED SIGNATURE TEMPLATES ========",
+    "_comment_prehashed_desc": "Templates for signing pre-computed digests. Use DigestSign/DigestVerify APIs.",
+    "ecdsa-p256-prehashed-der": {
+      "templateId": "ecdsa-p256-prehashed-der",
+      "displayName": "ECDSA-P256-Prehashed",
+      "description": "ECDSA P-256 for pre-computed digests. Caller provides digest, service signs directly. Use with DigestSign API.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_P256",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 186-5",
+        "ANSI X9.62"
+      ]
+    },
+    "ecdsa-p384-prehashed-der": {
+      "templateId": "ecdsa-p384-prehashed-der",
+      "displayName": "ECDSA-P384-Prehashed",
+      "description": "ECDSA P-384 for pre-computed digests. Caller provides digest, service signs directly. Use with DigestSign API.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_P384",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 186-5",
+        "ANSI X9.62"
+      ]
+    },
+    "ecdsa-p521-prehashed-der": {
+      "templateId": "ecdsa-p521-prehashed-der",
+      "displayName": "ECDSA-P521-Prehashed",
+      "description": "ECDSA P-521 for pre-computed digests. Caller provides digest, service signs directly. Use with DigestSign API.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_P521",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "FIPS 186-5",
+        "ANSI X9.62"
+      ]
+    },
+    "ecdsa-secp256k1-prehashed-der": {
+      "templateId": "ecdsa-secp256k1-prehashed-der",
+      "displayName": "ECDSA-secp256k1-Prehashed",
+      "description": "ECDSA secp256k1 for pre-computed digests. Used in Bitcoin/Ethereum with external hashing.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonMalleable": false,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.3.132.0.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "ecdsa": {
+          "curve": "ELLIPTIC_CURVE_SECP256K1",
+          "signatureFormat": "SIGNATURE_FORMAT_DER"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "SEC 2"
+      ]
+    },
+    "rsa-pss-2048-prehashed": {
+      "templateId": "rsa-pss-2048-prehashed",
+      "displayName": "RSA-PSS-2048-Prehashed",
+      "description": "RSA-PSS 2048-bit for pre-computed digests. Caller provides digest and declares hash algorithm.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 112,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPss": {
+          "keySizeBits": 2048,
+          "mgf": "MGF_MGF1",
+          "saltLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "PKCS#1 v2.2",
+        "RFC 8017",
+        "FIPS 186-5"
+      ]
+    },
+    "rsa-pss-3072-prehashed": {
+      "templateId": "rsa-pss-3072-prehashed",
+      "displayName": "RSA-PSS-3072-Prehashed",
+      "description": "RSA-PSS 3072-bit for pre-computed digests. Caller provides digest and declares hash algorithm.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPss": {
+          "keySizeBits": 3072,
+          "mgf": "MGF_MGF1",
+          "saltLength": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "PKCS#1 v2.2",
+        "RFC 8017",
+        "FIPS 186-5"
+      ]
+    },
+    "rsa-pss-4096-prehashed": {
+      "templateId": "rsa-pss-4096-prehashed",
+      "displayName": "RSA-PSS-4096-Prehashed",
+      "description": "RSA-PSS 4096-bit for pre-computed digests. High security for external hashing workflows.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 152,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonMalleable": true,
+              "deterministic": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true,
+              "sufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.10",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPss": {
+          "keySizeBits": 4096,
+          "mgf": "MGF_MGF1",
+          "saltLength": 48
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "PKCS#1 v2.2",
+        "RFC 8017",
+        "FIPS 186-5"
+      ]
+    },
+    "rsa-pkcs1v15-2048-prehashed": {
+      "templateId": "rsa-pkcs1v15-2048-prehashed",
+      "displayName": "RSA-PKCS1v15-2048-Prehashed",
+      "description": "RSA PKCS#1 v1.5 2048-bit for pre-computed digests. Legacy, prefer RSA-PSS-prehashed.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "signature": {
+              "scope": "SIGNATURE_SCOPE_PREHASHED",
+              "security": {
+                "securityStrengthBits": 112,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              },
+              "nonMalleable": false,
+              "deterministic": true
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_DIGEST_SIGN",
+            "CRYPTO_OPERATION_DIGEST_VERIFY"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "eufCma": true
+            },
+            "practical": {
+              "integrity": true,
+              "authenticity": true,
+              "nonRepudiation": true
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "1.2.840.113549.1.1.1",
+        "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
+        "rsaPkcs1v15": {
+          "keySizeBits": 2048
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "deprecationNotice": "Prefer RSA-PSS-prehashed for new applications",
+      "standards": [
+        "PKCS#1 v1.5",
+        "RFC 8017"
+      ]
+    }
+  }
+}

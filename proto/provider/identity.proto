@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+
+option go_package = "github.ibm.com/citius/citius-server/gen/go/provider;provider";
+
+import "buf/validate/validate.proto";
+import "types/templates.proto";
+import "types/common.proto";
+import "types/algorithm_params.proto";
+import "types/implementation.proto";
+import "types/providers.proto";
+
+// ProviderInfo is the SINGLE SOURCE OF TRUTH for all provider metadata.
+//
+// The provider returns this from GetInfo().  The core assembles the API-level
+// ProviderInfo (types/providers.proto) from this response — no separate
+// JSON catalog exists.
+//
+// WHAT BELONGS HERE vs. ON AlgorithmCapability:
+//   ProviderInfo.default_implementation → provider-wide properties
+//     (FIPS certification, formal verification, constant-time, etc.)
+//   AlgorithmCapability → WHAT the provider can do (algorithms + scopes)
+//
+// WHAT BELONGS ON ProviderInstance (not here):
+//   ProviderInstance.implementation_override → per-deployment overrides
+//     (e.g., HSM partition A is FIPS L3, partition B is not yet certified)
+message ProviderInfo {
+  string name        = 1 [(buf.validate.field).string.min_len = 1];
+  string version     = 2 [(buf.validate.field).string.min_len = 1];
+  string type        = 3 [(buf.validate.field).string.min_len = 1];   // "software", "hsm", "loopback"
+  string description = 4;
+
+  // Provider type classification (SOFTWARE, HSM, CLOUD_KMS, REMOTE).
+  // Used for migration strategy selection and provider-type filtering.
+  caas.crypto.v1.ProviderType provider_type = 5;
+
+  // Provider-wide default implementation properties.
+  // These apply to ALL algorithms this provider supports.
+  // Per-instance overrides use ProviderInstance.implementation_override.
+  caas.crypto.v1.ImplementationProperties default_implementation = 6;
+
+  // Configuration schema — what config parameters this provider accepts.
+  // Describes valid keys for ProviderInstance.configuration map.
+  repeated ConfigurationParameter configuration_schema = 7;
+}
+
+// ConfigurationParameter describes a configuration option for a provider.
+// The provider declares its own schema; the admin provides values at
+// instance creation time.
+message ConfigurationParameter {
+  string name          = 1;   // e.g. "pkcs11_library_path"
+  string type          = 2;   // e.g. "string", "int", "bool"
+  string description   = 3;
+  bool   required      = 4;
+  string default_value = 5;
+}
+
+// AlgorithmCapability describes one concrete algorithm configuration
+// the provider supports.
+//
+// Each entry is a SINGLE concrete configuration (e.g., ECDSA-P256-SHA256).
+// A provider returns one entry per supported combination.
+//
+// TEMPLATE MATCHING (computed by core, not declared):
+//   The core matches templates to providers by comparing
+//   TemplateInfo.algorithm against AlgorithmCapability.algorithm.
+//   The match is typed (oneof case + field values), not string-based.
+//   No one maintains ProviderTemplateSupport entries — the list of
+//   supported templates is derived from actual capabilities.
+//
+// IMPLEMENTATION PROPERTIES: Not on AlgorithmCapability.
+// FIPS certification, formal verification, etc. are provider-wide — they
+// live on ProviderInfo.default_implementation (or ProviderInstance.implementation_override).
+message AlgorithmCapability {
+  // The concrete algorithm parameters this provider supports.
+  // Uses the SAME AlgorithmDetails type the core sends in GenerateKeyRequest.
+  caas.crypto.v1.AlgorithmDetails algorithm = 1;
+
+  // Cryptographic primitive type (SIGNATURE, AE, KEM, etc.).
+  // Derivable from algorithm, but explicit here for efficient filtering.
+  caas.crypto.v1.CryptoPrimitive primitive = 2;
+
+  // Scopes this algorithm can operate in.
+  // Expressed as typed ScopeSpecification (same as templates).
+  repeated caas.crypto.v1.ScopeSpecification supported_scopes = 3;
+}
+
+// GetInfoRequest has no fields — it's a capability probe.
+message GetInfoRequest {}
+
+// GetInfoResponse returns provider identity.
+message GetInfoResponse {
+  ProviderInfo info = 1;
+}
+
+// GetCapabilitiesRequest carries optional instance configuration so that
+// providers with instance-scoped capabilities (e.g., PKCS#11) can probe
+// the correct token.  A PKCS#11 provider uses instance_config["slot_id"]
+// to call C_GetMechanismList on the right partition — enabling one plugin
+// binary to serve multiple slots with differing algorithm support.
+// Leave empty for providers whose capabilities are uniform across instances.
+message GetCapabilitiesRequest {
+  map<string, string> instance_config = 1;
+}
+
+// GetCapabilitiesResponse lists every algorithm this provider can perform.
+message GetCapabilitiesResponse {
+  repeated AlgorithmCapability capabilities = 1;
+}
+
+// ProviderIdentityService — identity and capability probe.
+service ProviderIdentityService {
+  rpc GetInfo(GetInfoRequest)                 returns (GetInfoResponse);
+  rpc GetCapabilities(GetCapabilitiesRequest) returns (GetCapabilitiesResponse);
+}

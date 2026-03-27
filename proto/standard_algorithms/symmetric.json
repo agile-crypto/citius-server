@@ -1,0 +1,560 @@
+{
+  "version": "4.0.0",
+  "lastUpdated": "2026-01-19T00:00:00Z",
+  "description": "Symmetric encryption algorithms. CycloneDX variant naming: aes-{keysize}-{mode}-{ivsize}-{tagsize|padding}",
+  "templates": {
+    "aes-128-gcm-96-128": {
+      "templateId": "aes-128-gcm-96-128",
+      "displayName": "AES-128-GCM-96-128",
+      "description": "AES with 128-bit key in Galois/Counter Mode, 96-bit IV, 128-bit tag. NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "aead": {
+              "scope": "AEAD_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonceMisuseResistant": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "intCtxt": true,
+              "intPtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true,
+              "authenticity": true
+            },
+            "bounds": {
+              "authenticationStrengthBits": 128,
+              "maxMessagesPerKey": 4294967296,
+              "maxPlaintextBytesPerKey": 68719476736,
+              "attackSuccessProbability": "2^-32"
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.6",
+        "primitive": "CRYPTO_PRIMITIVE_AE",
+        "aesGcm": {
+          "keySizeBits": 128,
+          "ivSizeBits": 96,
+          "tagSizeBits": 128
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "NIST SP 800-38D",
+        "FIPS 197"
+      ]
+    },
+    "aes-192-gcm-96-128": {
+      "templateId": "aes-192-gcm-96-128",
+      "displayName": "AES-192-GCM-96-128",
+      "description": "AES with 192-bit key in Galois/Counter Mode, 96-bit IV, 128-bit tag. NIST approved.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "aead": {
+              "scope": "AEAD_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonceMisuseResistant": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "intCtxt": true,
+              "intPtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true,
+              "authenticity": true
+            },
+            "bounds": {
+              "authenticationStrengthBits": 128,
+              "maxMessagesPerKey": 4294967296,
+              "maxPlaintextBytesPerKey": 68719476736,
+              "attackSuccessProbability": "2^-32"
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.26",
+        "primitive": "CRYPTO_PRIMITIVE_AE",
+        "aesGcm": {
+          "keySizeBits": 192,
+          "ivSizeBits": 96,
+          "tagSizeBits": 128
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "NIST SP 800-38D",
+        "FIPS 197"
+      ]
+    },
+    "aes-256-gcm-96-128": {
+      "templateId": "aes-256-gcm-96-128",
+      "displayName": "AES-256-GCM-96-128",
+      "description": "AES with 256-bit key in Galois/Counter Mode, 96-bit IV, 128-bit tag. NIST approved, recommended.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "aead": {
+              "scope": "AEAD_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
+              },
+              "nonceMisuseResistant": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "intCtxt": true,
+              "intPtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true,
+              "authenticity": true
+            },
+            "bounds": {
+              "authenticationStrengthBits": 128,
+              "maxMessagesPerKey": 4294967296,
+              "maxPlaintextBytesPerKey": 68719476736,
+              "attackSuccessProbability": "2^-32"
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.46",
+        "primitive": "CRYPTO_PRIMITIVE_AE",
+        "aesGcm": {
+          "keySizeBits": 256,
+          "ivSizeBits": 96,
+          "tagSizeBits": 128
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "NIST SP 800-38D",
+        "FIPS 197"
+      ]
+    },
+    "aes-128-cbc-128-pkcs7": {
+      "templateId": "aes-128-cbc-128-pkcs7",
+      "displayName": "AES-128-CBC-PKCS7",
+      "description": "AES with 128-bit key in CBC mode, 128-bit IV, PKCS7 padding. Legacy, prefer AEAD.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "symmetricCipher": {
+              "scope": "SYMMETRIC_CIPHER_SCOPE_BLOCK",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCpa": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": false,
+              "authenticity": false
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.2",
+        "primitive": "CRYPTO_PRIMITIVE_BLOCK_CIPHER",
+        "aesCbc": {
+          "keySizeBits": 128,
+          "ivSizeBits": 128,
+          "padding": "PADDING_SCHEME_PKCS7"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "deprecationNotice": "Prefer AES-GCM for authenticated encryption",
+      "standards": [
+        "NIST SP 800-38A",
+        "FIPS 197"
+      ]
+    },
+    "aes-192-cbc-128-pkcs7": {
+      "templateId": "aes-192-cbc-128-pkcs7",
+      "displayName": "AES-192-CBC-PKCS7",
+      "description": "AES with 192-bit key in CBC mode, 128-bit IV, PKCS7 padding. Legacy, prefer AEAD.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "symmetricCipher": {
+              "scope": "SYMMETRIC_CIPHER_SCOPE_BLOCK",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCpa": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": false,
+              "authenticity": false
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.22",
+        "primitive": "CRYPTO_PRIMITIVE_BLOCK_CIPHER",
+        "aesCbc": {
+          "keySizeBits": 192,
+          "ivSizeBits": 128,
+          "padding": "PADDING_SCHEME_PKCS7"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "deprecationNotice": "Prefer AES-GCM for authenticated encryption",
+      "standards": [
+        "NIST SP 800-38A",
+        "FIPS 197"
+      ]
+    },
+    "aes-256-cbc-128-pkcs7": {
+      "templateId": "aes-256-cbc-128-pkcs7",
+      "displayName": "AES-256-CBC-PKCS7",
+      "description": "AES with 256-bit key in CBC mode, 128-bit IV, PKCS7 padding. Legacy, prefer AEAD.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "symmetricCipher": {
+              "scope": "SYMMETRIC_CIPHER_SCOPE_BLOCK",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCpa": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": false,
+              "authenticity": false
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "oid": "2.16.840.1.101.3.4.1.42",
+        "primitive": "CRYPTO_PRIMITIVE_BLOCK_CIPHER",
+        "aesCbc": {
+          "keySizeBits": 256,
+          "ivSizeBits": 128,
+          "padding": "PADDING_SCHEME_PKCS7"
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "deprecationNotice": "Prefer AES-GCM for authenticated encryption",
+      "standards": [
+        "NIST SP 800-38A",
+        "FIPS 197"
+      ]
+    },
+    "aes-128-ctr-96-32": {
+      "templateId": "aes-128-ctr-96-32",
+      "displayName": "AES-128-CTR-96-32",
+      "description": "AES with 128-bit key in Counter mode, 96-bit nonce, 32-bit counter. Stream cipher mode.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "symmetricCipher": {
+              "scope": "SYMMETRIC_CIPHER_SCOPE_STREAM",
+              "security": {
+                "securityStrengthBits": 128,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCpa": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": false,
+              "authenticity": false
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_STREAM_CIPHER",
+        "aesCtr": {
+          "keySizeBits": 128,
+          "nonceSizeBits": 96,
+          "counterBits": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "standards": [
+        "NIST SP 800-38A",
+        "FIPS 197"
+      ]
+    },
+    "aes-192-ctr-96-32": {
+      "templateId": "aes-192-ctr-96-32",
+      "displayName": "AES-192-CTR-96-32",
+      "description": "AES with 192-bit key in Counter mode, 96-bit nonce, 32-bit counter. Stream cipher mode.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "symmetricCipher": {
+              "scope": "SYMMETRIC_CIPHER_SCOPE_STREAM",
+              "security": {
+                "securityStrengthBits": 192,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCpa": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": false,
+              "authenticity": false
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_STREAM_CIPHER",
+        "aesCtr": {
+          "keySizeBits": 192,
+          "nonceSizeBits": 96,
+          "counterBits": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "standards": [
+        "NIST SP 800-38A",
+        "FIPS 197"
+      ]
+    },
+    "aes-256-ctr-96-32": {
+      "templateId": "aes-256-ctr-96-32",
+      "displayName": "AES-256-CTR-96-32",
+      "description": "AES with 256-bit key in Counter mode, 96-bit nonce, 32-bit counter. Stream cipher mode.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "symmetricCipher": {
+              "scope": "SYMMETRIC_CIPHER_SCOPE_STREAM",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE",
+                "fipsApproved": true
+              }
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCpa": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": false,
+              "authenticity": false
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_STREAM_CIPHER",
+        "aesCtr": {
+          "keySizeBits": 256,
+          "nonceSizeBits": 96,
+          "counterBits": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACCEPTABLE",
+      "standards": [
+        "NIST SP 800-38A",
+        "FIPS 197"
+      ]
+    },
+    "chacha20poly1305-256-96-128": {
+      "templateId": "chacha20poly1305-256-96-128",
+      "displayName": "ChaCha20-Poly1305-IETF",
+      "description": "ChaCha20 (256-bit key) with Poly1305 MAC, 96-bit nonce, 128-bit tag. RFC 8439.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "aead": {
+              "scope": "AEAD_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonceMisuseResistant": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "intCtxt": true,
+              "intPtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true,
+              "authenticity": true
+            },
+            "bounds": {
+              "authenticationStrengthBits": 128,
+              "maxMessagesPerKey": 4294967296,
+              "attackSuccessProbability": "2^-32"
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_AE",
+        "chacha20Poly1305": {
+          "nonceSizeBits": 96,
+          "blockCounterBits": 32
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "RFC 8439"
+      ]
+    },
+    "xchacha20poly1305-256-192-128": {
+      "templateId": "xchacha20poly1305-256-192-128",
+      "displayName": "XChaCha20-Poly1305",
+      "description": "XChaCha20 (256-bit key) with Poly1305 MAC, 192-bit nonce, 128-bit tag. Extended nonce variant.",
+      "scopedCapabilities": [
+        {
+          "scope": {
+            "aead": {
+              "scope": "AEAD_SCOPE_STANDARD",
+              "security": {
+                "securityStrengthBits": 256,
+                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+              },
+              "nonceMisuseResistant": false
+            }
+          },
+          "operations": [
+            "CRYPTO_OPERATION_ENCRYPT",
+            "CRYPTO_OPERATION_DECRYPT"
+          ],
+          "securityGuarantees": {
+            "formal": {
+              "indCca2": true,
+              "intCtxt": true,
+              "intPtxt": true
+            },
+            "practical": {
+              "confidentiality": true,
+              "integrity": true,
+              "authenticity": true
+            },
+            "bounds": {
+              "authenticationStrengthBits": 128,
+              "maxMessagesPerKey": "18446744073709551615",
+              "attackSuccessProbability": "2^-128"
+            }
+          }
+        }
+      ],
+      "algorithm": {
+        "primitive": "CRYPTO_PRIMITIVE_AE",
+        "chacha20Poly1305": {
+          "nonceSizeBits": 192,
+          "blockCounterBits": 32,
+          "extendedNonce": true
+        }
+      },
+      "status": "TEMPLATE_STATUS_ACTIVE",
+      "standards": [
+        "draft-irtf-cfrg-xchacha"
+      ]
+    }
+  }
+}
