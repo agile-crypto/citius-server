@@ -7,6 +7,7 @@ option go_package = "github.ibm.com/citius/citius-server/gen/go/provider;provide
 import "buf/validate/validate.proto";
 import "types/operation_params.proto";
 import "types/algorithm_params.proto";
+import "types/templates.proto";
 import "messages/metadata.proto";
 
 // ============================================================================
@@ -46,6 +47,11 @@ message SignRequest {
     caas.crypto.v1.SignatureDomainContext   domain_context = 4;
     caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
   }
+
+  // Typed algorithm specification for provider dispatch.
+  // The core resolves this from the template and passes it through.
+  // The provider SHOULD validate it matches the key_material type.
+  caas.crypto.v1.AlgorithmDetails algorithm = 6;
 }
 
 // SignResponse contains the signature and provider output.
@@ -71,6 +77,9 @@ message VerifyRequest {
     caas.crypto.v1.SignatureDomainContext   domain_context = 5;
     caas.crypto.v1.VendorSignatureContext   vendor_context = 6;
   }
+
+  // Typed algorithm specification — must match the algorithm used during signing.
+  caas.crypto.v1.AlgorithmDetails algorithm = 7;
 }
 
 // VerifyResponse reports whether the signature is valid.
