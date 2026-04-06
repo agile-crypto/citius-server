@@ -59,7 +59,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 				"only P-256 curve supported")
 		}
 		pubDER, privDER, err = generateECDSAP256Key(ctx)
@@ -67,11 +67,16 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 			return nil, errors.Wrap(ctx, op, err)
 		}
 	case *types.AlgorithmDetails_MlDsa:
-		_ = alg // TODO: Implement
-		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-			"ml-dsa key generation not yet implemented")
+		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only ML-DSA-65 parameter set supported")
+		}
+		pubDER, privDER, err = generateMLDSA65Key(ctx)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
 	default:
-		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
 
@@ -82,17 +87,27 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	}, nil
 }
 
-// Sign stub - TODO: Implement
+// Sign dispatches to the algorithm-specific sign implementation.
 func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error) {
 	const op errors.Op = "software.(Provider).Sign"
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 				"only P-256 curve supported for sign")
 		}
 		sig, err := signECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only ML-DSA-65 parameter set supported for sign")
+		}
+		sig, err := signMLDSA65(ctx, req.GetKeyMaterial(), req.GetInput())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -103,17 +118,27 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 	}
 }
 
-// Verify stub - TODO: Implement
+// Verify dispatches to the algorithm-specific verify implementation.
 func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	const op errors.Op = "software.(Provider).Verify"
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 				"only P-256 curve supported for verify")
 		}
 		valid, err := verifyECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only ML-DSA-65 parameter set supported for verify")
+		}
+		valid, err := verifyMLDSA65(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}

@@ -109,19 +109,6 @@ func TestGenerateKey_ECDSA_P256_keysAreUnique(t *testing.T) {
 	}
 }
 
-func TestGenerateKey_MLDSA65_stillNotImplemented(t *testing.T) {
-	p := software.New()
-	_, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
-		Algorithm: mlDSA65Details(),
-	})
-	if err == nil {
-		t.Fatal("expected error for ml-dsa-65 (not yet implemented in this step)")
-	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented for ml-dsa-65, got: %v", err)
-	}
-}
-
 func TestGenerateKey_unknownAlgorithm_returnsError(t *testing.T) {
 	p := software.New()
 	_, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
