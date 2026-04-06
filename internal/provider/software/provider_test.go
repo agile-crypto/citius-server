@@ -100,34 +100,3 @@ func TestProvider_ExportPublicKey_returnsNotImplemented(t *testing.T) {
 		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
 }
-
-// ============================================================================
-// Stub Method Tests (return CodeNotImplemented for now)
-// ============================================================================
-
-func TestProvider_Sign_stub_returnsNotImplemented(t *testing.T) {
-	p := software.New()
-	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
-		Input: []byte("test"),
-	})
-	if err == nil {
-		t.Fatal("expected error from stub Sign")
-	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
-	}
-}
-
-func TestProvider_Verify_stub_returnsNotImplemented(t *testing.T) {
-	p := software.New()
-	_, err := p.Verify(context.Background(), &providerpb.VerifyRequest{
-		Input:     []byte("test"),
-		Signature: []byte("sig"),
-	})
-	if err == nil {
-		t.Fatal("expected error from stub Verify")
-	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
-	}
-}

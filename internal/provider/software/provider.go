@@ -83,17 +83,39 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 }
 
 // Sign stub - TODO: Implement
-func (p *Provider) Sign(ctx context.Context, _ *providerpb.SignRequest) (*providerpb.SignResponse, error) {
-	const op errors.Op = "software.Provider.Sign"
-	return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-		"Sign not yet implemented")
+func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	const op errors.Op = "software.(Provider).Sign"
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		_ = alg
+		sig, err := signECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for sign: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
 }
 
 // Verify stub - TODO: Implement
-func (p *Provider) Verify(ctx context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
-	const op errors.Op = "software.Provider.Verify"
-	return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-		"Verify not yet implemented")
+func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	const op errors.Op = "software.(Provider).Verify"
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		_ = alg
+		valid, err := verifyECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for verify: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
 }
 
 // Compile-time assertion: Provider implements provider.Backend.
