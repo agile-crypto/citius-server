@@ -301,6 +301,55 @@ func TestVerify_unsupportedAlgorithm_returnsError(t *testing.T) {
 	}
 }
 
+func TestSign_ECDSA_unsupportedCurve_returnsError(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       []byte("data"),
+		Algorithm: &types.AlgorithmDetails{
+			Algorithm: &types.AlgorithmDetails_Ecdsa{
+				Ecdsa: &types.EcdsaParams{
+					Curve: types.EllipticCurve_ELLIPTIC_CURVE_P384,
+					Hash:  types.HashAlgorithm_HASH_ALGORITHM_SHA384,
+				},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported curve P-384 on Sign")
+	}
+}
+
+func TestVerify_ECDSA_unsupportedCurve_returnsError(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	// Sign with the correct P-256 algorithm first.
+	signResult, err := p.Sign(context.Background(), &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       []byte("data"),
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	// Verify with P-384 curve — should be rejected.
+	_, err = p.Verify(context.Background(), &providerpb.VerifyRequest{
+		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
+		Input:       []byte("data"),
+		Signature:   signResult.GetSignature(),
+		Algorithm: &types.AlgorithmDetails{
+			Algorithm: &types.AlgorithmDetails_Ecdsa{
+				Ecdsa: &types.EcdsaParams{
+					Curve: types.EllipticCurve_ELLIPTIC_CURVE_P384,
+					Hash:  types.HashAlgorithm_HASH_ALGORITHM_SHA384,
+				},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported curve P-384 on Verify")
+	}
+}
+
 func TestSignVerify_ECDSA_P256_roundTrip(t *testing.T) {
 	p := software.New()
 	ctx := context.Background()
