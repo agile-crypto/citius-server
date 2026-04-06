@@ -135,3 +135,209 @@ func TestGenerateKey_unknownAlgorithm_returnsError(t *testing.T) {
 		t.Fatal("expected error for unknown algorithm")
 	}
 }
+
+func genECDSAKey(t *testing.T) (*software.Provider, *providerpb.GenerateKeyResponse) {
+	t.Helper()
+	p := software.New()
+	result, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
+		Algorithm: ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	return p, result
+}
+
+func TestSign_ECDSA_P256_happyPath(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	result, err := p.Sign(context.Background(), &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       []byte("hello world"),
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+	if len(result.GetSignature()) == 0 {
+		t.Error("expected non-empty signature")
+	}
+}
+
+func TestSign_unsupportedAlgorithm_returnsError(t *testing.T) {
+	p := software.New()
+	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
+		KeyMaterial: []byte("fake-key"),
+		Input:       []byte("data"),
+		Algorithm: &types.AlgorithmDetails{
+			Algorithm: &types.AlgorithmDetails_RsaPss{
+				RsaPss: &types.RsaPssParams{},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported algorithm")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	}
+}
+
+func TestSign_emptyPayload_succeeds(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       []byte{},
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign(empty): %v", err)
+	}
+}
+
+func TestVerify_ECDSA_P256_happyPath_validSignature(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	ctx := context.Background()
+	payload := []byte("test message")
+
+	signResult, err := p.Sign(ctx, &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       payload,
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	verifyResult, err := p.Verify(ctx, &providerpb.VerifyRequest{
+		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
+		Input:       payload,
+		Signature:   signResult.GetSignature(),
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if !verifyResult.GetValid() {
+		t.Error("Verify: expected valid=true for correct signature")
+	}
+}
+
+func TestVerify_ECDSA_P256_tamperedPayload_returnsFalse(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	ctx := context.Background()
+
+	signResult, err := p.Sign(ctx, &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       []byte("original"),
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	verifyResult, err := p.Verify(ctx, &providerpb.VerifyRequest{
+		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
+		Input:       []byte("tampered"),
+		Signature:   signResult.GetSignature(),
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if verifyResult.GetValid() {
+		t.Error("Verify: expected valid=false for tampered payload")
+	}
+}
+
+func TestVerify_ECDSA_P256_tamperedSignature_returnsFalse(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	ctx := context.Background()
+	payload := []byte("data")
+
+	signResult, err := p.Sign(ctx, &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       payload,
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	tampered := make([]byte, len(signResult.GetSignature()))
+	copy(tampered, signResult.GetSignature())
+	tampered[len(tampered)/2] ^= 0xFF
+
+	verifyResult, err := p.Verify(ctx, &providerpb.VerifyRequest{
+		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
+		Input:       payload,
+		Signature:   tampered,
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if verifyResult.GetValid() {
+		t.Error("Verify: expected valid=false for tampered signature")
+	}
+}
+
+func TestVerify_unsupportedAlgorithm_returnsError(t *testing.T) {
+	p := software.New()
+	_, err := p.Verify(context.Background(), &providerpb.VerifyRequest{
+		KeyMaterial: []byte("fake-key"),
+		Input:       []byte("x"),
+		Signature:   []byte("y"),
+		Algorithm: &types.AlgorithmDetails{
+			Algorithm: &types.AlgorithmDetails_RsaPss{
+				RsaPss: &types.RsaPssParams{},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported algorithm")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	}
+}
+
+func TestSignVerify_ECDSA_P256_roundTrip(t *testing.T) {
+	p := software.New()
+	ctx := context.Background()
+
+	keyResult, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
+		Algorithm: ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	payloads := [][]byte{
+		[]byte("short"),
+		[]byte("a longer message with punctuation: !@#$%^&"),
+		make([]byte, 4096),
+	}
+
+	for _, payload := range payloads {
+		signResult, err := p.Sign(ctx, &providerpb.SignRequest{
+			KeyMaterial: keyResult.GetKeyMaterial(),
+			Input:       payload,
+			Algorithm:   ecdsaP256Details(),
+		})
+		if err != nil {
+			t.Fatalf("Sign: %v", err)
+		}
+		verifyResult, err := p.Verify(ctx, &providerpb.VerifyRequest{
+			KeyMaterial: keyResult.GetPublicKeyBytes(),
+			Input:       payload,
+			Signature:   signResult.GetSignature(),
+			Algorithm:   ecdsaP256Details(),
+		})
+		if err != nil {
+			t.Fatalf("Verify: %v", err)
+		}
+		if !verifyResult.GetValid() {
+			t.Errorf("round-trip failed for payload of length %d", len(payload))
+		}
+	}
+}
