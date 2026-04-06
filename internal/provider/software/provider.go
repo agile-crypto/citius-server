@@ -88,7 +88,10 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		_ = alg
+		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+				"only P-256 curve supported for sign")
+		}
 		sig, err := signECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
@@ -106,7 +109,10 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		_ = alg
+		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+				"only P-256 curve supported for verify")
+		}
 		valid, err := verifyECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
