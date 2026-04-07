@@ -67,6 +67,10 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"key name must not be empty")
 	}
+	if req.PolicyID == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"policy ID must not be empty")
+	}
 
 	// 2. Resolve template + derive scope.
 	//    Two paths: explicit template_id OR scope-based selection.
@@ -108,6 +112,17 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
+	}
+
+	// 2a. Policy: validate that create_key with this template is permitted.
+	if err := r.policy.ValidateOperation(ctx, req.PolicyID,
+		core.OperationCreateKey, tmpl.TemplateID(), ""); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	// 2b. Policy: validate key configuration constraints (extractable, rotation, etc.)
+	if err := r.policy.ValidateKeyCreation(ctx, req.PolicyID, &req); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
 	}
 
 	// 3. Find a provider that supports this template.
@@ -164,19 +179,31 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	return k, nil
 }
 
-func (r *keyOrchestrator) ReadKey(ctx context.Context, _ string) (*key.Key, error) {
-	return nil, errors.New(ctx, "service.(keyOrchestrator).ReadKey", errors.CodeNotImplemented,
-		"ReadKey not yet implemented")
+func (r *keyOrchestrator) ReadKey(ctx context.Context, publicID string) (*key.Key, error) {
+	const op errors.Op = "service.(keyOrchestrator).ReadKey"
+	k, err := r.repo.GetKey(ctx, publicID)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return k, nil
 }
 
 func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*key.Key, error) {
-	return nil, errors.New(ctx, "service.(keyOrchestrator).ListKeys", errors.CodeNotImplemented,
-		"ListKeys not yet implemented")
+	const op errors.Op = "service.(keyOrchestrator).ListKeys"
+	// Repository.ListKeys returns []*key.Key directly — no N+1 fetch needed.
+	keys, err := r.repo.ListKeys(ctx)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return keys, nil
 }
 
-func (r *keyOrchestrator) DeleteKey(ctx context.Context, _ string) error {
-	return errors.New(ctx, "service.(keyOrchestrator).DeleteKey", errors.CodeNotImplemented,
-		"DeleteKey not yet implemented")
+func (r *keyOrchestrator) DeleteKey(ctx context.Context, publicID string) error {
+	const op errors.Op = "service.(keyOrchestrator).DeleteKey"
+	if err := r.repo.DeleteKey(ctx, publicID); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	return nil
 }
 
 func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, _ string, _ uint32) (*key.Key, *key.Version, error) {
