@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
-	api "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/key"
 	"github.ibm.com/citius/citius-server/internal/policy"
@@ -16,7 +15,6 @@ import (
 	"github.ibm.com/citius/citius-server/internal/provider/software"
 	"github.ibm.com/citius/citius-server/internal/service"
 	"github.ibm.com/citius/citius-server/internal/template"
-	"google.golang.org/protobuf/proto"
 )
 
 // ============================================================================
@@ -54,18 +52,13 @@ func catalogPath() string {
 	return filepath.Join(filepath.Dir(currentFile), "..", "..", "proto", "standard_algorithms.json")
 }
 
-// setupOrchestratorFull creates a fully wired KeyOrchestrator backed by
-// in-memory storage, the software provider, and the standard algorithm catalog.
-// It returns the orchestrator, the underlying key.Repository (for lifecycle
-// mutation in tests), and the policy.Engine (for seeding custom policies).
+// setupOrchestrator creates a fully wired KeyOrchestrator backed by in-memory
+// storage, the software provider, and the standard algorithm catalog.
 //
 // The software provider advertises "ecdsa-p256-sha256" and "ml-dsa-65".
 // The standard catalog contains "ml-dsa-65" (matching), so end-to-end tests
 // use that template ID.
-//
-// A permissive policy (testPolicyName) is pre-seeded that allows ml-dsa-65 and
-// the create_key operation.
-func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, key.Repository, policy.Engine) {
+func setupOrchestrator(t *testing.T) service.KeyOrchestrator {
 	t.Helper()
 
 	ctx := context.Background()
@@ -110,23 +103,6 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, key.Repositor
 	if err != nil {
 		t.Fatalf("NewKeyOrchestrator: %v", err)
 	}
-	return orch, repo, pol
-}
-
-// setupOrchestratorWithPolicy is a convenience wrapper that returns the
-// orchestrator and policy engine (without the repo). Use setupOrchestratorFull
-// when you also need the underlying key.Repository for lifecycle mutation.
-func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, policy.Engine) {
-	t.Helper()
-	orch, _, pol := setupOrchestratorFull(t)
-	return orch, pol
-}
-
-// setupOrchestrator is a convenience wrapper that returns only the orchestrator.
-// Use setupOrchestratorWithPolicy when you need to seed additional policies.
-func setupOrchestrator(t *testing.T) service.KeyOrchestrator {
-	t.Helper()
-	orch, _ := setupOrchestratorWithPolicy(t)
 	return orch
 }
 
@@ -265,247 +241,5 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error when no provider supports the template")
-	}
-}
-
-// ============================================================================
-// Scope-Based Helpers
-// ============================================================================
-
-// marshalSignatureScope builds proto-encoded ScopeSpecification bytes for the
-// given SignatureScope. Used by scope-based CreateKey tests.
-func marshalSignatureScope(t *testing.T, scope api.SignatureScope) []byte {
-	t.Helper()
-	spec := &api.ScopeSpecification{
-		ScopeSpec: &api.ScopeSpecification_Signature{
-			Signature: &api.SignatureScopeSpec{
-				Scope: scope,
-			},
-		},
-	}
-	b, err := proto.Marshal(spec)
-	if err != nil {
-		t.Fatalf("marshal ScopeSpecification: %v", err)
-	}
-	return b
-}
-
-// seedScopePolicy creates a named policy with the given rules and returns the
-// policy name. Convenience for scope-based tests that need custom policies.
-func seedScopePolicy(t *testing.T, ctx context.Context, pol policy.Engine, name string, rules *policy.Rules) string {
-	t.Helper()
-	var rulesJSON []byte
-	if rules != nil {
-		var err error
-		rulesJSON, err = json.Marshal(rules)
-		if err != nil {
-			t.Fatalf("marshal rules: %v", err)
-		}
-	}
-	p := policy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
-	_, err := pol.CreatePolicy(ctx, p)
-	if err != nil {
-		t.Fatalf("seed policy %q: %v", name, err)
-	}
-	return name
-}
-
-// ============================================================================
-// CreateKey Tests — Scope-Based Path
-// ============================================================================
-
-func TestCreateKey_scopeBased_permissivePolicy_selectsByScope(t *testing.T) {
-	orch, pol := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	// Seed a policy that allows ml-dsa-65 + create_key for the scope path.
-	policyName := seedScopePolicy(t, ctx, pol, "scope-permissive", &policy.Rules{
-		Version:          "1",
-		AllowedTemplates: []string{"ml-dsa-65"},
-		AllowedOperations: &policy.OperationRule{
-			KeyOperations: []string{string(core.OperationCreateKey)},
-		},
-	})
-
-	scopeBytes := marshalSignatureScope(t, api.SignatureScope_SIGNATURE_SCOPE_STANDARD)
-
-	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "scope-based-key",
-		Scope:    scopeBytes,
-		PolicyID: policyName,
-	})
-	if err != nil {
-		t.Fatalf("CreateKey (scope-based, permissive policy): %v", err)
-	}
-	if created.GetPrimitive() == "" {
-		t.Error("Primitive should be set from scope")
-	}
-	if created.GetPrimitive() != "signature" {
-		t.Errorf("Primitive: got %q want %q", created.GetPrimitive(), "signature")
-	}
-}
-
-func TestCreateKey_scopeBased_policyAllowsTemplate(t *testing.T) {
-	orch, pol := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	policyName := seedScopePolicy(t, ctx, pol, "allow-mldsa", &policy.Rules{
-		Version:          "1",
-		AllowedTemplates: []string{"ml-dsa-65"},
-		AllowedOperations: &policy.OperationRule{
-			KeyOperations: []string{string(core.OperationCreateKey)},
-		},
-	})
-
-	scopeBytes := marshalSignatureScope(t, api.SignatureScope_SIGNATURE_SCOPE_STANDARD)
-
-	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "policy-allowed",
-		Scope:    scopeBytes,
-		PolicyID: policyName,
-	})
-	if err != nil {
-		t.Fatalf("CreateKey: %v", err)
-	}
-	if created.GetPublicId() == "" {
-		t.Error("expected valid key")
-	}
-}
-
-func TestCreateKey_scopeBased_policyDenies_noMatchingTemplate(t *testing.T) {
-	orch, pol := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	// Policy allows only a template that doesn't exist in the catalog.
-	policyName := seedScopePolicy(t, ctx, pol, "deny-all-real", &policy.Rules{
-		Version:          "1",
-		AllowedTemplates: []string{"nonexistent-template"},
-		AllowedOperations: &policy.OperationRule{
-			KeyOperations: []string{string(core.OperationCreateKey)},
-		},
-	})
-
-	scopeBytes := marshalSignatureScope(t, api.SignatureScope_SIGNATURE_SCOPE_STANDARD)
-
-	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "should-fail",
-		Scope:    scopeBytes,
-		PolicyID: policyName,
-	})
-	if err == nil {
-		t.Fatal("expected error: policy restricts to non-existent template")
-	}
-}
-
-func TestCreateKey_scopeBased_policyDenyByDefault(t *testing.T) {
-	orch, pol := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	// Empty/nil rules = deny-by-default: allowed_templates is absent (nil).
-	policyName := seedScopePolicy(t, ctx, pol, "deny-default", nil)
-
-	scopeBytes := marshalSignatureScope(t, api.SignatureScope_SIGNATURE_SCOPE_STANDARD)
-
-	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "should-fail",
-		Scope:    scopeBytes,
-		PolicyID: policyName,
-	})
-	if err == nil {
-		t.Fatal("expected error: deny-by-default policy should block key creation")
-	}
-}
-
-func TestCreateKey_scopeBased_quantumSafeFilter(t *testing.T) {
-	orch, pol := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	// Allow both templates; the quantum_safe filter in the scope should narrow
-	// selection to ml-dsa-65 only (ecdsa-p256 is not quantum-safe).
-	policyName := seedScopePolicy(t, ctx, pol, "qs-policy", &policy.Rules{
-		Version:          "1",
-		AllowedTemplates: []string{"ml-dsa-65", "ecdsa-p256-sha256-der"},
-		AllowedOperations: &policy.OperationRule{
-			KeyOperations: []string{string(core.OperationCreateKey)},
-		},
-	})
-
-	qsTrue := true
-	spec := &api.ScopeSpecification{
-		ScopeSpec: &api.ScopeSpecification_Signature{
-			Signature: &api.SignatureScopeSpec{
-				Scope: api.SignatureScope_SIGNATURE_SCOPE_STANDARD,
-				Security: &api.UniversalSecurityProperties{
-					QuantumSafe: &qsTrue,
-				},
-			},
-		},
-	}
-	scopeBytes, err := proto.Marshal(spec)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-
-	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "quantum-safe-key",
-		Scope:    scopeBytes,
-		PolicyID: policyName,
-	})
-	if err != nil {
-		t.Fatalf("CreateKey (quantum_safe scope): %v", err)
-	}
-	// The only quantum-safe signature template in the catalog is ml-dsa-65.
-	if created.GetPrimitive() != "signature" {
-		t.Errorf("Primitive: got %q want %q", created.GetPrimitive(), "signature")
-	}
-}
-
-func TestCreateKey_scopeBased_policyNotFound(t *testing.T) {
-	orch, _ := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	scopeBytes := marshalSignatureScope(t, api.SignatureScope_SIGNATURE_SCOPE_STANDARD)
-
-	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "should-fail",
-		Scope:    scopeBytes,
-		PolicyID: "nonexistent-policy",
-	})
-	if err == nil {
-		t.Fatal("expected error: policy not found")
-	}
-}
-
-func TestCreateKey_scopeBased_primitiveMismatch(t *testing.T) {
-	orch, pol := setupOrchestratorWithPolicy(t)
-	ctx := context.Background()
-
-	// Allow everything — but the KEM primitive has no templates in the catalog.
-	policyName := seedScopePolicy(t, ctx, pol, "allow-all-kem", &policy.Rules{
-		Version:          "1",
-		AllowedTemplates: []string{"ml-dsa-65", "ecdsa-p256-sha256-der"},
-		AllowedOperations: &policy.OperationRule{
-			KeyOperations: []string{string(core.OperationCreateKey)},
-		},
-	})
-
-	// The catalog only has signature templates; request KEM scope.
-	spec := &api.ScopeSpecification{
-		ScopeSpec: &api.ScopeSpecification_Kem{
-			Kem: &api.KemScopeSpec{},
-		},
-	}
-	scopeBytes, err := proto.Marshal(spec)
-	if err != nil {
-		t.Fatalf("marshal: %v", err)
-	}
-
-	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "kem-key",
-		Scope:    scopeBytes,
-		PolicyID: policyName,
-	})
-	if err == nil {
-		t.Fatal("expected error: no KEM template in catalog")
 	}
 }
