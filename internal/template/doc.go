@@ -22,9 +22,21 @@
 //     policy constraints and preferred properties.
 //
 // Proto -> Domain conversion:
-//   - scopeSpecFromProto (unexported) converts *api.ScopeSpecification →
-//     core.ScopeSpec for internal use by Select. This is NOT an
-//     Anti-Corruption Layer — it is a localised conversion that
+//   - scopeSpecFromProto (unexported, vault_registry.go) converts
+//     *api.ScopeSpecification => core.ScopeSpec for internal use by
+//     Select, MatchesScope, and PrimaryScopeSpec. This is NOT an
+//     Anti-Corruption Layer - it is a localised conversion that
 //     interprets the template's own proto capabilities in domain terms.
+//
+// Domain-level scope APIs (for cross-package use):
+//   - Template.PrimaryScopeSpec() (template.go) returns the core.ScopeSpec
+//     derived from the template's first ScopedCapability.
+//   - ParseScopeSpecification() (scope.go) converts proto-encoded []byte =>
+//     core.ScopeSpec. This is the exported entry point for callers who
+//     receive scope data as proto wire bytes (e.g. the service layer
+//     deserializing core.KeyCreationSpec.Scope from a gRPC request).
+//     It lives in this package, rather than in core, because the
+//     conversion requires knowledge of the api.ScopeSpecification proto
+//     oneof structure, which core must not import.
 
 package template

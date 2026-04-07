@@ -2,6 +2,7 @@ package template
 
 import (
 	api "github.ibm.com/citius/citius-server/gen/go/types"
+	"github.ibm.com/citius/citius-server/internal/core"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -47,4 +48,19 @@ func (t *Template) GetScopedCapabilities() []*api.ScopedCapabilities {
 // Clone returns a deep copy of the Template.
 func (t *Template) Clone() *Template {
 	return &Template{stored: proto.Clone(t.stored).(*api.TemplateInfo)}
+}
+
+// PrimaryScopeSpec returns the core.ScopeSpec derived from the template's
+// first ScopedCapability. If the template has no scoped capabilities,
+// a zero-value ScopeSpec is returned.
+//
+// This is the domain-level accessor that lets callers (e.g. the service
+// layer) obtain scope information without reaching into proto internals.
+// The unexported scopeSpecFromProto handles the actual conversion.
+func (t *Template) PrimaryScopeSpec() core.ScopeSpec {
+	caps := t.GetScopedCapabilities()
+	if len(caps) == 0 {
+		return core.ScopeSpec{}
+	}
+	return scopeSpecFromProto(caps[0].GetScope())
 }
