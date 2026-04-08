@@ -7,19 +7,20 @@ import "google.golang.org/grpc/codes"
 type Code int
 
 const (
-	CodeInternal         Code = iota // 0 — unexpected internal error
-	CodeInvalidArgument              // 1 — caller provided invalid input
-	CodeNotFound                     // 2 — generic not-found (use specific variants below)
-	CodeKeyNotFound                  // 3
-	CodePolicyNotFound               // 4
-	CodeTemplateNotFound             // 5
-	CodeProviderNotFound             // 6
-	CodePolicyViolation              // 7 — operation denied by policy
-	CodeAlreadyExists                // 8 — resource already exists
-	CodeNotImplemented               // 9 — stub / future feature
-	CodeUnauthenticated              // 10 — missing / invalid credentials
-	CodeUnavailable                  // 11 — provider temporarily unavailable
-	CodeDataLoss                     // 12 — data corruption detected
+	CodeInternal           Code = iota // 0 — unexpected internal error
+	CodeInvalidArgument                // 1 — caller provided invalid input
+	CodeNotFound                       // 2 — generic not-found (use specific variants below)
+	CodeKeyNotFound                    // 3
+	CodePolicyNotFound                 // 4
+	CodeTemplateNotFound               // 5
+	CodeProviderNotFound               // 6
+	CodePolicyViolation                // 7 — operation denied by policy
+	CodeAlreadyExists                  // 8 — resource already exists
+	CodeNotImplemented                 // 9 — stub / future feature
+	CodeUnauthenticated                // 10 — missing / invalid credentials
+	CodeUnavailable                    // 11 — provider temporarily unavailable
+	CodeDataLoss                       // 12 — data corruption detected
+	CodeFailedPrecondition             // 13 — lifecycle / state precondition not met
 )
 
 // GRPCCode maps an core Code to the nearest gRPC status code.
@@ -50,6 +51,8 @@ func GRPCCode(err error) codes.Code {
 		return codes.Unavailable
 	case CodeDataLoss:
 		return codes.DataLoss
+	case CodeFailedPrecondition:
+		return codes.FailedPrecondition
 	default:
 		return codes.Internal
 	}
@@ -81,6 +84,9 @@ func IsAlreadyExists(err error) bool { return hasCode(err, CodeAlreadyExists) }
 
 // IsInvalidArgument reports whether err was caused by invalid input.
 func IsInvalidArgument(err error) bool { return hasCode(err, CodeInvalidArgument) }
+
+// IsFailedPrecondition reports whether err was caused by a lifecycle/state precondition not being met.
+func IsFailedPrecondition(err error) bool { return hasCode(err, CodeFailedPrecondition) }
 
 // hasCode returns true if any error in the chain is an *Error with one of the given codes.
 func hasCode(err error, codes ...Code) bool {

@@ -190,11 +190,3 @@ func TestUpdateKeyPolicy_notImplemented(t *testing.T) {
 		t.Errorf("UpdateKeyPolicy should be CodeNotImplemented, got: %v", err)
 	}
 }
-
-func TestGetKeyWithMaterial_notImplemented(t *testing.T) {
-	orch := setupOrchestrator(t)
-	_, _, err := orch.GetKeyWithMaterial(context.Background(), "any", 1)
-	if err == nil || !errors.IsNotImplemented(err) {
-		t.Errorf("GetKeyWithMaterial should be CodeNotImplemented, got: %v", err)
-	}
-}
