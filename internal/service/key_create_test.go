@@ -54,9 +54,10 @@ func catalogPath() string {
 	return filepath.Join(filepath.Dir(currentFile), "..", "..", "proto", "standard_algorithms.json")
 }
 
-// setupOrchestratorWithPolicy creates a fully wired KeyOrchestrator backed by
+// setupOrchestratorFull creates a fully wired KeyOrchestrator backed by
 // in-memory storage, the software provider, and the standard algorithm catalog.
-// It also returns the policy.Engine so callers can seed custom policies.
+// It returns the orchestrator, the underlying key.Repository (for lifecycle
+// mutation in tests), and the policy.Engine (for seeding custom policies).
 //
 // The software provider advertises "ecdsa-p256-sha256" and "ml-dsa-65".
 // The standard catalog contains "ml-dsa-65" (matching), so end-to-end tests
@@ -64,7 +65,7 @@ func catalogPath() string {
 //
 // A permissive policy (testPolicyName) is pre-seeded that allows ml-dsa-65 and
 // the create_key operation.
-func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, policy.Engine) {
+func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, key.Repository, policy.Engine) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -109,6 +110,15 @@ func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, policy.
 	if err != nil {
 		t.Fatalf("NewKeyOrchestrator: %v", err)
 	}
+	return orch, repo, pol
+}
+
+// setupOrchestratorWithPolicy is a convenience wrapper that returns the
+// orchestrator and policy engine (without the repo). Use setupOrchestratorFull
+// when you also need the underlying key.Repository for lifecycle mutation.
+func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, policy.Engine) {
+	t.Helper()
+	orch, _, pol := setupOrchestratorFull(t)
 	return orch, pol
 }
 
