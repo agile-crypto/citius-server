@@ -1,0 +1,127 @@
+package service_test
+
+import (
+	"context"
+	"testing"
+
+	"github.ibm.com/citius/citius-server/internal/crypto"
+	"github.ibm.com/citius/citius-server/internal/errors"
+)
+
+// ============================================================================
+// TODO: Stub Tests to be done after full implementation
+// ============================================================================
+
+func TestEncrypt_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.Encrypt(context.Background(), crypto.EncryptRequest{})
+	if err == nil {
+		t.Fatal("Encrypt should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for Encrypt, got: %v", err)
+	}
+}
+
+func TestDecrypt_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.Decrypt(context.Background(), crypto.DecryptRequest{})
+	if err == nil {
+		t.Fatal("Decrypt should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for Decrypt, got: %v", err)
+	}
+}
+
+func TestWrapKey_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.WrapKey(context.Background(), crypto.WrapKeyRequest{})
+	if err == nil {
+		t.Fatal("WrapKey should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for WrapKey, got: %v", err)
+	}
+}
+
+func TestUnwrapKey_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.UnwrapKey(context.Background(), crypto.UnwrapKeyRequest{})
+	if err == nil {
+		t.Fatal("UnwrapKey should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for UnwrapKey, got: %v", err)
+	}
+}
+
+func TestDeriveKey_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.DeriveKey(context.Background(), crypto.DeriveKeyRequest{})
+	if err == nil {
+		t.Fatal("DeriveKey should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for DeriveKey, got: %v", err)
+	}
+}
+
+func TestGenerateMAC_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.GenerateMAC(context.Background(), crypto.MacRequest{})
+	if err == nil {
+		t.Fatal("GenerateMAC should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for GenerateMAC, got: %v", err)
+	}
+}
+
+func TestVerifyMAC_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.VerifyMAC(context.Background(), crypto.VerifyMacRequest{})
+	if err == nil {
+		t.Fatal("VerifyMAC should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for VerifyMAC, got: %v", err)
+	}
+}
+
+func TestDigest_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.Digest(context.Background(), crypto.DigestRequest{})
+	if err == nil {
+		t.Fatal("Digest should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for Digest, got: %v", err)
+	}
+}
+
+func TestGenerateRandom_notImplemented(t *testing.T) {
+	ops := setupCryptoOrchestrator(t)
+	_, err := ops.GenerateRandom(context.Background(), 32)
+	if err == nil {
+		t.Fatal("GenerateRandom should return error")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for GenerateRandom, got: %v", err)
+	}
+}
+
+// ============================================================================
+// Interface Completeness
+// ============================================================================
+
+func TestCryptoOrchestrator_interfaceComplete(t *testing.T) {
+	// Compile-time check: if this file compiles, cryptoOrchestrator satisfies CryptoOrchestrator.
+	// The real assertion is in service/crypto_orchestrator_impl.go:
+	//   var _ CryptoOrchestrator = (*cryptoOrchestrator)(nil)
+	// From service_test, we verify via the constructor return type.
+	ops := setupCryptoOrchestrator(t)
+	if ops == nil {
+		t.Fatal("expected non-nil CryptoOrchestrator from constructor")
+	}
+}
