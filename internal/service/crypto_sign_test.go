@@ -71,9 +71,9 @@ func TestSign_MLDSA_happyPath(t *testing.T) {
 	ctx := context.Background()
 
 	result, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              []byte("post-quantum signing"),
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     []byte("post-quantum signing"),
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
@@ -168,9 +168,9 @@ func TestSign_policyDeniesSign_returnsError(t *testing.T) {
 
 	// Sign should fail with policy violation.
 	_, err = ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          created.GetPublicId(),
-		Payload:              []byte("should fail"),
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: created.GetPublicId(),
+		Payload:     []byte("should fail"),
+		NoContext:   &types.NoParams{},
 	})
 	if err == nil {
 		t.Fatal("expected error for policy-denied sign")
@@ -200,9 +200,9 @@ func TestSign_MLDSA_noContext_succeeds(t *testing.T) {
 	// "standard", so NoContext (standard) matches the key's declared scope.
 	ops, keyID := setupCryptoWithKey(t)
 	result, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              []byte("standard scope signing"),
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     []byte("standard scope signing"),
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign with NoContext on ML-DSA: %v", err)
@@ -217,12 +217,29 @@ func TestSign_scopeMismatch_returnsError(t *testing.T) {
 	// DomainContext maps to "with_context" — scope mismatch.
 	ops, keyID := setupCryptoWithKey(t)
 	_, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              []byte("data"),
-		SignatureScopeFields: crypto.SignatureScopeFields{DomainContext: &types.SignatureDomainContext{}},
+		KeyPublicID:   keyID,
+		Payload:       []byte("data"),
+		DomainContext: &types.SignatureDomainContext{},
 	})
 	if err == nil {
 		t.Fatal("expected error for scope mismatch")
+	}
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
+	}
+}
+
+func TestSign_multipleScopeParams_returnsError(t *testing.T) {
+	// Setting both NoContext and DomainContext violates the oneof contract.
+	ops, keyID := setupCryptoWithKey(t)
+	_, err := ops.Sign(context.Background(), crypto.SignRequest{
+		KeyPublicID:   keyID,
+		Payload:       []byte("data"),
+		NoContext:     &types.NoParams{},
+		DomainContext: &types.SignatureDomainContext{},
+	})
+	if err == nil {
+		t.Fatal("expected error when multiple scope_params are set")
 	}
 	if !errors.IsInvalidArgument(err) {
 		t.Errorf("expected CodeInvalidArgument, got: %v", err)

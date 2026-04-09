@@ -73,19 +73,19 @@ func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
 	payload := []byte("post-quantum verification")
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              payload,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     payload,
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
-		Payload:              payload,
-		Signature:            signResult.Signature,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     payload,
+		Signature:   signResult.Signature,
+		NoContext:   &types.NoParams{}, // must match signing scope
 	})
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
@@ -109,19 +109,19 @@ func TestVerify_tamperedPayload_returnsFalse_notError(t *testing.T) {
 	ctx := context.Background()
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              []byte("original"),
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     []byte("original"),
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
-		Payload:              []byte("tampered"), // different payload
-		Signature:            signResult.Signature,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     []byte("tampered"), // different payload
+		Signature:   signResult.Signature,
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("tampered payload should NOT return error, got: %v", err)
@@ -137,9 +137,9 @@ func TestVerify_tamperedSignature_returnsFalse_notError(t *testing.T) {
 	payload := []byte("data")
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              payload,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     payload,
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
@@ -151,10 +151,10 @@ func TestVerify_tamperedSignature_returnsFalse_notError(t *testing.T) {
 	tampered[len(tampered)/2] ^= 0xFF
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
-		Payload:              payload,
-		Signature:            tampered,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     payload,
+		Signature:   tampered,
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("tampered signature should NOT return error, got: %v", err)
@@ -228,9 +228,9 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Sign first (allowed).
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          created.GetPublicId(),
-		Payload:              []byte("data"),
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: created.GetPublicId(),
+		Payload:     []byte("data"),
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
@@ -238,10 +238,10 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Verify should fail with policy violation.
 	_, err = ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          created.GetPublicId(),
-		Payload:              []byte("data"),
-		Signature:            signResult.Signature,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: created.GetPublicId(),
+		Payload:     []byte("data"),
+		Signature:   signResult.Signature,
+		NoContext:   &types.NoParams{},
 	})
 	if err == nil {
 		t.Fatal("expected error for policy-denied verify")
@@ -273,19 +273,19 @@ func TestSignVerify_roundTrip_MLDSA65(t *testing.T) {
 	payload := []byte("canonical round-trip test: ML-DSA-65")
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
-		Payload:              payload,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     payload,
+		NoContext:   &types.NoParams{},
 	})
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
-		Payload:              payload,
-		Signature:            signResult.Signature,
-		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		KeyPublicID: keyID,
+		Payload:     payload,
+		Signature:   signResult.Signature,
+		NoContext:   &types.NoParams{}, // must match signing scope
 	})
 	if err != nil {
 		t.Fatalf("Verify: %v", err)
@@ -309,13 +309,31 @@ func TestVerify_scopeMismatch_returnsError(t *testing.T) {
 	// DomainContext maps to "with_context" — scope mismatch.
 	ops, keyID := setupCryptoWithKeyForVerify(t)
 	_, err := ops.Verify(context.Background(), crypto.VerifyRequest{
-		KeyPublicID:          keyID,
-		Payload:              []byte("data"),
-		Signature:            []byte("sig"),
-		SignatureScopeFields: crypto.SignatureScopeFields{DomainContext: &types.SignatureDomainContext{}},
+		KeyPublicID:   keyID,
+		Payload:       []byte("data"),
+		Signature:     []byte("sig"),
+		DomainContext: &types.SignatureDomainContext{},
 	})
 	if err == nil {
 		t.Fatal("expected error for scope mismatch")
+	}
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
+	}
+}
+
+func TestVerify_multipleScopeParams_returnsError(t *testing.T) {
+	// Setting both NoContext and DomainContext violates the oneof contract.
+	ops, keyID := setupCryptoWithKeyForVerify(t)
+	_, err := ops.Verify(context.Background(), crypto.VerifyRequest{
+		KeyPublicID:   keyID,
+		Payload:       []byte("data"),
+		Signature:     []byte("sig"),
+		NoContext:     &types.NoParams{},
+		DomainContext: &types.SignatureDomainContext{},
+	})
+	if err == nil {
+		t.Fatal("expected error when multiple scope_params are set")
 	}
 	if !errors.IsInvalidArgument(err) {
 		t.Errorf("expected CodeInvalidArgument, got: %v", err)
