@@ -158,6 +158,8 @@ linters:
       forbid:
         - pattern: '^fmt\.Print.*$'
           msg: use structured logging instead of fmt.Print
+        - pattern: '^fmt\.Errorf$'
+          msg: use errors.New or errors.Wrap from internal/errors — domain packages (key, policy, template) may use fmt.Errorf for pure validation
         - pattern: '^os\.Exit$'
           msg: return errors; os.Exit belongs in main() only
         - pattern: '^log\.(Fatal|Panic).*$'
@@ -189,6 +191,10 @@ linters:
       - legacy
       - std-error-handling
     rules:
+      - linters:
+          - forbidigo
+        path: 'internal/(key|policy|template)/'
+        text: 'fmt\.Errorf'
       - linters:
           - cyclop
           - errcheck
