@@ -1,5 +1,9 @@
-// Package errors provides the structured error type for the core.
-// All operations must return *Error (or nil), never fmt.Errorf or errors.New.
+// Package errors provides the structured error type for the service layer.
+//
+// Orchestrators and services must return *Error (or nil), never fmt.Errorf.
+// Domain entity methods (key, policy, template) that are pure predicates or
+// validators without context.Context may use plain fmt.Errorf — callers in
+// the service layer wrap those into *Error before crossing the boundary.
 package errors
 
 import (
