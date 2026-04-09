@@ -178,3 +178,16 @@ func (s *ScopeSpec) Serialize(ctx context.Context) ([]byte, error) {
 	}
 	return res, nil
 }
+
+func ParseScopeSpec(ctx context.Context, data []byte) (ScopeSpec, error) {
+	const op errors.Op = "core.ParseScopeSpec"
+	if len(data) == 0 {
+		return ScopeSpec{}, errors.New(ctx, op, errors.CodeInternal,
+			"scope specification data is empty")
+	}
+	var s ScopeSpec
+	if err := json.Unmarshal(data, &s); err != nil {
+		return ScopeSpec{}, errors.Wrap(ctx, op, err)
+	}
+	return s, nil
+}

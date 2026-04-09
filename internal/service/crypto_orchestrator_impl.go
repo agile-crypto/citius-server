@@ -2,11 +2,8 @@ package service
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
-	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	"github.ibm.com/citius/citius-server/internal/errors"
@@ -117,11 +114,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	}
 
 	// 5a. Validate that the caller's scope_params match the key's declared scope.
-	if err = validateSignatureScopeParams(ctx, op, k, signatureScopeParams{
-		NoContext:     req.NoContext,
-		DomainContext: req.DomainContext,
-		VendorContext: req.VendorContext,
-	}); err != nil {
+	if err = validateSignatureScopeParams(ctx, op, k, req.SignatureScopeFields); err != nil {
 		return crypto.SignResult{}, err
 	}
 
@@ -201,11 +194,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	}
 
 	// 5a. Validate that the caller's scope_params match the key's declared scope.
-	if err = validateSignatureScopeParams(ctx, op, k, signatureScopeParams{
-		NoContext:     req.NoContext,
-		DomainContext: req.DomainContext,
-		VendorContext: req.VendorContext,
-	}); err != nil {
+	if err = validateSignatureScopeParams(ctx, op, k, req.SignatureScopeFields); err != nil {
 		return crypto.VerifyResult{}, err
 	}
 
@@ -306,77 +295,48 @@ func (o *cryptoOrchestrator) GenerateRandom(ctx context.Context, _ int) ([]byte,
 // Scope-param validation helpers
 // ---------------------------------------------------------------------------
 
-// signatureScopeParams groups the scope_params from a Sign or Verify request.
-// Exactly one field must be non-nil, mirroring the scope_params oneof in proto.
-type signatureScopeParams struct {
-	NoContext     *types.NoParams
-	DomainContext *types.SignatureDomainContext
-	VendorContext *types.VendorSignatureContext
-}
-
-// validateSignatureScopeParams checks that:
-//  1. Exactly one scope_params variant is set (enforcing the oneof contract).
-//  2. The caller's scope_params match the key's declared ScopeSpecification.
+// validateSignatureScopeParams validates that the caller's scope_params
+// are compatible with the key's declared ScopeSpecification.
 //
-// The key's ScopeSpecification (set at creation time or after transformation)
-// is the authoritative source of truth. If the key was created with scope "standard", only
-// NoContext is valid; if "with_context", only DomainContext is valid.
-// VendorContext bypasses standard scope matching.
+// The orchestrator handles:
+//  1. Vendor short-circuit (vendor context bypasses standard scope matching)
+//  2. Proto oneof arm → core.Scope mapping
+//  3. Delegating semantic validation to core.ValidateSignatureScope
+//  4. Wrapping core errors with ctx/op/code
 //
-// Returns CodeInvalidArgument if the oneof contract is violated or the
-// caller's scope_params do not align with the key's stored scope.
+// The proto oneof at the API boundary guarantees at-most-one variant.
+// If none is set, callerScope maps to "" and core rejects it.
 func validateSignatureScopeParams(
 	ctx context.Context,
 	op errors.Op,
 	k *key.Key,
-	sp signatureScopeParams,
+	sf crypto.SignatureScopeFields,
 ) error {
-	// 1. Exactly one scope_params must be set.
-	count := 0
-	if sp.NoContext != nil {
-		count++
-	}
-	if sp.DomainContext != nil {
-		count++
-	}
-	if sp.VendorContext != nil {
-		count++
-	}
-	if count == 0 {
-		return errors.New(ctx, op, errors.CodeInvalidArgument,
-			"exactly one scope_params must be set (no_context, domain_context, or vendor_context)")
-	}
-	if count > 1 {
-		return errors.New(ctx, op, errors.CodeInvalidArgument,
-			"exactly one scope_params must be set; multiple were provided")
-	}
-
-	// 2. Vendor context — no standard scope to validate.
-	if sp.VendorContext != nil {
+	// 1. Vendor context bypasses standard scope matching.
+	if sf.VendorContext != nil {
 		return nil
 	}
 
-	// 3. Deserialize the key's stored scope specification.
-	var keyScope core.ScopeSpec
-	if err := json.Unmarshal(k.GetScopeSpecification(), &keyScope); err != nil {
-		return errors.New(ctx, op, errors.CodeInternal,
-			fmt.Sprintf("failed to deserialize key scope specification: %v", err))
-	}
-
-	// 4. Map the caller's scope_params variant to the expected scope.
+	// 2. Map proto oneof arm → core.Scope.
+	//    If no arm is set (all nil), callerScope is "",
+	//    which core.ValidateSignatureScope rejects.
 	var callerScope core.Scope
 	switch {
-	case sp.NoContext != nil:
+	case sf.NoContext != nil:
 		callerScope = core.SignatureScopeStandard
-	case sp.DomainContext != nil:
+	case sf.DomainContext != nil:
 		callerScope = core.SignatureScopeWithContext
 	}
 
-	// 5. Validate caller's scope matches the key's declared scope.
-	if keyScope.Scope != callerScope {
-		return errors.New(ctx, op, errors.CodeInvalidArgument,
-			fmt.Sprintf("scope_params %q does not match key scope %q",
-				callerScope, keyScope.Scope))
+	// 3. Deserialize the key's scope specification.
+	keyScope, err := core.ParseScopeSpec(ctx, k.GetScopeSpecification())
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+
+	// 4. Delegate semantic validation to core.
+	if err := core.ValidateSignatureScope(ctx, keyScope, callerScope); err != nil {
+		return errors.Wrap(ctx, op, err)
 	}
 	return nil
 }

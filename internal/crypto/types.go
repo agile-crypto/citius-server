@@ -5,6 +5,18 @@ import (
 	types "github.ibm.com/citius/citius-server/gen/go/types"
 )
 
+// SignatureScopeFields groups the scope_params for signature operations.
+// Embedded in SignRequest and VerifyRequest so callers can pass them as a
+// single value (e.g., req.SignatureScopeFields) to validation helpers.
+//
+// Exactly one field should be non-nil, mirroring the scope_params oneof
+// in caas.crypto.v1.SignRequest / VerifyRequest.
+type SignatureScopeFields struct {
+	NoContext     *types.NoParams               // ECDSA, RSA-PSS, DSA (no context needed)
+	DomainContext *types.SignatureDomainContext // EdDSA, ML-DSA, SLH-DSA (0-255 byte context)
+	VendorContext *types.VendorSignatureContext // vendor/custom scope
+}
+
 // SignRequest carries the inputs for a Sign operation at the orchestrator level.
 // The orchestrator resolves key material and passes scope_params through to the provider.
 type SignRequest struct {
@@ -14,9 +26,7 @@ type SignRequest struct {
 	// Scope-based context for domain separation — exactly one must be non-nil.
 	// Maps to the scope_params oneof in caas.crypto.v1.SignRequest.
 	// The gRPC handler copies the user's scope choice as-is.
-	NoContext     *types.NoParams               // ECDSA, RSA-PSS, DSA (no context needed)
-	DomainContext *types.SignatureDomainContext // EdDSA, ML-DSA, SLH-DSA (0-255 byte context)
-	VendorContext *types.VendorSignatureContext // vendor/custom scope
+	SignatureScopeFields
 }
 
 // SignResult carries the outputs of a Sign operation.
@@ -36,9 +46,7 @@ type VerifyRequest struct {
 	Signature   []byte
 
 	// Scope must match the scope used during signing.
-	NoContext     *types.NoParams
-	DomainContext *types.SignatureDomainContext
-	VendorContext *types.VendorSignatureContext
+	SignatureScopeFields
 }
 
 // VerifyResult carries the outputs of a Verify operation.
