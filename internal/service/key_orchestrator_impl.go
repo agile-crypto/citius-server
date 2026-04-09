@@ -12,6 +12,7 @@ import (
 	"github.ibm.com/citius/citius-server/internal/policy"
 	"github.ibm.com/citius/citius-server/internal/provider"
 	"github.ibm.com/citius/citius-server/internal/template"
+	"google.golang.org/protobuf/proto"
 )
 
 // keyOrchestrator implements the KeyOrchestrator interface.
@@ -125,13 +126,27 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	// 3. Find a provider that supports this template.
+	// 3. Generate key material and persist key + initial version.
+	return r.generateAndPersistKey(ctx, op, req, tmpl, scopeSpec)
+}
+
+// generateAndPersistKey handles provider key generation, proto marshaling, and
+// repository persistence.  Extracted from CreateKey to keep cyclomatic
+// complexity within linter limits.
+func (r *keyOrchestrator) generateAndPersistKey(
+	ctx context.Context,
+	op errors.Op,
+	req core.KeyCreationSpec,
+	tmpl *template.Template,
+	scopeSpec core.ScopeSpec,
+) (*key.Key, error) {
+	// 1. Find a provider that supports this template.
 	prov, err := r.providers.MatchForTemplate(ctx, tmpl.TemplateID())
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	// 4. Generate key material via the provider.
+	// 2. Generate key material via the provider.
 	genResp, err := prov.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
 		Algorithm: tmpl.GetAlgorithm(),
 	})
@@ -139,7 +154,7 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	// 5. Build Key + initial Version, then persist.
+	// 3. Build Key + initial Version, then persist.
 	//
 	// TODO: add saga compensation to prevent orphaned key
 	// material if storage fails after provider key generation succeeds.
@@ -147,6 +162,14 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	versionID := fmt.Sprintf("%s:%d", keyID, 1)
 
 	scopeBytes, err := scopeSpec.Serialize(ctx)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	// Marshal the full GenerateKeyResponse so that both KeyMaterial (private)
+	// and PublicKeyBytes are persisted.  The crypto orchestrator unmarshals to
+	// pick the right bytes per operation (Sign => private, Verify => public).
+	genRespBytes, err := proto.Marshal(genResp)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -168,7 +191,7 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		Version:     1,
 		ProviderId:  prov.Name(),
 		TemplateId:  tmpl.TemplateID(),
-		KeyMaterial: genResp.GetKeyMaterial(),
+		KeyMaterial: genRespBytes,
 		Status:      storepb.KeyStatus_KEY_STATUS_ACTIVE,
 	})
 
