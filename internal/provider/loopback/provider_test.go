@@ -53,7 +53,7 @@ func TestProvider_SupportedAlgorithms_returnsBothM1Algorithms(t *testing.T) {
 	for _, id := range algs {
 		ids[id] = true
 	}
-	for _, want := range []string{"ecdsa-p256-sha256", "ml-dsa-65"} {
+	for _, want := range []string{"ecdsa-p256-sha256-der", "ml-dsa-65"} {
 		if !ids[want] {
 			t.Errorf("missing algorithm %q", want)
 		}

@@ -31,9 +31,9 @@ func (p *Provider) Name() string { return "loopback" }
 func (p *Provider) Type() string { return "loopback" }
 
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
-// This currently includes both the classical and post-quantum algorithms.
+// IDs must exactly match TemplateID values in the standard algorithm catalog JSON.
 func (p *Provider) SupportedAlgorithms() []string {
-	return []string{"ecdsa-p256-sha256", "ml-dsa-65"}
+	return []string{"ecdsa-p256-sha256-der", "ml-dsa-65"}
 }
 
 // GenerateKey returns synthetic deterministic bytes — no real key material.
