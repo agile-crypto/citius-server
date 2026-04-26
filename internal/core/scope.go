@@ -56,7 +56,6 @@ const (
 	AeadScopeStandard      Scope = "standard"
 	AeadScopeDeterministic Scope = "deterministic"
 	AeadScopeStreaming     Scope = "streaming"
-	AeadScopeTweakable     Scope = "tweakable"
 )
 
 // ---------------------------------------------------------------------------

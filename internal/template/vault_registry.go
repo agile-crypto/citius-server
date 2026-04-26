@@ -321,8 +321,6 @@ func aeadScopeToCore(s api.AeadScope) core.Scope {
 		return core.AeadScopeDeterministic
 	case api.AeadScope_AEAD_SCOPE_STREAMING:
 		return core.AeadScopeStreaming
-	case api.AeadScope_AEAD_SCOPE_TWEAKABLE:
-		return core.AeadScopeTweakable
 	default:
 		return ""
 	}
