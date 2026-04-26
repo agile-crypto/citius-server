@@ -235,9 +235,9 @@ message DecryptResponse {
 // The CaaS core engine calls these RPCs after resolving template, policy,
 // and key material.  Each provider implements the subset it supports.
 //
-// M1 scope: Sign + Verify (+ DigestSign/DigestVerify for prehash).
-// Encrypt + Decrypt are included for completeness but may return
-// UNIMPLEMENTED in M1 provider builds.
+// Sign + Verify (+ DigestSign/DigestVerify for prehash).
+// Encrypt + Decrypt are included for completeness
+// TODO: Add more rpcs for other primitive operations (e.g., MAC, KDF, key agreement).
 service CryptoService {
   // Full-message signing (provider hashes internally per template config).
   rpc Sign(SignRequest)               returns (SignResponse);
