@@ -149,7 +149,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	return crypto.SignResult{
 		Signature:    signResp.GetSignature(),
 		KeyPublicID:  req.KeyPublicID,
-		KeyVersionID: kv.GetPublicId(),
+		KeyVersionID: kv.GetVersion(),
 		Algorithm:    templateID,
 		ProviderName: prov.Name(),
 		Output:       signResp.GetOutput(),
@@ -317,7 +317,7 @@ func validateSignatureScopeParams(
 		return nil
 	}
 
-	// 2. Map proto oneof arm → core.Scope.
+	// 2. Map proto oneof arm => core.Scope.
 	//    If no arm is set (all nil), callerScope is "",
 	//    which core.ValidateSignatureScope rejects.
 	var callerScope core.Scope
