@@ -27,7 +27,7 @@ func (p *Provider) Type() string { return "software" }
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
 // These IDs must exactly match the TemplateID values in the template catalog JSON.
 func (p *Provider) SupportedAlgorithms() []string {
-	return []string{"ecdsa-p256-sha256", "ml-dsa-65"}
+	return []string{"ecdsa-p256-sha256-der", "ml-dsa-65"}
 }
 
 // DestroyKey is a no-op for the stateless software provider.

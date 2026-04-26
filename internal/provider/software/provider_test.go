@@ -58,9 +58,9 @@ func TestProvider_SupportedAlgorithms_hasBothAlgorithms(t *testing.T) {
 		ids[id] = true
 	}
 
-	// ECDSA-P256-SHA256
-	if !ids["ecdsa-p256-sha256"] {
-		t.Fatal("missing ecdsa-p256-sha256 algorithm")
+	// ECDSA-P256-SHA256-DER
+	if !ids["ecdsa-p256-sha256-der"] {
+		t.Fatal("missing ecdsa-p256-sha256-der algorithm")
 	}
 
 	// ML-DSA-65
