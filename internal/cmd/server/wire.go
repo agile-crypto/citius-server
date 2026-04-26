@@ -1,0 +1,240 @@
+// Package server wires the production dependency graph.
+//
+// The single exported function, NewServer, assembles all core subsystems into
+// a [grpchandler.Handler] ready for gRPC registration.
+// All constructors are called here, not in main.go (keeps main thin).
+// Every error is returned, never panicked - callers decide what to do.
+// The Handler is safe for concurrent use after construction.
+package server
+
+import (
+	"context"
+
+	"github.com/hashicorp/vault/sdk/logical"
+
+	"github.ibm.com/citius/citius-server/internal/app"
+	engerr "github.ibm.com/citius/citius-server/internal/errors"
+	grpchandler "github.ibm.com/citius/citius-server/internal/grpc"
+	"github.ibm.com/citius/citius-server/internal/key"
+	"github.ibm.com/citius/citius-server/internal/policy"
+	"github.ibm.com/citius/citius-server/internal/provider"
+	"github.ibm.com/citius/citius-server/internal/provider/software"
+	"github.ibm.com/citius/citius-server/internal/service"
+	"github.ibm.com/citius/citius-server/internal/storage"
+	"github.ibm.com/citius/citius-server/internal/template"
+)
+
+// Config carries the small number of knobs for NewServer.
+// All fields are optional — zero values select sensible defaults.
+type Config struct {
+	// CatalogPath is the path to the proto-JSON standard_algorithms.json file.
+	// When empty, NewServer does not load a catalog (useful for testing).
+	CatalogPath string
+}
+
+// NewServer assembles the full dependency graph and returns a ready-to-use
+// [grpchandler.Handler].
+func NewServer(ctx context.Context, cfg Config) (*grpchandler.Handler, error) {
+	// Template registry + catalog
+	bootstrapStorage := &logical.InmemStorage{}
+	templateReg, err := buildTemplateRegistry(ctx, bootstrapStorage, cfg.CatalogPath)
+	if err != nil {
+		return nil, err
+	}
+
+	// Provider registry + validation
+	providerReg, err := buildProviderRegistry(ctx, templateReg)
+	if err != nil {
+		return nil, err
+	}
+
+	// app.Service
+	svc, err := buildAppService(ctx, templateReg, providerReg)
+	if err != nil {
+		return nil, err
+	}
+
+	// Adapter => Handler
+	gateway := &appServiceAdapter{svc: svc}
+	storageFactory := func() storage.Storage { return &logical.InmemStorage{} }
+
+	return grpchandler.New(gateway, storageFactory), nil
+}
+
+// ============================================================================
+// Shared bootstrap helpers (used by both NewServer and NewTestableServer)
+// ============================================================================
+
+// buildTemplateRegistry creates a VaultRegistry and optionally loads the
+// standard algorithm catalog from disk.
+func buildTemplateRegistry(
+	ctx context.Context,
+	bootstrapStorage *logical.InmemStorage,
+	catalogPath string,
+) (template.Registry, error) {
+	const op engerr.Op = "server.buildTemplateRegistry"
+	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	if catalogPath != "" {
+		if err := template.LoadStandardCatalog(catalogPath, reg); err != nil {
+			return nil, engerr.Wrap(ctx, op, err)
+		}
+	}
+	return reg, nil
+}
+
+// buildProviderRegistry creates a provider.Registry, registers the software
+// provider, and validates capabilities against the template registry.
+func buildProviderRegistry(
+	ctx context.Context,
+	templateReg template.Registry,
+) (provider.Registry, error) {
+	const op engerr.Op = "server.buildProviderRegistry"
+	providerReg := provider.NewRegistry()
+	if err := providerReg.Register(ctx, software.New()); err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	if err := app.ValidateAllProviders(ctx, providerReg, templateReg); err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	return providerReg, nil
+}
+
+// buildAppService constructs an app.Service from the shared registries.
+// The optional overrideStore, when non-nil, makes every factory closure use
+// that fixed storage instead of its argument - this is used by
+// NewTestableServer to share state between policy seeding and handler calls.
+func buildAppService(
+	ctx context.Context,
+	templateReg template.Registry,
+	providerReg provider.Registry,
+	overrideStore ...storage.Storage,
+) (*app.Service, error) {
+	const op engerr.Op = "server.buildAppService"
+
+	// When an override is provided, factories ignore their argument and use it.
+	resolve := func(s storage.Storage) storage.Storage { return s }
+	if len(overrideStore) > 0 && overrideStore[0] != nil {
+		fixed := overrideStore[0]
+		resolve = func(_ storage.Storage) storage.Storage { return fixed }
+	}
+
+	keyFactory := func(s storage.Storage) (service.KeyOrchestrator, error) {
+		return buildKeyOrchestrator(ctx, resolve(s), templateReg, providerReg)
+	}
+	cryptoFactory := func(s storage.Storage) (service.CryptoOrchestrator, error) {
+		return buildCryptoOrchestrator(ctx, resolve(s), templateReg, providerReg)
+	}
+	policyFactory := func(s storage.Storage) (policy.Engine, error) {
+		return buildPolicyEngine(ctx, resolve(s))
+	}
+	instanceFactory := func(_ storage.Storage) (provider.InstanceManager, error) {
+		return &noopInstanceManager{}, nil
+	}
+
+	svc, err := app.NewService(
+		app.WithKeyOrchestratorFactory(keyFactory),
+		app.WithCryptoOrchestratorFactory(cryptoFactory),
+		app.WithPolicyEngineFactory(policyFactory),
+		app.WithProviderInstanceManagerFactory(instanceFactory),
+		app.WithTemplateRegistry(templateReg),
+		app.WithProviderRegistry(providerReg),
+	)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	return svc, nil
+}
+
+// ============================================================================
+// Factory builders — same pattern as integration tests
+// ============================================================================
+
+func buildKeyOrchestrator(
+	ctx context.Context, s storage.Storage,
+	templateReg template.Registry, providerReg provider.Registry,
+) (service.KeyOrchestrator, error) {
+	repo, err := key.NewVaultRepository(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	policyRepo, err := policy.NewVaultRepository(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+	if err != nil {
+		return nil, err
+	}
+	return service.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
+}
+
+func buildCryptoOrchestrator(
+	ctx context.Context, s storage.Storage,
+	templateReg template.Registry, providerReg provider.Registry,
+) (service.CryptoOrchestrator, error) {
+	repo, err := key.NewVaultRepository(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	policyRepo, err := policy.NewVaultRepository(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+	if err != nil {
+		return nil, err
+	}
+	keyOrch, err := service.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
+	if err != nil {
+		return nil, err
+	}
+	return service.NewCryptoOrchestrator(s, keyOrch, pol, providerReg, templateReg)
+}
+
+func buildPolicyEngine(
+	ctx context.Context, s storage.Storage,
+) (policy.Engine, error) {
+	policyRepo, err := policy.NewVaultRepository(ctx, s)
+	if err != nil {
+		return nil, err
+	}
+	return policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+}
+
+// ============================================================================
+// Adapters & stubs
+// ============================================================================
+
+// appServiceAdapter bridges *app.Service (concrete ForStorage returning
+// *RequestScope) to grpchandler.ServiceGateway (interface returning
+// ScopeGateway).  *app.RequestScope already satisfies ScopeGateway
+// (it has Keys() and Crypto() methods), so the adapter just converts
+// the return type.
+type appServiceAdapter struct {
+	svc *app.Service
+}
+
+func (a *appServiceAdapter) ForStorage(ctx context.Context, store storage.Storage) (grpchandler.ScopeGateway, error) {
+	return a.svc.ForStorage(ctx, store)
+}
+
+// noopInstanceManager satisfies provider.InstanceManager.
+// TODO: Provider instance management is not yet implemented and will be wired later
+type noopInstanceManager struct{}
+
+func (n *noopInstanceManager) Create(_ context.Context, pi *provider.Instance) (*provider.Instance, error) {
+	return pi, nil
+}
+
+func (n *noopInstanceManager) Read(_ context.Context, _ string) (*provider.Instance, error) {
+	return nil, nil
+}
+
+func (n *noopInstanceManager) List(_ context.Context) ([]*provider.Instance, error) {
+	return nil, nil
+}
+
+func (n *noopInstanceManager) Delete(_ context.Context, _ string) error { return nil }

@@ -14,13 +14,13 @@ import (
 // template registry.
 //
 // This is an application-layer coordination function that bridges the
-// provider and template bounded contexts — neither imports the other.
-// Call it at provider registration time to catch configuration errors early
+// provider and template bounded contexts - neither imports the other.
+// It is called at provider registration time to catch configuration errors early
 // (fail-fast) rather than at operation time when MatchForTemplate() silently
 // fails.
 //
 // If the provider does not implement [provider.AlgorithmCapabilityProvider],
-// validation is skipped — the provider doesn't declare specific algorithm
+// validation is skipped - the provider doesn't declare specific algorithm
 // support.
 func ValidateProviderCapabilities(
 	ctx context.Context,

@@ -1,0 +1,249 @@
+package grpc
+
+import (
+	"context"
+
+	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
+	servicespb "github.ibm.com/citius/citius-server/gen/go/services"
+	"github.ibm.com/citius/citius-server/internal/core"
+	"github.ibm.com/citius/citius-server/internal/crypto"
+	engerr "github.ibm.com/citius/citius-server/internal/errors"
+	"github.ibm.com/citius/citius-server/internal/service"
+	"github.ibm.com/citius/citius-server/internal/storage"
+	"google.golang.org/protobuf/proto"
+)
+
+// ScopeGateway is the per-request subset of *app.RequestScope used by the Handler.
+// *app.RequestScope satisfies this interface via its Keys() and Crypto() methods.
+type ScopeGateway interface {
+	Keys() service.KeyOrchestrator
+	Crypto() service.CryptoOrchestrator
+}
+
+// ServiceGateway abstracts app.Service for testability.
+// Tests inject a mock directly; production code wraps *app.Service with an adapter.
+type ServiceGateway interface {
+	ForStorage(ctx context.Context, store storage.Storage) (ScopeGateway, error)
+}
+
+// Compile-time assertion: Handler implements the generated CryptoServiceServer interface.
+// This catches any method-signature drift between handler.go and the proto definition.
+var _ servicespb.CryptoServiceServer = (*Handler)(nil)
+
+const handlerOp = engerr.Op("grpc.(Handler)")
+
+// Handler translates gRPC requests into core calls via a ServiceGateway.
+// It holds no mutable state after construction — safe for concurrent use.
+type Handler struct {
+	svc   ServiceGateway
+	store func() storage.Storage // factory for per-request Storage; nil is allowed in tests
+	servicespb.UnimplementedCryptoServiceServer
+}
+
+// New creates a Handler.
+// storageFactory can be nil in tests that inject a mock service (getScope passes nil storage).
+// In production, always supply a real storageFactory.
+func New(svc ServiceGateway, storageFactory func() storage.Storage) *Handler {
+	return &Handler{svc: svc, store: storageFactory}
+}
+
+// getScope calls ForStorage and returns the per-request scope.
+func (h *Handler) getScope(ctx context.Context) (ScopeGateway, error) {
+	const scopeOp engerr.Op = handlerOp + ".getScope"
+	var store storage.Storage
+	if h.store != nil {
+		store = h.store()
+	}
+	scope, err := h.svc.ForStorage(ctx, store)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, scopeOp, err)
+	}
+	return scope, nil
+}
+
+// CreateKey handles the CreateKey RPC.
+//
+// Proto mapping:
+//
+//	messages.CreateKeyRequest.name            => core.KeyCreationSpec.Name
+//	messages.CreateKeyRequest.policy          => core.KeyCreationSpec.PolicyID
+//	messages.CreateKeyRequest.provider_id     => core.KeyCreationSpec.ProviderInstanceID
+//	messages.CreateKeyRequest.template_id     => core.KeyCreationSpec.TemplateID (oneof)
+//	messages.CreateKeyRequest.scope_spec      => core.KeyCreationSpec.Scope (serialised, oneof)
+func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyRequest) (*messagespb.CreateKeyResponse, error) {
+	const createOp engerr.Op = handlerOp + ".CreateKey"
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	spec := core.KeyCreationSpec{
+		Name:               req.GetName(),
+		PolicyID:           req.GetPolicy(),
+		ProviderInstanceID: req.GetProviderId(),
+	}
+
+	// Handle key_specification oneof: template_id XOR scope_spec.
+	switch ks := req.GetKeySpecification().(type) {
+	case *messagespb.CreateKeyRequest_TemplateId:
+		spec.TemplateID = ks.TemplateId
+	case *messagespb.CreateKeyRequest_ScopeSpec:
+		if ks.ScopeSpec != nil {
+			raw, merr := proto.Marshal(ks.ScopeSpec)
+			if merr != nil {
+				return nil, ToStatusError(engerr.New(ctx, createOp, engerr.CodeInvalidArgument, "invalid scope_spec encoding"))
+			}
+			spec.Scope = raw
+		}
+	}
+
+	k, err := scope.Keys().CreateKey(ctx, spec)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, createOp, err))
+	}
+
+	return &messagespb.CreateKeyResponse{
+		Success: true,
+		KeyMetadata: &messagespb.KeyMetadata{
+			Name:    k.GetPublicId(),
+			Version: k.GetCurrentVersion(),
+			Policy:  k.GetPolicyId(),
+		},
+	}, nil
+}
+
+// ReadKey handles the ReadKey RPC.
+//
+// Proto mapping:
+//
+//	messages.ReadKeyRequest.name => KeyOrchestrator.ReadKey(ctx, name)
+func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (*messagespb.ReadKeyResponse, error) {
+	const readOp engerr.Op = handlerOp + ".ReadKey"
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	k, err := scope.Keys().ReadKey(ctx, req.GetName())
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, readOp, err))
+	}
+
+	return &messagespb.ReadKeyResponse{
+		KeyMetadata: &messagespb.KeyMetadata{
+			Name:    k.GetPublicId(),
+			Version: k.GetCurrentVersion(),
+			Policy:  k.GetPolicyId(),
+		},
+	}, nil
+}
+
+// Sign handles the Sign RPC.
+//
+// Proto mapping:
+//
+//	messages.SignRequest.key_name     => crypto.SignRequest.KeyPublicID
+//	messages.SignRequest.input        => crypto.SignRequest.Payload
+//	messages.SignRequest.scope_params => crypto.SignRequest.{NoContext,DomainContext,VendorContext}
+//	crypto.SignResult.Output          => messages.SignResponse.Metadata.ProviderOutput
+func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messagespb.SignResponse, error) {
+	const signOp engerr.Op = handlerOp + ".Sign"
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	signReq := crypto.SignRequest{
+		KeyPublicID: req.GetKeyName(),
+		Payload:     req.GetInput(),
+	}
+	extractSigningScopeParams(req.GetScopeParams(), &signReq)
+
+	result, err := scope.Crypto().Sign(ctx, signReq)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, signOp, err))
+	}
+
+	// Wrap ProviderOutput into OperationMetadata.
+	// KeyVersion is 0 until version tracking is wired.
+	return &messagespb.SignResponse{
+		Signature: result.Signature,
+		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     0, // TODO: populate from result.KeyVersionID once version tracking is wired
+			ProviderOutput: result.Output,
+		},
+	}, nil
+}
+
+// Verify handles the Verify RPC.
+//
+// Proto mapping:
+//
+//	messages.VerifyRequest.key_name     => crypto.VerifyRequest.KeyPublicID
+//	messages.VerifyRequest.input        => crypto.VerifyRequest.Payload
+//	messages.VerifyRequest.signature    => crypto.VerifyRequest.Signature
+//	messages.VerifyRequest.scope_params => crypto.VerifyRequest.{NoContext,DomainContext,VendorContext}
+//	crypto.VerifyResult.Output          => messages.VerifyResponse.Metadata.ProviderOutput
+//
+// An invalid signature is NOT an error — it returns Valid: false with no error.
+func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*messagespb.VerifyResponse, error) {
+	const verifyOp engerr.Op = handlerOp + ".Verify"
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	verifyReq := crypto.VerifyRequest{
+		KeyPublicID: req.GetKeyName(),
+		Payload:     req.GetInput(),
+		Signature:   req.GetSignature(),
+	}
+	extractVerifyScopeParams(req.GetScopeParams(), &verifyReq)
+
+	result, err := scope.Crypto().Verify(ctx, verifyReq)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, verifyOp, err))
+	}
+
+	return &messagespb.VerifyResponse{
+		Valid: result.Valid,
+		Metadata: &messagespb.OperationMetadata{
+			ProviderOutput: result.Output,
+		},
+	}, nil
+}
+
+// extractSigningScopeParams maps the proto scope_params oneof to Go pointer fields.
+// The proto oneof interface (isSignRequest_ScopeParams) is unexported, so we accept any.
+// Concrete wrapper types SignRequest_NoContext / _DomainContext / _VendorContext are exported.
+func extractSigningScopeParams(sp any, req *crypto.SignRequest) {
+	switch v := sp.(type) {
+	case *messagespb.SignRequest_NoContext:
+		req.NoContext = v.NoContext
+	case *messagespb.SignRequest_DomainContext:
+		req.DomainContext = v.DomainContext
+	case *messagespb.SignRequest_VendorContext:
+		req.VendorContext = v.VendorContext
+	default:
+		// nil or unrecognised variant — downstream validation will report the issue.
+	}
+}
+
+// extractVerifyScopeParams maps the proto scope_params oneof for VerifyRequest.
+// Same pattern as extractSigningScopeParams but uses VerifyRequest_* wrapper types.
+func extractVerifyScopeParams(sp any, req *crypto.VerifyRequest) {
+	switch v := sp.(type) {
+	case *messagespb.VerifyRequest_NoContext:
+		req.NoContext = v.NoContext
+	case *messagespb.VerifyRequest_DomainContext:
+		req.DomainContext = v.DomainContext
+	case *messagespb.VerifyRequest_VendorContext:
+		req.VendorContext = v.VendorContext
+	default:
+		// nil or unrecognised variant.
+	}
+}
