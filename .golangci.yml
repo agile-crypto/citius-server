@@ -196,6 +196,9 @@ linters:
         path: 'internal/(key|policy|template)/'
         text: 'fmt\.Errorf'
       - linters:
+          - forbidigo
+        path: 'internal/cmd/server/main/'
+      - linters:
           - cyclop
           - errcheck
           - forbidigo
