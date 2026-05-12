@@ -1,0 +1,19 @@
+# bootstrap/zitadel/docker-compose.mode-letsencrypt.yml
+#
+# PROD overlay: enables Traefik's ACME resolver against Let's Encrypt.
+# Requires:
+#   - ${ZITADEL_DOMAIN} resolves publicly to this host
+#   - port 80 + 443 reachable from the public internet
+#   - LETSENCRYPT_EMAIL set in .env
+
+services:
+  traefik:
+    command:
+      - "--certificatesresolvers.le.acme.email=${LETSENCRYPT_EMAIL}"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.le.acme.tlschallenge=true"
+    volumes:
+      - letsencrypt:/letsencrypt
+
+volumes:
+  letsencrypt:

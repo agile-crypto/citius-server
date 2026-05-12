@@ -1,0 +1,6 @@
+# Operator-supplied secrets and runtime state — never commit.
+.env
+pat/
+certs/
+generated-config.json
+citius-zitadel.env

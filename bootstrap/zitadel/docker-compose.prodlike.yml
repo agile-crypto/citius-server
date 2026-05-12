@@ -1,0 +1,16 @@
+# bootstrap/zitadel/docker-compose.prodlike.yml — VENDORED FROM UPSTREAM
+#
+# Splits the Zitadel container into init / setup / api so that:
+#  - migrations run exactly once (no race on multi-replica scale-out),
+#  - first-instance setup writes the bootstrap PAT atomically,
+#  - the long-running API container restarts independently.
+#
+# Vendor from the same pinned release tag as docker-compose.yml:
+#
+#   curl -fsSL \
+#     https://raw.githubusercontent.com/zitadel/zitadel/${ZITADEL_VERSION}/deploy/compose/docker-compose-prodlike.yml \
+#     -o bootstrap/zitadel/docker-compose.prodlike.yml
+
+x-citius-vendor-placeholder: true
+
+services: {}

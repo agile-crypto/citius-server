@@ -1,0 +1,24 @@
+# bootstrap/zitadel/docker-compose.yml — VENDORED FROM UPSTREAM
+#
+# This file is a placeholder. Vendor the production-hardened compose file
+# from the pinned Zitadel release tag (NEVER `main`):
+#
+#   curl -fsSL \
+#     https://raw.githubusercontent.com/zitadel/zitadel/${ZITADEL_VERSION}/deploy/compose/docker-compose.yml \
+#     -o bootstrap/zitadel/docker-compose.yml
+#
+# Then pin every image to a digest:
+#
+#   image: ghcr.io/zitadel/zitadel:${ZITADEL_VERSION}@sha256:<digest>
+#
+# The vendor step is reviewable — every bump is a diff in this file.
+#
+# Once vendored, this header comment block should be replaced with the
+# upstream license header (Apache-2.0) and a SOURCE: line pointing at the
+# exact upstream commit.
+
+# Sentinel marker used by bootstrap.sh to detect that the vendor step
+# has not been performed yet — bootstrap.sh refuses to `up` while present.
+x-citius-vendor-placeholder: true
+
+services: {}
