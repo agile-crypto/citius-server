@@ -51,15 +51,32 @@ make run
 
 ## Vendoring upstream compose
 
-The base compose files are placeholders until vendored from a pinned
-release tag. To populate them:
+The base + overlay compose files in this directory are placeholders until
+vendored from a pinned upstream release. Pick a tag from
+<https://github.com/zitadel/zitadel/releases> (v4.x line; the v3 series
+is EOL — do not pin to it). At the time of writing, `v4.15.0` is current.
 
 ```bash
-TAG=v3.0.0
-curl -fsSL "https://raw.githubusercontent.com/zitadel/zitadel/${TAG}/deploy/compose/docker-compose.yml"          -o bootstrap/zitadel/docker-compose.yml
-curl -fsSL "https://raw.githubusercontent.com/zitadel/zitadel/${TAG}/deploy/compose/docker-compose-prodlike.yml" -o bootstrap/zitadel/docker-compose.prodlike.yml
+TAG=v4.15.0
+BASE="https://raw.githubusercontent.com/zitadel/zitadel/${TAG}/deploy/compose"
+
+curl -fsSL "${BASE}/docker-compose.yml"                   -o bootstrap/zitadel/docker-compose.yml
+curl -fsSL "${BASE}/docker-compose.prodlike.yml"          -o bootstrap/zitadel/docker-compose.prodlike.yml
+curl -fsSL "${BASE}/docker-compose.mode-local-tls.yml"    -o bootstrap/zitadel/docker-compose.mode-local-tls.yml
+curl -fsSL "${BASE}/docker-compose.mode-letsencrypt.yml"  -o bootstrap/zitadel/docker-compose.mode-letsencrypt.yml
+curl -fsSL "${BASE}/traefik-local-tls.yml"                -o bootstrap/zitadel/traefik-local-tls.yml
 ```
 
-Then pin every `image:` line to a digest (`@sha256:...`). `bootstrap.sh`
-refuses to run while the placeholder sentinel
-(`x-citius-vendor-placeholder: true`) is present.
+Then:
+
+1. Pin every `image:` line to a digest (`@sha256:...`) — never rely on
+   the floating tag for reproducible builds.
+2. Reconcile any new env keys upstream introduced into our
+   [.env.example](.env.example) (diff against `${BASE}/.env.example`).
+3. Remove the `x-citius-vendor-placeholder: true` sentinel from each
+   vendored file — `bootstrap.sh` refuses to run while it is present.
+
+> Note: the upstream filename is `docker-compose.prodlike.yml` (a dot
+> before `prodlike`, not a hyphen). Earlier revisions of this README had
+> the wrong path; the curl above is correct.
+
