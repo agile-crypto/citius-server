@@ -22,6 +22,7 @@
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
+.PHONY: zitadel-up zitadel-down zitadel-reset zitadel-env test-integration-auth
 
 # Default goal: print help when `make` is run with no arguments.
 .DEFAULT_GOAL := help
@@ -159,3 +160,23 @@ hooks: ## Install .githooks/ as the local git hooks directory (run once per clon
 clean: ## Remove build artefacts, coverage reports, and Go caches
 	rm -rf coverage.out coverage.html $(BIN_DIR)
 	go clean -cache -testcache
+
+# ---------------------------------------------------------------------------
+# Zitadel local stack (bootstrap/zitadel)
+# ---------------------------------------------------------------------------
+ZITADEL_DIR := bootstrap/zitadel
+
+zitadel-up: ## Boot the local Zitadel stack and seed the citius project
+	$(ZITADEL_DIR)/bootstrap.sh up
+
+zitadel-down: ## Stop the local Zitadel stack (preserve data volumes)
+	$(ZITADEL_DIR)/bootstrap.sh down
+
+zitadel-reset: ## Stop the stack and wipe data volumes
+	$(ZITADEL_DIR)/bootstrap.sh reset
+
+zitadel-env: ## Print sourced env entries written by bootstrap.sh
+	$(ZITADEL_DIR)/bootstrap.sh env
+
+test-integration-auth: ## Run the Zitadel-tagged auth integration suite (requires zitadel-up)
+	go test -tags 'integration zitadel' -count=1 ./test/integration/auth/...
