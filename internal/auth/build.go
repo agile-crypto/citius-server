@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"sync/atomic"
+
 	zsrv "github.ibm.com/citius/zitadel-grpc-auth/server"
 	"google.golang.org/grpc"
 )
@@ -8,6 +10,18 @@ import (
 // Closer releases resources held by the auth bundle (currently the
 // introspection cache). Callers should defer Close on shutdown.
 type Closer = zsrv.Closer
+
+// authEnabled is set by Build and read by AuthorizeKey / AuthorizePolicy
+// to decide whether resource-scoping should run. Storing the bit here
+// (rather than inferring it from a missing claim) makes the security
+// posture an explicit input to the package, immune to upstream changes
+// in how unauthenticated requests are represented in context.
+//
+// It is an atomic.Bool so Build can be called from a startup goroutine
+// and AuthorizeKey can be called from request goroutines without a
+// mutex. The expected lifecycle is exactly one Build call per process,
+// so the racy case (Build mid-request) is academic.
+var authEnabled atomic.Bool
 
 // Build returns the gRPC server options that install the Citius authn
 // + authz interceptor chain, plus a Closer to release any held resources.
@@ -17,7 +31,13 @@ type Closer = zsrv.Closer
 // claims are attached to the request context. This is the contract that
 // keeps AUTH_ENABLED=false a first-class mode for local dev and the
 // non-auth integration suite.
+//
+// Build also sets a package-level flag consulted by AuthorizeKey and
+// AuthorizePolicy. Callers that bypass Build (tests constructing claims
+// directly in context) must call SetEnabledForTest to opt resource-
+// scoping in.
 func Build(cfg Config) ([]grpc.ServerOption, Closer, error) {
+	authEnabled.Store(cfg.Enabled)
 	return zsrv.New(zsrv.Config{
 		RequireAuth:                    cfg.Enabled,
 		Issuer:                         cfg.Issuer,

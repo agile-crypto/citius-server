@@ -26,10 +26,14 @@ func ctxWithClaims(allow []string) context.Context {
 }
 
 func TestAuthorizeKeyName_NoClaims_AllowsAll(t *testing.T) {
+	prev := citiusauth.SetEnabledForTest(false)
+	t.Cleanup(func() { citiusauth.SetEnabledForTest(prev) })
 	require.NoError(t, authorizeKeyName(context.Background(), testOp, "any/key"))
 }
 
 func TestAuthorizeKeyName_ForbiddenMapsToPolicyViolation(t *testing.T) {
+	prev := citiusauth.SetEnabledForTest(true)
+	t.Cleanup(func() { citiusauth.SetEnabledForTest(prev) })
 	ctx := ctxWithClaims(nil) // claims present, allow list empty -> deny
 	err := authorizeKeyName(ctx, testOp, "tenants/acme/k1")
 	require.Error(t, err)
@@ -40,11 +44,15 @@ func TestAuthorizeKeyName_ForbiddenMapsToPolicyViolation(t *testing.T) {
 }
 
 func TestAuthorizeKeyName_GrantedAllowGlob(t *testing.T) {
+	prev := citiusauth.SetEnabledForTest(true)
+	t.Cleanup(func() { citiusauth.SetEnabledForTest(prev) })
 	ctx := ctxWithClaims([]string{"tenants/acme/*"})
 	require.NoError(t, authorizeKeyName(ctx, testOp, "tenants/acme/k1"))
 }
 
 func TestAuthorizePolicyName_DelegatesToPolicyClaims(t *testing.T) {
+	prev := citiusauth.SetEnabledForTest(true)
+	t.Cleanup(func() { citiusauth.SetEnabledForTest(prev) })
 	raw := map[string]any{
 		"sub": "svc-tester",
 		citiusauth.ClaimAllowedPolicyPatterns: []any{"strict/*"},

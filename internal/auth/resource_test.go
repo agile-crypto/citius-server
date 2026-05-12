@@ -29,11 +29,15 @@ func toAny(s []string) []any {
 }
 
 func TestAuthorizeKey_DisabledWhenNoClaims(t *testing.T) {
+	prev := SetEnabledForTest(false)
+	t.Cleanup(func() { SetEnabledForTest(prev) })
 	require.NoError(t, AuthorizeKey(context.Background(), "any/key"))
 	require.NoError(t, AuthorizePolicy(context.Background(), "any/policy"))
 }
 
 func TestAuthorizeKey_EmptyAllowDenies(t *testing.T) {
+	prev := SetEnabledForTest(true)
+	t.Cleanup(func() { SetEnabledForTest(prev) })
 	ctx := ctxWith(t, nil, nil, ClaimAllowedKeyPatterns, ClaimDenyKeyPatterns)
 	err := AuthorizeKey(ctx, "tenants/acme/k1")
 	require.Error(t, err)
@@ -41,12 +45,16 @@ func TestAuthorizeKey_EmptyAllowDenies(t *testing.T) {
 }
 
 func TestAuthorizeKey_AllowGlobMatches(t *testing.T) {
+	prev := SetEnabledForTest(true)
+	t.Cleanup(func() { SetEnabledForTest(prev) })
 	ctx := ctxWith(t, []string{"tenants/acme/*"}, nil, ClaimAllowedKeyPatterns, ClaimDenyKeyPatterns)
 	require.NoError(t, AuthorizeKey(ctx, "tenants/acme/k1"))
 	require.Error(t, AuthorizeKey(ctx, "tenants/other/k1"))
 }
 
 func TestAuthorizeKey_DenyOverridesAllow(t *testing.T) {
+	prev := SetEnabledForTest(true)
+	t.Cleanup(func() { SetEnabledForTest(prev) })
 	ctx := ctxWith(t,
 		[]string{"tenants/acme/*"},
 		[]string{"tenants/acme/forbidden-*"},
@@ -59,7 +67,17 @@ func TestAuthorizeKey_DenyOverridesAllow(t *testing.T) {
 }
 
 func TestAuthorizePolicy_UsesPolicyClaims(t *testing.T) {
+	prev := SetEnabledForTest(true)
+	t.Cleanup(func() { SetEnabledForTest(prev) })
 	ctx := ctxWith(t, []string{"strict/*"}, nil, ClaimAllowedPolicyPatterns, ClaimDenyPolicyPatterns)
 	require.NoError(t, AuthorizePolicy(ctx, "strict/aes"))
 	require.Error(t, AuthorizePolicy(ctx, "loose/aes"))
+}
+
+func TestAuthorize_NoClaimsButEnabled_Denies(t *testing.T) {
+	prev := SetEnabledForTest(true)
+	t.Cleanup(func() { SetEnabledForTest(prev) })
+	err := AuthorizeKey(context.Background(), "any")
+	require.Error(t, err)
+	require.True(t, IsForbidden(err))
 }
