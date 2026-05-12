@@ -19,16 +19,17 @@ type Closer = zsrv.Closer
 // non-auth integration suite.
 func Build(cfg Config) ([]grpc.ServerOption, Closer, error) {
 	return zsrv.New(zsrv.Config{
-		RequireAuth:               cfg.Enabled,
-		Issuer:                    cfg.Issuer,
-		IntrospectionClientID:     cfg.IntrospectClientID,
-		IntrospectionClientSecret: cfg.IntrospectSecret,
-		Insecure:                  cfg.Insecure,
-		CacheTTL:                  cfg.CacheTTL,
-		CacheMaxEntries:           cfg.CacheMaxEntries,
-		ExpectedIssuer:            cfg.Issuer,
-		ExpectedAudience:          cfg.ExpectedAudience,
-		PublicMethods:             cfg.PublicMethods,
-		Policies:                  policyRegistry(),
+		RequireAuth:                    cfg.Enabled,
+		Issuer:                         cfg.Issuer,
+		IntrospectionClientID:          cfg.IntrospectClientID,
+		IntrospectionClientSecret:      cfg.IntrospectSecret,
+		Insecure:                       cfg.Insecure,
+		CacheTTL:                       cfg.CacheTTL,
+		CacheMaxEntries:                cfg.CacheMaxEntries,
+		ExpectedIssuer:                 cfg.Issuer,
+		ExpectedAudience:               cfg.ExpectedAudience,
+		PublicMethods:                  cfg.PublicMethods,
+		AllowUnauthenticatedReflection: cfg.AllowUnauthenticatedReflection,
+		Policies:                       policyRegistry(),
 	})
 }

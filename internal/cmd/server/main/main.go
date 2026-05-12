@@ -34,6 +34,12 @@ func main() {
 	catalog := flag.String("catalog", defaultCatalogPath(), "path to standard_algorithms.json")
 	tlsCert := flag.String("tls-cert", os.Getenv("TLS_CERT_FILE"), "path to TLS certificate (PEM); required when AUTH_ENABLED=true")
 	tlsKey := flag.String("tls-key", os.Getenv("TLS_KEY_FILE"), "path to TLS private key (PEM); required when AUTH_ENABLED=true")
+	enableReflection := flag.Bool("grpc-reflection", os.Getenv("GRPC_REFLECTION") == "true",
+		"register the gRPC reflection service. Default false; production deployments should leave it off. "+
+			"When true, reflection RPCs bypass authentication and authorization \u2014 a deliberate carve-out "+
+			"so `grpcurl list` works. Treat enabling this as exposing the API surface to anonymous callers.")
+	// TODO(mtls): add -mtls-ca to enable client-cert authentication as a defence-in-depth
+	// layer alongside bearer-token introspection. Tracked in the auth roadmap.
 	flag.Parse()
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -43,6 +49,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("auth config: %v", err)
 	}
+	// Reflection-on-with-auth-on means an unauthenticated peer can list
+	// the API surface. The operator opts in by setting -grpc-reflection;
+	// we honour that by carving reflection out of the policy map.
+	authCfg.AllowUnauthenticatedReflection = *enableReflection
 
 	authOpts, authCloser, err := auth.Build(authCfg)
 	if err != nil {
@@ -89,7 +99,10 @@ func main() {
 
 	srv := grpc.NewServer(serverOpts...)
 	servicespb.RegisterCryptoServiceServer(srv, handler)
-	reflection.Register(srv)
+	if *enableReflection {
+		reflection.Register(srv)
+		log.Println("gRPC reflection registered")
+	}
 
 	// Graceful shutdown: when ctx is cancelled, stop accepting new RPCs.
 	go func() {

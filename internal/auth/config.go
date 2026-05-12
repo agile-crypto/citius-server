@@ -63,6 +63,17 @@ type Config struct {
 	// PublicMethods lists fully-qualified gRPC methods that bypass authn
 	// AND authz. Empty by default. Healthz, if added later, would go here.
 	PublicMethods []string
+
+	// AllowUnauthenticatedReflection lets gRPC reflection RPCs
+	// ("/grpc.reflection.v1.*", "/grpc.reflection.v1alpha.*") bypass
+	// authentication and authorization. The default is false: reflection
+	// is treated like any other RPC and would be default-denied.
+	//
+	// Set true only when the operator has explicitly registered the
+	// reflection service AND accepts that an unauthenticated peer can
+	// enumerate the API surface. Production deployments should leave
+	// reflection unregistered entirely and this field false.
+	AllowUnauthenticatedReflection bool
 }
 
 // LoadFromEnv reads every recognised env var and returns a populated
