@@ -28,6 +28,7 @@ Plain `go test ./...` will never compile or run these files.
 | `INTROSPECT_ID/SECRET`      | citius-zitadel.env                    |
 | `CITIUS_ADDR`               | host:port the test client should dial |
 | `CITIUS_TLS_CA`             | path to PEM CA bundle                 |
+| `CITIUS_TLS_SERVER_NAME`    | (optional) SNI / cert SAN to verify; defaults to host portion of `CITIUS_ADDR` |
 | `SVC_ADMIN_TOKEN_FILE`      | path to file containing access token  |
 | `SVC_TESTER_TOKEN_FILE`     | path to file containing access token  |
 | `SVC_READONLY_TOKEN_FILE`   | path to file containing access token  |

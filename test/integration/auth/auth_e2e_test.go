@@ -29,6 +29,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"net"
 	"os"
 	"testing"
 	"time"
@@ -55,8 +56,11 @@ func requireEnv(t *testing.T, key string) string {
 }
 
 // dial opens a TLS gRPC connection to the configured CITIUS_ADDR using
-// the CA bundle exported by bootstrap.sh. ServerName is left at the
-// default — bootstrap issues certs with the dial address as a SAN.
+// the CA bundle exported by bootstrap.sh. ServerName is taken from
+// CITIUS_TLS_SERVER_NAME when set, otherwise from the host portion of
+// CITIUS_ADDR — operators who terminate TLS on a name that does not
+// match the dial host (e.g. an in-cluster service hostname) must export
+// CITIUS_TLS_SERVER_NAME explicitly.
 func dial(t *testing.T) *grpc.ClientConn {
 	t.Helper()
 	addr := requireEnv(t, "CITIUS_ADDR")
@@ -70,7 +74,23 @@ func dial(t *testing.T) *grpc.ClientConn {
 	if !pool.AppendCertsFromPEM(caPem) {
 		t.Fatalf("parse ca bundle %s: no certs", caPath)
 	}
-	tlsCfg := &tls.Config{RootCAs: pool, MinVersion: tls.VersionTLS12}
+
+	serverName := os.Getenv("CITIUS_TLS_SERVER_NAME")
+	if serverName == "" {
+		// Strip the port from CITIUS_ADDR. host:port → host.
+		// IPv6 literals are wrapped in brackets and fall through to
+		// SplitHostPort cleanly.
+		if h, _, splitErr := net.SplitHostPort(addr); splitErr == nil && h != "" {
+			serverName = h
+		} else {
+			serverName = addr
+		}
+	}
+	tlsCfg := &tls.Config{
+		RootCAs:    pool,
+		ServerName: serverName,
+		MinVersion: tls.VersionTLS12,
+	}
 
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(credentials.NewTLS(tlsCfg)))
 	if err != nil {
