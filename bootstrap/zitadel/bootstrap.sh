@@ -4,9 +4,14 @@
 #
 # Subcommands:
 #   up      Bring the stack up (default). Idempotent.
-#   down    Tear it down. Preserves .env (masterkey, DB passwords).
-#   reset   down then up — fresh masterkey, fresh secrets.
-#   nuke    down + delete .env. Operator must be sure.
+#   down    Stop containers but preserve data volumes, .env, certs, PAT,
+#           generated-config.json and citius-zitadel.env. Safe to follow
+#           with `up` for a fast restart against the same instance.
+#   reset   Stop containers AND wipe data volumes, PAT, generated config,
+#           citius-zitadel.env. Then `up`. Issues a fresh masterkey only
+#           if .env is recreated by the operator.
+#   nuke    `reset` plus delete .env. The next `up` regenerates every
+#           secret. Operator must be sure.
 #   certs   (Re)issue mkcert certificate for ${ZITADEL_DOMAIN}.
 #   env     Print path to citius-zitadel.env.
 #   help    Show this message.
@@ -14,6 +19,7 @@
 # Exit codes: 0 ok, non-zero on failure. Every error is printed to stderr.
 
 set -euo pipefail
+umask 077
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly ENV_FILE="${SCRIPT_DIR}/.env"
@@ -43,8 +49,15 @@ need_cmd() {
 }
 
 # Load .env into the current shell so subsequent helpers can read variables.
+# When called with --optional the absence of .env is not fatal — used by
+# `down`/`nuke` so the cleanup path works after a previous `nuke`.
 load_env() {
-  [[ -f "$ENV_FILE" ]] || die ".env not found. cp .env.example .env and edit."
+  local optional=0
+  [[ "${1:-}" == "--optional" ]] && optional=1
+  if [[ ! -f "$ENV_FILE" ]]; then
+    (( optional )) && return 0
+    die ".env not found. cp .env.example .env and edit."
+  fi
   set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
@@ -74,15 +87,18 @@ ensure_env_secret() {
   else
     printf '\n%s=%s\n' "$var" "$value" >> "$ENV_FILE"
   fi
+  chmod 600 "$ENV_FILE"
   export "${var}=${value}"
 }
 
 # Resolve the active TLS overlay path based on TLS_MODE.
 tls_overlay_path() {
-  case "${TLS_MODE:-local-tls}" in
+  local mode="${TLS_MODE:-}"
+  [[ -n "$mode" ]] || die "TLS_MODE is empty in .env (expected: local-tls or letsencrypt)"
+  case "$mode" in
     local-tls)   echo "${SCRIPT_DIR}/docker-compose.mode-local-tls.yml" ;;
     letsencrypt) echo "${SCRIPT_DIR}/docker-compose.mode-letsencrypt.yml" ;;
-    *)           die "unknown TLS_MODE: ${TLS_MODE}" ;;
+    *)           die "unknown TLS_MODE: ${mode}" ;;
   esac
 }
 
@@ -171,7 +187,11 @@ wait_for_setup() {
     sleep 2
     elapsed=$((elapsed + 2))
   done
-  (( elapsed < READINESS_TIMEOUT )) || die "zitadel-setup did not complete within ${READINESS_TIMEOUT}s"
+  if (( elapsed >= READINESS_TIMEOUT )); then
+    warn "zitadel-setup did not exit within ${READINESS_TIMEOUT}s; last 50 log lines:"
+    compose logs --tail 50 zitadel-setup >&2 || true
+    die "zitadel-setup did not complete within ${READINESS_TIMEOUT}s"
+  fi
 
   [[ -s "${PAT_DIR}/admin.pat" ]] || die "${PAT_DIR}/admin.pat is missing or empty after setup"
   log "admin PAT present"
@@ -265,21 +285,37 @@ cmd_up() {
 }
 
 cmd_down() {
-  load_env
-  log "docker compose down"
-  compose down -v --remove-orphans
-  rm -rf "$PAT_DIR" "$GENERATED_CONFIG" "$OUT_ENV"
+  load_env --optional
+  if [[ ! -f "$ENV_FILE" ]]; then
+    warn ".env absent; nothing to stop"
+    return 0
+  fi
+  log "docker compose down (volumes preserved)"
+  compose down --remove-orphans
 }
 
+# cmd_reset stops containers, wipes data volumes and runtime artefacts,
+# then brings the stack back up. .env (masterkey + DB passwords) is
+# preserved unless the operator deletes it manually or runs `nuke`.
 cmd_reset() {
-  cmd_down
+  load_env --optional
+  if [[ -f "$ENV_FILE" ]]; then
+    log "docker compose down -v (wiping data volumes)"
+    compose down -v --remove-orphans
+  fi
+  rm -rf "$PAT_DIR" "$GENERATED_CONFIG" "$OUT_ENV"
   cmd_up
 }
 
 cmd_nuke() {
-  cmd_down
+  load_env --optional
+  if [[ -f "$ENV_FILE" ]]; then
+    log "docker compose down -v (wiping data volumes)"
+    compose down -v --remove-orphans
+  fi
+  rm -rf "$PAT_DIR" "$GENERATED_CONFIG" "$OUT_ENV"
   rm -f "$ENV_FILE"
-  log "wiped .env"
+  log "wiped .env, data volumes and runtime artefacts"
 }
 
 cmd_env() {
@@ -291,10 +327,18 @@ cmd_help() {
 }
 
 main() {
-  if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
-    warn ".env not found; copying from .env.example"
-    cp "$ENV_EXAMPLE" "$ENV_FILE"
-  fi
+  # `help` and `env` are read-only; do not bootstrap .env from .env.example
+  # for them or we leak operator state on every `--help` invocation.
+  case "${1:-up}" in
+    help|-h|--help|env) ;;
+    *)
+      if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
+        warn ".env not found; copying from .env.example"
+        cp "$ENV_EXAMPLE" "$ENV_FILE"
+        chmod 600 "$ENV_FILE"
+      fi
+      ;;
+  esac
 
   case "${1:-up}" in
     up)    cmd_up ;;
