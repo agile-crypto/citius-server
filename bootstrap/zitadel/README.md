@@ -9,10 +9,48 @@ repo root so it can be operated independently of the server build.
 
 ---
 
+## Prerequisites
+
+### mkcert (dev / `local-tls` mode only)
+
+`mkcert` issues locally-trusted TLS certificates and installs its CA into
+the OS / browser trust stores. It is required when `TLS_MODE=local-tls`
+(the default for local development).
+
+**Install** (one-time):
+
+```bash
+# Linux — download the static binary; no package manager needed.
+mkdir -p ~/.local/bin
+curl -fsSL "https://dl.filippo.io/mkcert/latest?for=linux/amd64" \
+     -o ~/.local/bin/mkcert
+chmod +x ~/.local/bin/mkcert
+# Make sure ~/.local/bin is on your PATH (it usually is on modern distros).
+# If not: echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc && source ~/.bashrc
+
+# macOS (Homebrew)
+brew install mkcert
+
+# Windows (Chocolatey / Scoop)
+choco install mkcert   # or: scoop bucket add extras && scoop install mkcert
+```
+
+**Trust the local CA** (one-time, must be re-run after OS reinstall):
+
+```bash
+mkcert -install
+```
+
+This registers `mkcert`'s root CA in the system trust store and in
+Firefox/Chrome. Browsers opened *after* this step will accept the certs
+`bootstrap.sh certs` issues.
+
+---
+
 ## Quick start (dev)
 
 ```bash
-# 1. one-time: trust mkcert's local CA in your OS / browser
+# 1. one-time: install mkcert and trust its local CA (see Prerequisites above)
 mkcert -install
 
 # 2. copy the env template, then bring the stack up
