@@ -73,6 +73,15 @@ func (h *Handler) getScope(ctx context.Context) (ScopeGateway, error) {
 func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyRequest) (*messagespb.CreateKeyResponse, error) {
 	const createOp engerr.Op = handlerOp + ".CreateKey"
 
+	if err := authorizeKeyName(ctx, createOp, req.GetName()); err != nil {
+		return nil, ToStatusError(err)
+	}
+	if req.GetPolicy() != "" {
+		if err := authorizePolicyName(ctx, createOp, req.GetPolicy()); err != nil {
+			return nil, ToStatusError(err)
+		}
+	}
+
 	scope, err := h.getScope(ctx)
 	if err != nil {
 		return nil, ToStatusError(err)
@@ -121,6 +130,10 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (*messagespb.ReadKeyResponse, error) {
 	const readOp engerr.Op = handlerOp + ".ReadKey"
 
+	if err := authorizeKeyName(ctx, readOp, req.GetName()); err != nil {
+		return nil, ToStatusError(err)
+	}
+
 	scope, err := h.getScope(ctx)
 	if err != nil {
 		return nil, ToStatusError(err)
@@ -150,6 +163,10 @@ func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (
 //	crypto.SignResult.Output          => messages.SignResponse.Metadata.ProviderOutput
 func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messagespb.SignResponse, error) {
 	const signOp engerr.Op = handlerOp + ".Sign"
+
+	if err := authorizeKeyName(ctx, signOp, req.GetKeyName()); err != nil {
+		return nil, ToStatusError(err)
+	}
 
 	scope, err := h.getScope(ctx)
 	if err != nil {
@@ -191,6 +208,10 @@ func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messa
 // An invalid signature is NOT an error — it returns Valid: false with no error.
 func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*messagespb.VerifyResponse, error) {
 	const verifyOp engerr.Op = handlerOp + ".Verify"
+
+	if err := authorizeKeyName(ctx, verifyOp, req.GetKeyName()); err != nil {
+		return nil, ToStatusError(err)
+	}
 
 	scope, err := h.getScope(ctx)
 	if err != nil {
