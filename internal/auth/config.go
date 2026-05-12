@@ -21,9 +21,12 @@ const (
 	EnvExpectedAudience  = "EXPECTED_AUDIENCE"
 )
 
-// defaultCacheTTL and defaultCacheMaxEntries match the upstream module's
-// own defaults; they are repeated here so LoadFromEnv produces a fully
-// populated Config that is independent of the upstream zero-value behaviour.
+// defaultCacheTTL and defaultCacheMaxEntries are Citius defaults applied
+// by LoadFromEnv when the operator does not set CACHE_TTL_SECONDS /
+// CACHE_MAX_ENTRIES. The upstream module does not impose its own
+// defaults — its zero-value config disables caching entirely — so we set
+// these here to make the production behaviour predictable without
+// requiring every deployment to specify them.
 const (
 	defaultCacheTTL        = 30 * time.Second
 	defaultCacheMaxEntries = 10_000
