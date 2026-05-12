@@ -2,5 +2,9 @@
 .env
 pat/
 certs/
+tokens/
 generated-config.json
 citius-zitadel.env
+
+# The root .gitignore globs `.env.*`; re-include the committed template.
+!.env.example
