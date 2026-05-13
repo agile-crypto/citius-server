@@ -377,6 +377,7 @@ cmd_up() {
   fi
 
   mkdir -p "$PAT_DIR"
+  chmod 755 "$PAT_DIR"   # must be world-executable so the container UID can write into it
 
   log "docker compose up"
   compose up -d --wait
