@@ -66,8 +66,11 @@ load_env() {
 }
 
 # Generate a cryptographically random 32-character key (alnum).
+# { tr … || true } suppresses the SIGPIPE (exit 141) that tr receives when
+# head closes the pipe after reading 32 bytes, which would otherwise abort
+# the script under set -o pipefail.
 gen_secret() {
-  LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32
+  { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom || true; } | head -c 32
 }
 
 # If a variable is empty in .env, generate a value and persist it.
