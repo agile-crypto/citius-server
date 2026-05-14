@@ -56,6 +56,22 @@ services:
   # overlay only sets LOGINCLIENT_* and never reads our .env entries.
   zitadel-setup:
     environment:
+      # CRITICAL: zitadel-setup persists the OIDC issuer + login URLs to
+      # the DB at first-instance time using ExternalDomain/ExternalPort/
+      # ExternalSecure. The upstream prodlike overlay reads
+      # ZITADEL_EXTERNALPORT from .env (defaults to 443), so without this
+      # override the persisted login URL lacks the host-published port
+      # (e.g. :8443). The console then redirects browsers to
+      # https://<domain>/ui/v2/login/login?authRequest=... -- which is
+      # unreachable when the host port is not 443. Forcing the same
+      # ZITADEL_HTTPS_PORT here keeps setup, api and the persisted URLs
+      # in lockstep.
+      ZITADEL_EXTERNALPORT: ${ZITADEL_HTTPS_PORT:-443}
+      ZITADEL_EXTERNALSECURE: "true"
+      ZITADEL_DEFAULTINSTANCE_FEATURES_LOGINV2_BASEURI: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/
+      ZITADEL_OIDC_DEFAULTLOGINURLV2: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/login?authRequest=
+      ZITADEL_OIDC_DEFAULTLOGOUTURLV2: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/logout?post_logout_redirect=
+      ZITADEL_SAML_DEFAULTLOGINURLV2: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/login?samlRequest=
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME}
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME}
       ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_SCOPES: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_SCOPES}
