@@ -22,7 +22,7 @@
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env run-auth-dev test-integration-auth
+.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env run-auth-dev test-integration-auth test-integration-auth-e2e
 
 # Default goal: print help when `make` is run with no arguments.
 .DEFAULT_GOAL := help
@@ -203,3 +203,32 @@ test-integration-auth: ## Run Zitadel-tagged auth integration suite (auto-source
 	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run make zitadel-up first" && exit 1)
 	env $$(grep -v '^#' $(ZITADEL_ENV_FILE) | sed 's/^export //') \
 	  go test -tags 'integration zitadel' -count=1 ./test/integration/auth/...
+
+test-integration-auth-e2e: ## One-shot: build, start caas-server, run auth integration suite, tear server down
+	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run make zitadel-up first" && exit 1)
+	@test -f $(ZITADEL_TLS_CERT) || (echo "ERROR: $(ZITADEL_TLS_CERT) not found - run make zitadel-up first" && exit 1)
+	@go build -o $(SERVER_BIN) $(SERVER_PKG)
+	@bash -c '\
+	  set -e; \
+	  log=$$(mktemp -t caas-server.XXXXXX.log); \
+	  env $$(grep -v "^#" $(ZITADEL_ENV_FILE) | sed "s/^export //") \
+	    TLS_CERT_FILE=$(abspath $(ZITADEL_TLS_CERT)) TLS_KEY_FILE=$(abspath $(ZITADEL_TLS_KEY)) \
+	    $(SERVER_BIN) -addr $(ADDR) -catalog $(CATALOG) >"$$log" 2>&1 & \
+	  pid=$$!; \
+	  trap "kill $$pid 2>/dev/null; wait $$pid 2>/dev/null; rm -f \"$$log\"" EXIT INT TERM; \
+	  port=$$(printf "%s" "$(ADDR)" | sed "s/.*://"); \
+	  echo "waiting for caas-server (pid=$$pid) on :$$port ..."; \
+	  for i in $$(seq 1 50); do \
+	    if ! kill -0 $$pid 2>/dev/null; then echo "caas-server died early; log:"; cat "$$log"; exit 1; fi; \
+	    if (exec 3<>/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then exec 3<&-; exec 3>&-; break; fi; \
+	    sleep 0.1; \
+	  done; \
+	  if ! (exec 3<>/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then echo "caas-server never listened; log:"; cat "$$log"; exit 1; fi; \
+	  exec 3<&-; exec 3>&-; \
+	  echo "caas-server up; running tests"; \
+	  env $$(grep -v "^#" $(ZITADEL_ENV_FILE) | sed "s/^export //") \
+	    go test -tags "integration zitadel" -count=1 ./test/integration/auth/...; \
+	  rc=$$?; \
+	  echo "tests exited rc=$$rc; shutting caas-server down"; \
+	  exit $$rc \
+	'
