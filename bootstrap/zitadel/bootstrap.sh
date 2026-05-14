@@ -301,7 +301,10 @@ emit_env() {
   project_id="$(jq -r '.project_id' "$GENERATED_CONFIG")"
   api_id="$(jq -r '.api_app.ClientID' "$GENERATED_CONFIG")"
   api_secret="$(jq -r '.api_app.ClientSecret' "$GENERATED_CONFIG")"
-  expected_aud="urn:zitadel:iam:org:project:id:${project_id}:aud"
+  # Zitadel maps the requested scope `urn:zitadel:iam:org:project:id:<id>:aud`
+  # to the raw project ID in the issued token's `aud` claim — not the URN
+  # literally. So the server-side audience check must be the project ID.
+  expected_aud="${project_id}"
 
   # Defaults for the Citius client connection. Operator may override any
   # of these in .env to point integration tests at a remote caas-server.
