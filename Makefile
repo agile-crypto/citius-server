@@ -22,7 +22,7 @@
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-env test-integration-auth
+.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env test-integration-auth
 
 # Default goal: print help when `make` is run with no arguments.
 .DEFAULT_GOAL := help
@@ -180,6 +180,9 @@ zitadel-reset: ## Stop the stack and wipe data volumes
 
 zitadel-reset-dev: ## Like zitadel-reset but also provisions a human console-UI admin account
 	CITIUS_DEV_CONSOLE=1 $(ZITADEL_DIR)/bootstrap.sh reset
+
+zitadel-nuke: ## Wipe everything including .env (next up regenerates all secrets)
+	$(ZITADEL_DIR)/bootstrap.sh nuke
 
 zitadel-env: ## Print sourced env entries written by bootstrap.sh
 	$(ZITADEL_DIR)/bootstrap.sh env
