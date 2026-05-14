@@ -166,15 +166,12 @@ do_certs() {
 
   mkdir -p "$CERTS_DIR"
   log "issuing mkcert certificate for ${ZITADEL_DOMAIN}"
-  ( cd "$CERTS_DIR" && mkcert -cert-file "${ZITADEL_DOMAIN}.crt" -key-file "${ZITADEL_DOMAIN}.key" "${ZITADEL_DOMAIN}" )
+  # The upstream traefik-local-tls.yml hard-codes /certs/local.{crt,key}
+  # as the default certificate, so we MUST emit those exact filenames.
+  # Also include 'localhost' as a SAN so curl/clients can reach the
+  # stack via either citius-auth.localhost or plain localhost.
+  ( cd "$CERTS_DIR" && mkcert -cert-file "local.crt" -key-file "local.key" "${ZITADEL_DOMAIN}" "localhost" "127.0.0.1" "::1" )
 
-  # Emit a Traefik dynamic-config file that points at the issued cert.
-  cat > "${CERTS_DIR}/dynamic.yml" <<EOF
-tls:
-  certificates:
-    - certFile: /etc/traefik/certs/${ZITADEL_DOMAIN}.crt
-      keyFile:  /etc/traefik/certs/${ZITADEL_DOMAIN}.key
-EOF
   log "certs written to ${CERTS_DIR}"
 }
 
@@ -186,7 +183,9 @@ wait_for_setup() {
   local elapsed=0
   while (( elapsed < READINESS_TIMEOUT )); do
     local state
-    state="$(compose ps zitadel-setup --format '{{.State}}' 2>/dev/null || true)"
+    # `ps -a` is required so that exited (one-shot) containers are
+    # included; without it, newer compose hides them once they stop.
+    state="$(compose ps -a zitadel-setup --format '{{.State}}' 2>/dev/null || true)"
     if [[ "$state" == "exited" ]]; then
       log "zitadel-setup exited"
       break
@@ -209,11 +208,15 @@ wait_for_setup() {
 # ---------------------------------------------------------------------------
 run_setup_sdk() {
   log "running setup-sdk"
+  # The SDK connects from the host, so the port it must dial is the
+  # host-published HTTPS port (ZITADEL_HTTPS_PORT), not the container-
+  # internal ZITADEL_EXTERNALPORT (which is the port the proxy
+  # advertises in OIDC issuer URLs).
   (
     cd "${SCRIPT_DIR}/setup-sdk"
     ZITADEL_ADMIN_PAT="$(<"${PAT_DIR}/admin.pat")" \
     ZITADEL_DOMAIN="${ZITADEL_DOMAIN}" \
-    ZITADEL_PORT="${ZITADEL_EXTERNALPORT:-443}" \
+    ZITADEL_PORT="${ZITADEL_HTTPS_PORT:-${ZITADEL_EXTERNALPORT:-443}}" \
     ZITADEL_INSECURE="${ZITADEL_INSECURE:-false}" \
       go run .
   )
@@ -224,7 +227,7 @@ run_setup_sdk() {
 # Service-user token minting (OAuth2 client_credentials)
 # ---------------------------------------------------------------------------
 # Mint short-lived access tokens for every service user in
-# generated-config.json and write each token to tokens/svc-<name>.token.
+# generated-config.json and write each token to tokens/<name>.token.
 # Returns silently with no files created if jq finds no users.
 mint_tokens() {
   [[ -f "$GENERATED_CONFIG" ]] || die "${GENERATED_CONFIG} not found"
@@ -259,9 +262,9 @@ mint_tokens() {
   log "minting service-user tokens at ${token_url}"
   local user cid csecret resp tok out
   while IFS= read -r user; do
-    cid="$(jq -r --arg u "$user" '.users[$u].client_id'     "$GENERATED_CONFIG")"
-    csecret="$(jq -r --arg u "$user" '.users[$u].client_secret' "$GENERATED_CONFIG")"
-    [[ -n "$cid" && -n "$csecret" ]] || die "user ${user}: missing client_id/secret"
+    cid="$(jq -r --arg u "$user" '.users[$u].ClientID'     "$GENERATED_CONFIG")"
+    csecret="$(jq -r --arg u "$user" '.users[$u].ClientSecret' "$GENERATED_CONFIG")"
+    [[ -n "$cid" && -n "$csecret" ]] || die "user ${user}: missing ClientID/ClientSecret"
 
     resp="$(curl -sS "${curl_insecure[@]}" -X POST "$token_url" \
       -u "${cid}:${csecret}" \
@@ -273,7 +276,7 @@ mint_tokens() {
     tok="$(printf '%s' "$resp" | jq -r '.access_token // empty')"
     [[ -n "$tok" ]] || die "token mint failed for ${user}: $(printf '%s' "$resp" | jq -c '.' 2>/dev/null || printf '%s' "$resp")"
 
-    out="${TOKENS_DIR}/svc-${user}.token"
+    out="${TOKENS_DIR}/${user}.token"
     printf '%s' "$tok" > "$out"
     chmod 600 "$out"
   done <<< "$users"
@@ -289,8 +292,8 @@ emit_env() {
 
   local project_id api_id api_secret expected_aud
   project_id="$(jq -r '.project_id' "$GENERATED_CONFIG")"
-  api_id="$(jq -r '.api_app.client_id' "$GENERATED_CONFIG")"
-  api_secret="$(jq -r '.api_app.client_secret' "$GENERATED_CONFIG")"
+  api_id="$(jq -r '.api_app.ClientID' "$GENERATED_CONFIG")"
+  api_secret="$(jq -r '.api_app.ClientSecret' "$GENERATED_CONFIG")"
   expected_aud="urn:zitadel:iam:org:project:id:${project_id}:aud"
 
   # Defaults for the Citius client connection. Operator may override any
@@ -340,11 +343,11 @@ emit_env() {
       | "export "
         + (.key | gsub("-"; "_") | ascii_upcase)
         + "_CLIENT_ID="
-        + .value.client_id
+        + .value.ClientID
         + "\nexport "
         + (.key | gsub("-"; "_") | ascii_upcase)
         + "_CLIENT_SECRET="
-        + .value.client_secret
+        + .value.ClientSecret
     ' "$GENERATED_CONFIG"
     echo
     echo "# --- Service-user access-token files (minted by bootstrap.sh) ---"
@@ -354,7 +357,7 @@ emit_env() {
       | "export "
         + (.key | gsub("-"; "_") | ascii_upcase)
         + "_TOKEN_FILE="
-        + $dir + "/svc-" + .key + ".token"
+        + $dir + "/" + .key + ".token"
     ' "$GENERATED_CONFIG"
   } > "$OUT_ENV"
   chmod 600 "$OUT_ENV"
@@ -371,7 +374,7 @@ cmd_up() {
   ensure_env_secret POSTGRES_ZITADEL_PASSWORD
 
   if [[ "${TLS_MODE:-local-tls}" == "local-tls" ]]; then
-    if [[ ! -f "${CERTS_DIR}/${ZITADEL_DOMAIN}.crt" ]]; then
+    if [[ ! -f "${CERTS_DIR}/local.crt" ]]; then
       do_certs
     fi
   fi
@@ -387,7 +390,12 @@ cmd_up() {
   mint_tokens
   emit_env
 
-  log "stack ready: https://${ZITADEL_DOMAIN}"
+  local _https_port="${ZITADEL_HTTPS_PORT:-443}"
+  if [[ "$_https_port" == "443" ]]; then
+    log "stack ready: https://${ZITADEL_DOMAIN}"
+  else
+    log "stack ready: https://${ZITADEL_DOMAIN}:${_https_port}"
+  fi
   log "env file:    ${OUT_ENV}"
 }
 

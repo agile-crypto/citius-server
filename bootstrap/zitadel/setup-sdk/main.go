@@ -117,10 +117,10 @@ func main() {
 // generatedConfig is the on-disk shape of generated-config.json.
 // bootstrap.sh slices it into citius-zitadel.env.
 type generatedConfig struct {
-	ProjectID string                          `json:"project_id"`
-	ActionID  string                          `json:"action_id"`
-	APIApp    admin.AppCredentials            `json:"api_app"`
-	Users     map[string]admin.OnboardResult  `json:"users"`
+	ProjectID string                         `json:"project_id"`
+	ActionID  string                         `json:"action_id"`
+	APIApp    admin.AppCredentials           `json:"api_app"`
+	Users     map[string]admin.OnboardResult `json:"users"`
 }
 
 // loadEnv loads ../.env if present, falling back to ./.env. Missing file is
@@ -147,4 +147,3 @@ func envOr(k, fallback string) string {
 	}
 	return fallback
 }
-

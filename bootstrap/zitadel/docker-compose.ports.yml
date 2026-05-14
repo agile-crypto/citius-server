@@ -9,15 +9,26 @@
 # unless the operator changes them.
 services:
   proxy:
-    command:
+    # Override the entire command list so that the docker provider only
+    # discovers containers attached to OUR network (citius-zitadel-net),
+    # not the orphan "zitadel" network that may exist from a parallel
+    # stack on the same Docker daemon. Without this filter, traefik
+    # picks up labels from both stacks and emits "router defined
+    # multiple times" errors that prevent TLS termination.
+    command: !override
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
-      - --providers.docker.network=zitadel
+      - --providers.docker.network=citius-zitadel-net
+      # Restrict the docker provider to containers from THIS compose
+      # project so traefik does not pick up labels from a parallel
+      # zitadel stack on the same Docker daemon (which would cause
+      # "router defined multiple times" errors and break TLS routing).
+      - --providers.docker.constraints=Label(`com.docker.compose.project`,`citius-zitadel`)
       - --providers.file.filename=/etc/traefik/dynamic/local-tls.yml
-      - --entrypoints.web.address=:${ZITADEL_HTTP_PORT:-80}
+      - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.address=:${ZITADEL_HTTPS_PORT:-443}
+      - --entrypoints.websecure.address=:443
       - --entrypoints.websecure.http.tls=true
       - --api.dashboard=${TRAEFIK_DASHBOARD_ENABLED}
       - --api.insecure=false
@@ -25,10 +36,37 @@ services:
       - --ping.entrypoint=web
       - --log.level=${TRAEFIK_LOG_LEVEL}
       - --accesslog=${TRAEFIK_ACCESSLOG_ENABLED}
+    # Traefik still listens on :80/:443 inside the container (the
+    # mode-local-tls overlay configures the entrypoints that way and we
+    # don't change them); we only remap the host-side published ports
+    # so the stack can run when 80/443 are already taken on the host.
+    #
+    # The leading `!override` resets the merged `ports` list from the
+    # base + prodlike + mode-local-tls files; otherwise compose appends
+    # entries instead of replacing them.
     ports: !override
-      - "${ZITADEL_HTTP_PORT:-80}:${ZITADEL_HTTP_PORT:-80}"
-      - "${ZITADEL_HTTPS_PORT:-443}:${ZITADEL_HTTPS_PORT:-443}"
+      - "${ZITADEL_HTTP_PORT:-80}:80"
+      - "${ZITADEL_HTTPS_PORT:-443}:443"
 
+  # Override zitadel-setup to use a bind-mount of ./pat instead of the
+  # default named volume so that bootstrap.sh can read login-client.pat
+  # directly from the host without needing docker cp or extra permissions.
+  # Also inject the IAM_OWNER machine-user (admin PAT) env vars that
+  # upstream's prodlike overlay does not pass through; the upstream
+  # overlay only sets LOGINCLIENT_* and never reads our .env entries.
+  zitadel-setup:
+    environment:
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_USERNAME}
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_MACHINE_NAME}
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_SCOPES: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_SCOPES}
+      ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE: ${ZITADEL_FIRSTINSTANCE_ORG_MACHINE_PAT_EXPIRATIONDATE}
+      ZITADEL_FIRSTINSTANCE_PATPATH: ${ZITADEL_FIRSTINSTANCE_PATPATH}
+    volumes: !override
+      - ./pat:/zitadel/bootstrap:rw
+
+  # zitadel-api: rewrite the externally-visible URLs to include the
+  # published HTTPS port (so OIDC issuer / login URLs are reachable from
+  # the host). Also bind-mount ./pat to stay aligned with zitadel-setup.
   zitadel-api:
     environment:
       ZITADEL_EXTERNALPORT: ${ZITADEL_HTTPS_PORT:-443}
@@ -37,7 +75,18 @@ services:
       ZITADEL_OIDC_DEFAULTLOGINURLV2: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/login?authRequest=
       ZITADEL_OIDC_DEFAULTLOGOUTURLV2: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/logout?post_logout_redirect=
       ZITADEL_SAML_DEFAULTLOGINURLV2: https://${ZITADEL_DOMAIN}:${ZITADEL_HTTPS_PORT:-443}/ui/v2/login/login?samlRequest=
+    volumes: !override
+      - ./pat:/zitadel/bootstrap:rw
 
   zitadel-login:
+    volumes: !override
+      - ./pat:/zitadel/bootstrap:ro
     environment:
       CUSTOM_REQUEST_HEADERS: Host:${ZITADEL_DOMAIN},X-Forwarded-Proto:https
+
+# Give the internal network a project-specific name so that this stack
+# never collides with any pre-existing Docker network called "zitadel"
+# (e.g. a stale stack from a previous run or a parallel deployment).
+networks:
+  zitadel:
+    name: citius-zitadel-net
