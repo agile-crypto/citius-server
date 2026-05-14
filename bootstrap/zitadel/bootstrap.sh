@@ -107,7 +107,13 @@ tls_overlay_path() {
 }
 
 # Wrap `docker compose` with our project name and the active overlay set.
+# Set CITIUS_DEV_CONSOLE=1 to also include docker-compose.dev-console.yml,
+# which provisions a human admin account with known credentials for the UI.
 compose() {
+  local extra_overlays=()
+  if [[ "${CITIUS_DEV_CONSOLE:-0}" == "1" ]]; then
+    extra_overlays=(-f "${SCRIPT_DIR}/docker-compose.dev-console.yml")
+  fi
   docker compose \
     --env-file "$ENV_FILE" \
     --project-name "$COMPOSE_PROJECT" \
@@ -115,6 +121,7 @@ compose() {
     -f "$PRODLIKE_COMPOSE" \
     -f "$(tls_overlay_path)" \
     -f "${SCRIPT_DIR}/docker-compose.ports.yml" \
+    "${extra_overlays[@]}" \
     "$@"
 }
 

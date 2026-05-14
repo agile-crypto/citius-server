@@ -1,0 +1,25 @@
+# docker-compose.dev-console.yml — optional dev-only overlay.
+#
+# Provisions a human admin account with deterministic credentials so
+# developers can log straight into the Zitadel Console UI after a reset.
+#
+# DO NOT include in production deployments.
+#
+# Activated by:
+#   make zitadel-up-dev    (boot + seed with console credentials)
+#   make zitadel-reset-dev (wipe + reseed with console credentials)
+#
+# Or manually:
+#   CITIUS_DEV_CONSOLE=1 bootstrap/zitadel/bootstrap.sh up
+#
+# Credentials (override in .env before sharing):
+#   URL:      https://<ZITADEL_DOMAIN>:<ZITADEL_HTTPS_PORT>/ui/console
+#   Username: $ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL
+#   Password: $ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD
+services:
+  zitadel-setup:
+    environment:
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME: ${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_USERNAME}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL: ${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_EMAIL}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD: ${ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORD}
+      ZITADEL_FIRSTINSTANCE_ORG_HUMAN_PASSWORDCHANGEREQUIRED: "false"
