@@ -84,6 +84,24 @@ services:
     environment:
       CUSTOM_REQUEST_HEADERS: Host:${ZITADEL_DOMAIN},X-Forwarded-Proto:https
 
+  # Override the upstream postgres healthcheck so it goes via TCP
+  # (-h localhost) instead of the unix socket. The unix socket becomes
+  # ready during the temporary single-user postgres that initdb spins
+  # up to apply POSTGRES_PASSWORD, BEFORE the real network-listening
+  # postgres restarts. Without -h, dependents (zitadel-init) race in
+  # during that window and hit SASL auth failures because the password
+  # is not yet active. Forcing TCP makes the healthcheck only succeed
+  # once the configured postgres is fully up with the right password.
+  postgres:
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -d ${POSTGRES_DB} -U ${POSTGRES_ADMIN_USER} -h localhost
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
 # Give the internal network a project-specific name so that this stack
 # never collides with any pre-existing Docker network called "zitadel"
 # (e.g. a stale stack from a previous run or a parallel deployment).

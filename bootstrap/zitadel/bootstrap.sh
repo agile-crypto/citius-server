@@ -380,6 +380,16 @@ cmd_up() {
   ensure_env_secret POSTGRES_ADMIN_PASSWORD
   ensure_env_secret POSTGRES_ZITADEL_PASSWORD
 
+  # Re-source .env AFTER secret generation so that any value containing
+  # `${POSTGRES_ADMIN_PASSWORD}` (notably ZITADEL_DATABASE_POSTGRES_DSN)
+  # is re-evaluated with the freshly-generated password. Without this,
+  # preflight's earlier load_env exported a DSN with an empty password
+  # into the shell, and that stale shell value would override the .env
+  # file during `docker compose up` -- leading to SASL auth failures
+  # because zitadel-init dialled postgres with an empty password.
+  unset ZITADEL_DATABASE_POSTGRES_DSN
+  load_env
+
   if [[ "${TLS_MODE:-local-tls}" == "local-tls" ]]; then
     if [[ ! -f "${CERTS_DIR}/local.crt" ]]; then
       do_certs
