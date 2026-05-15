@@ -1,20 +1,20 @@
 // Package main is the Citius bootstrap CLI for Zitadel. It owns three
 // commands:
 //
-//	 setup-auth validate -acl PATH
-//	     Parse and validate an ACL file. No network calls, no PAT needed.
-//	     Use this in CI to fail a PR that introduces a typo'd permission.
+//	setup-auth validate -acl PATH
+//	    Parse and validate an ACL file. No network calls, no PAT needed.
+//	    Use this in CI to fail a PR that introduces a typo'd permission.
 //
-//	 setup-auth apply    -acl PATH [-dry-run]
-//	     Bootstrap the citius-api project and per-RPC permission catalog
-//	     (idempotent), then onboard every user in the ACL. Writes the same
-//	     ../generated-config.json that bootstrap.sh slices into
-//	     citius-zitadel.env.
+//	setup-auth apply    -acl PATH [-dry-run]
+//	    Bootstrap the citius-api project and per-RPC permission catalog
+//	    (idempotent), then onboard every user in the ACL. Writes the same
+//	    ../generated-config.json that bootstrap.sh slices into
+//	    citius-zitadel.env.
 //
-//	 setup-auth users    -acl PATH [-dry-run]
-//	    Onboard users only, reusing the project_id from existing
-//	    ../generated-config.json. Use this for incremental ACL edits
-//	    when the project + catalog are already provisioned.
+//	setup-auth users    -acl PATH [-dry-run]
+//	   Onboard users only, reusing the project_id from existing
+//	   ../generated-config.json. Use this for incremental ACL edits
+//	   when the project + catalog are already provisioned.
 //
 // Required environment for `apply` and `users`:
 //

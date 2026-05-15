@@ -1,10 +1,10 @@
-# Citius access-control list, applied by bootstrap/zitadel/setup-sdk.
+# Citius access-control list, applied by bootstrap/zitadel/setup-auth.
 #
 # This file is the source of truth for which Zitadel service users exist,
 # what gRPC permissions they hold, and which key/policy name patterns they
 # may touch. Apply with:
 #
-#   cd bootstrap/zitadel/setup-sdk
+#   cd bootstrap/zitadel/setup-auth
 #   go run . apply -acl ../acl.yaml
 #
 # Or validate without any network calls:
@@ -12,7 +12,7 @@
 #   go run . validate -acl ../acl.yaml
 #
 # The RPC -> permission mapping itself (which RPC requires which permission)
-# lives in setup-sdk/operations.go because it is tied to the proto compile-
+# lives in setup-auth/operations.go because it is tied to the proto compile-
 # time invariant and is verified against the generated *_grpc.pb.go method
 # constants by an integration test. Do not duplicate it here.
 #
@@ -24,7 +24,7 @@
 #   citius:crypto:encrypt     - Encrypt*, EncryptMessage*
 #   citius:crypto:decrypt     - Decrypt*, DecryptMessage*
 #   citius:crypto:sign        - Sign*, DigestSign, SignMessage*
-#   citius:crypto:verify      - Verify*, DigestVerify, VerifyMessage*
+#   citius:crypto:verify      - Verify*, DigestVerify, VerifyMessage*s
 #   citius:crypto:misc        - Digest*, Xof*, MAC, KDF, Wrap, KEM, Random
 #   citius:policy:read        - ReadCryptoPolicy, ListCryptoPolicies, EvaluatePolicy
 #   citius:policy:write       - CreateCryptoPolicy, UpdateCryptoPolicy, DeleteCryptoPolicy
