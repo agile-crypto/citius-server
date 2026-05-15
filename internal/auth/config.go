@@ -1,11 +1,14 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	engerr "github.ibm.com/citius/citius-server/internal/errors"
 )
 
 // Environment variable names. These are the contract surface between
@@ -14,7 +17,7 @@ const (
 	EnvAuthEnabled      = "AUTH_ENABLED"
 	EnvIssuer           = "ZITADEL_ISSUER"
 	EnvIntrospectID     = "INTROSPECT_ID"
-	EnvIntrospectSecret = "INTROSPECT_SECRET"
+	EnvIntrospectSecret = "INTROSPECT_SECRET" //nolint:gosec // env var name, not a credential
 	EnvInsecure         = "ZITADEL_INSECURE"
 	EnvCacheTTLSeconds  = "CACHE_TTL_SECONDS"
 	EnvCacheMaxEntries  = "CACHE_MAX_ENTRIES"
@@ -101,10 +104,12 @@ func LoadFromEnv() (Config, error) {
 	if v := os.Getenv(EnvCacheTTLSeconds); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			return Config{}, fmt.Errorf("auth: parse %s=%q: %w", EnvCacheTTLSeconds, v, err)
+			return Config{}, engerr.New(context.Background(), "auth.LoadFromEnv", engerr.CodeInvalidArgument,
+				fmt.Sprintf("parse %s=%q: %v", EnvCacheTTLSeconds, v, err))
 		}
 		if n < 0 {
-			return Config{}, fmt.Errorf("auth: %s must be >= 0, got %d", EnvCacheTTLSeconds, n)
+			return Config{}, engerr.New(context.Background(), "auth.LoadFromEnv", engerr.CodeInvalidArgument,
+				fmt.Sprintf("%s must be >= 0, got %d", EnvCacheTTLSeconds, n))
 		}
 		cfg.CacheTTL = time.Duration(n) * time.Second
 	}
@@ -112,10 +117,12 @@ func LoadFromEnv() (Config, error) {
 	if v := os.Getenv(EnvCacheMaxEntries); v != "" {
 		n, err := strconv.Atoi(v)
 		if err != nil {
-			return Config{}, fmt.Errorf("auth: parse %s=%q: %w", EnvCacheMaxEntries, v, err)
+			return Config{}, engerr.New(context.Background(), "auth.LoadFromEnv", engerr.CodeInvalidArgument,
+				fmt.Sprintf("parse %s=%q: %v", EnvCacheMaxEntries, v, err))
 		}
 		if n < 0 {
-			return Config{}, fmt.Errorf("auth: %s must be >= 0, got %d", EnvCacheMaxEntries, n)
+			return Config{}, engerr.New(context.Background(), "auth.LoadFromEnv", engerr.CodeInvalidArgument,
+				fmt.Sprintf("%s must be >= 0, got %d", EnvCacheMaxEntries, n))
 		}
 		cfg.CacheMaxEntries = n
 	}
@@ -126,10 +133,9 @@ func LoadFromEnv() (Config, error) {
 
 	if cfg.Enabled {
 		if cfg.Issuer == "" || cfg.IntrospectClientID == "" || cfg.IntrospectSecret == "" {
-			return Config{}, fmt.Errorf(
-				"auth: %s=true requires %s, %s and %s to be set",
-				EnvAuthEnabled, EnvIssuer, EnvIntrospectID, EnvIntrospectSecret,
-			)
+			return Config{}, engerr.New(context.Background(), "auth.LoadFromEnv", engerr.CodeInvalidArgument,
+				fmt.Sprintf("%s=true requires %s, %s and %s to be set",
+					EnvAuthEnabled, EnvIssuer, EnvIntrospectID, EnvIntrospectSecret))
 		}
 	}
 

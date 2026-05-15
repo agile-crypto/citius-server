@@ -32,9 +32,11 @@ func TestGetKeyWithMaterial_latestVersion(t *testing.T) {
 	}
 	if k == nil {
 		t.Fatal("returned nil key")
+		return // unreachable; satisfies static-analysis nil-flow
 	}
 	if v == nil {
 		t.Fatal("returned nil version")
+		return // unreachable; satisfies static-analysis nil-flow
 	}
 	if k.GetPublicId() != created.GetPublicId() {
 		t.Errorf("key PublicId: got %q want %q", k.GetPublicId(), created.GetPublicId())

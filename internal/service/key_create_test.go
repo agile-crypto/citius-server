@@ -148,6 +148,7 @@ func TestCreateKey_templateBased_happyPath(t *testing.T) {
 	}
 	if created == nil {
 		t.Fatal("CreateKey returned nil key")
+		return // unreachable; satisfies static-analysis nil-flow
 	}
 	if created.GetPublicId() == "" {
 		t.Error("PublicId must not be empty")

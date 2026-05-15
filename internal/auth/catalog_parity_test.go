@@ -29,45 +29,7 @@ func TestCatalogParity_BootstrapMatchesAuth(t *testing.T) {
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
 	opsPath := filepath.Join(repoRoot, "bootstrap", "zitadel", "setup-auth", "operations.go")
 
-	fset := token.NewFileSet()
-	f, err := parser.ParseFile(fset, opsPath, nil, parser.ParseComments)
-	if err != nil {
-		t.Fatalf("parse %s: %v", opsPath, err)
-	}
-
-	bootstrap := map[string]struct{}{}
-	for _, decl := range f.Decls {
-		gd, ok := decl.(*ast.GenDecl)
-		if !ok || gd.Tok != token.CONST {
-			continue
-		}
-		for _, spec := range gd.Specs {
-			vs, ok := spec.(*ast.ValueSpec)
-			if !ok {
-				continue
-			}
-			for i, name := range vs.Names {
-				if i >= len(vs.Values) {
-					continue
-				}
-				if !startsWith(name.Name, "perm") {
-					continue
-				}
-				bl, ok := vs.Values[i].(*ast.BasicLit)
-				if !ok || bl.Kind != token.STRING {
-					continue
-				}
-				val, err := strconv.Unquote(bl.Value)
-				if err != nil {
-					t.Fatalf("unquote %s: %v", bl.Value, err)
-				}
-				bootstrap[val] = struct{}{}
-			}
-		}
-	}
-	if len(bootstrap) == 0 {
-		t.Fatalf("no perm* constants found in %s; parser logic stale?", opsPath)
-	}
+	bootstrap := parseBootstrapPermissions(t, opsPath)
 
 	authSet := map[string]struct{}{}
 	for _, p := range AllPermissions() {
@@ -79,6 +41,55 @@ func TestCatalogParity_BootstrapMatchesAuth(t *testing.T) {
 	}
 	if extra := diff(bootstrap, authSet); len(extra) > 0 {
 		t.Errorf("permissions in bootstrap setup-auth but not in auth.AllPermissions(): %v", extra)
+	}
+}
+
+// parseBootstrapPermissions parses the setup-auth operations.go file and
+// returns all string values of constants whose names start with "perm".
+func parseBootstrapPermissions(t *testing.T, path string) map[string]struct{} {
+	t.Helper()
+	fset := token.NewFileSet()
+	f, err := parser.ParseFile(fset, path, nil, parser.ParseComments)
+	if err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	out := map[string]struct{}{}
+	for _, decl := range f.Decls {
+		gd, ok := decl.(*ast.GenDecl)
+		if !ok || gd.Tok != token.CONST {
+			continue
+		}
+		collectPermConsts(t, gd, out)
+	}
+	if len(out) == 0 {
+		t.Fatalf("no perm* constants found in %s; parser logic stale?", path)
+	}
+	return out
+}
+
+// collectPermConsts extracts string values from perm-prefixed constants in a
+// single const block and adds them to dst.
+func collectPermConsts(t *testing.T, gd *ast.GenDecl, dst map[string]struct{}) {
+	t.Helper()
+	for _, spec := range gd.Specs {
+		vs, ok := spec.(*ast.ValueSpec)
+		if !ok {
+			continue
+		}
+		for i, name := range vs.Names {
+			if i >= len(vs.Values) || !startsWith(name.Name, "perm") {
+				continue
+			}
+			bl, ok := vs.Values[i].(*ast.BasicLit)
+			if !ok || bl.Kind != token.STRING {
+				continue
+			}
+			val, err := strconv.Unquote(bl.Value)
+			if err != nil {
+				t.Fatalf("unquote %s: %v", bl.Value, err)
+			}
+			dst[val] = struct{}{}
+		}
 	}
 }
 

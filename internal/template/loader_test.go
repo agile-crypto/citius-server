@@ -71,6 +71,7 @@ func verifyEcdsaP256Template(t *testing.T, r template.Registry, ctx context.Cont
 	ecdsaSec := sigScope.GetSecurity()
 	if ecdsaSec == nil {
 		t.Fatal("ecdsa: expected UniversalSecurityProperties in scope")
+		return // unreachable; satisfies static-analysis nil-flow
 	}
 	if ecdsaSec.FipsApproved == nil || !*ecdsaSec.FipsApproved {
 		t.Error("ecdsa: expected fips_approved=true in scope security")
@@ -104,6 +105,7 @@ func verifyMlDsa65Template(t *testing.T, r template.Registry, ctx context.Contex
 	mldsaSec := mldsaSigScope.GetSecurity()
 	if mldsaSec == nil {
 		t.Fatal("ml-dsa-65: expected UniversalSecurityProperties in scope")
+		return // unreachable; satisfies static-analysis nil-flow
 	}
 	if mldsaSec.QuantumSafe == nil || !*mldsaSec.QuantumSafe {
 		t.Error("ml-dsa-65: expected quantum_safe=true in scope security")

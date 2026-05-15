@@ -76,12 +76,12 @@ func main() {
 		}
 	}
 	if *tlsCert != "" && *tlsKey != "" {
-		creds, err := credentials.NewServerTLSFromFile(*tlsCert, *tlsKey)
-		if err != nil {
-			log.Fatalf("load tls credentials: %v", err)
+		creds, credsErr := credentials.NewServerTLSFromFile(*tlsCert, *tlsKey)
+		if credsErr != nil {
+			log.Fatalf("load tls credentials: %v", credsErr)
 		}
 		serverOpts = append(serverOpts, grpc.Creds(creds))
-		log.Printf("TLS enabled (cert=%s)", *tlsCert)
+		log.Printf("TLS enabled (cert=%s)", *tlsCert) //nolint:gosec // cert path from operator-controlled flag
 	}
 
 	handler, err := server.NewServer(ctx, server.Config{
