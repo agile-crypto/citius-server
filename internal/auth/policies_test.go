@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"testing"
 
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
 	"github.com/stretchr/testify/require"
+	zauth "github.ibm.com/citius/zitadel-grpc-auth"
 )
 
 // claimsCtx wraps the upstream ContextWithClaims helper for tests.
@@ -17,8 +17,8 @@ func claimsCtx(t *testing.T, raw map[string]any) context.Context {
 
 func TestRequirePerm_Granted(t *testing.T) {
 	ctx := claimsCtx(t, map[string]any{
-		"sub":                    "svc-tester",
-		ClaimPermissions:         []any{PermCryptoEncrypt},
+		"sub":            "svc-tester",
+		ClaimPermissions: []any{PermCryptoEncrypt},
 	})
 	c := zauth.ClaimsFromContext(ctx)
 	require.NoError(t, requirePerm(PermCryptoEncrypt)(ctx, "/x/y", c))

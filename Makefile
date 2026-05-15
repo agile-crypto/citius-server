@@ -22,7 +22,7 @@
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env run-auth-dev test-integration-auth test-integration-auth-e2e
+.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env test-integration-auth-e2e
 
 # Default goal: print help when `make` is run with no arguments.
 .DEFAULT_GOAL := help
@@ -190,19 +190,6 @@ zitadel-env: ## Print sourced env entries written by bootstrap.sh
 ZITADEL_ENV_FILE := $(ZITADEL_DIR)/citius-zitadel.env
 ZITADEL_TLS_CERT := $(ZITADEL_DIR)/certs/local.crt
 ZITADEL_TLS_KEY  := $(ZITADEL_DIR)/certs/local.key
-
-run-auth-dev: ## Run caas-server with Zitadel auth (sources citius-zitadel.env; run in a second terminal)
-	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run make zitadel-up first" && exit 1)
-	@test -f $(ZITADEL_TLS_CERT) || (echo "ERROR: $(ZITADEL_TLS_CERT) not found - run make zitadel-up first" && exit 1)
-	go build -o $(SERVER_BIN) $(SERVER_PKG)
-	env $$(grep -v '^#' $(ZITADEL_ENV_FILE) | sed 's/^export //') \
-	  TLS_CERT_FILE=$(abspath $(ZITADEL_TLS_CERT)) TLS_KEY_FILE=$(abspath $(ZITADEL_TLS_KEY)) \
-	  $(SERVER_BIN) -addr $(ADDR) -catalog $(CATALOG)
-
-test-integration-auth: ## Run Zitadel-tagged auth integration suite (auto-sources citius-zitadel.env; requires caas-server via run-auth-dev)
-	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run make zitadel-up first" && exit 1)
-	env $$(grep -v '^#' $(ZITADEL_ENV_FILE) | sed 's/^export //') \
-	  go test -tags 'integration zitadel' -count=1 ./test/integration/auth/...
 
 test-integration-auth-e2e: ## One-shot: build, start caas-server, run auth integration suite, tear server down
 	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run make zitadel-up first" && exit 1)

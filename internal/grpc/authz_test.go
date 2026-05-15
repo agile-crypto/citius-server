@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
+	"github.com/stretchr/testify/require"
 	citiusauth "github.ibm.com/citius/citius-server/internal/auth"
 	engerr "github.ibm.com/citius/citius-server/internal/errors"
-	"github.com/stretchr/testify/require"
+	zauth "github.ibm.com/citius/zitadel-grpc-auth"
 )
 
 const testOp engerr.Op = "grpc.authz.test"
@@ -54,7 +54,7 @@ func TestAuthorizePolicyName_DelegatesToPolicyClaims(t *testing.T) {
 	prev := citiusauth.SetEnabledForTest(true)
 	t.Cleanup(func() { citiusauth.SetEnabledForTest(prev) })
 	raw := map[string]any{
-		"sub": "svc-tester",
+		"sub":                                 "svc-tester",
 		citiusauth.ClaimAllowedPolicyPatterns: []any{"strict/*"},
 	}
 	ctx := zauth.ContextWithClaims(context.Background(), zauth.NewClaims(raw))

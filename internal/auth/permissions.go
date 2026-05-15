@@ -2,7 +2,7 @@ package auth
 
 // Permission keys.
 //
-// Mirrored verbatim in bootstrap/zitadel/setup-sdk/operations.go. The two
+// Mirrored verbatim in bootstrap/zitadel/setup-auth/operations.go. The two
 // must stay in sync; an integration test asserts the policy registry's
 // permission set is a subset of the bootstrap catalog.
 //

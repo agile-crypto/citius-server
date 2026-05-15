@@ -1,8 +1,8 @@
-// Module setup-sdk provisions the Citius project, per-RPC permission
+// Module setup-auth provisions the Citius project, per-RPC permission
 // catalog, and seed service users in a Zitadel instance brought up by
 // ../bootstrap.sh. It is a separate Go module so that bootstrap-only
 // dependencies do not leak into the citius-server build.
-module github.ibm.com/citius/citius-server/bootstrap/zitadel/setup-sdk
+module github.ibm.com/citius/citius-server/bootstrap/zitadel/setup-auth
 
 go 1.25.0
 

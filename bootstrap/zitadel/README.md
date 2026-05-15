@@ -79,10 +79,10 @@ make run
 | `.env.example` | Template; copy to `.env`. |
 | `.env` | **gitignored** — runtime config + generated secrets. |
 | `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `env`). |
-| `setup-sdk/` | Go program that calls the Zitadel admin SDK to provision the `citius-api` project, the per-RPC permission catalog, and the seed service users. |
+| `setup-auth/` | Go program that calls the Zitadel admin SDK to provision the `citius-api` project, the per-RPC permission catalog, and the seed service users. |
 | `pat/` | **gitignored** — bootstrap PAT mount target. |
 | `certs/` | **gitignored** — mkcert output. |
-| `generated-config.json` | **gitignored** — written by `setup-sdk`. |
+| `generated-config.json` | **gitignored** — written by `setup-auth`. |
 | `citius-zitadel.env` | **gitignored** — sourceable env file consumed by the server and the integration test suite. |
 
 ---

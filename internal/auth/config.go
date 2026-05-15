@@ -11,14 +11,14 @@ import (
 // Environment variable names. These are the contract surface between
 // bootstrap/zitadel/citius-zitadel.env and the Citius server.
 const (
-	EnvAuthEnabled       = "AUTH_ENABLED"
-	EnvIssuer            = "ZITADEL_ISSUER"
-	EnvIntrospectID      = "INTROSPECT_ID"
-	EnvIntrospectSecret  = "INTROSPECT_SECRET"
-	EnvInsecure          = "ZITADEL_INSECURE"
-	EnvCacheTTLSeconds   = "CACHE_TTL_SECONDS"
-	EnvCacheMaxEntries   = "CACHE_MAX_ENTRIES"
-	EnvExpectedAudience  = "EXPECTED_AUDIENCE"
+	EnvAuthEnabled      = "AUTH_ENABLED"
+	EnvIssuer           = "ZITADEL_ISSUER"
+	EnvIntrospectID     = "INTROSPECT_ID"
+	EnvIntrospectSecret = "INTROSPECT_SECRET"
+	EnvInsecure         = "ZITADEL_INSECURE"
+	EnvCacheTTLSeconds  = "CACHE_TTL_SECONDS"
+	EnvCacheMaxEntries  = "CACHE_MAX_ENTRIES"
+	EnvExpectedAudience = "EXPECTED_AUDIENCE"
 )
 
 // defaultCacheTTL and defaultCacheMaxEntries are Citius defaults applied

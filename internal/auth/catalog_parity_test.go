@@ -12,7 +12,7 @@ import (
 )
 
 // TestCatalogParity_BootstrapMatchesAuth asserts that the permission
-// catalog hard-coded in bootstrap/zitadel/setup-sdk/operations.go is the
+// catalog hard-coded in bootstrap/zitadel/setup-auth/operations.go is the
 // same set of strings as auth.AllPermissions(). The two live in
 // different Go modules so we cannot import the constants directly;
 // instead we parse the source file with go/parser and compare values.
@@ -20,14 +20,14 @@ import (
 // If this test fails, you almost certainly added a permission to one
 // side without touching the other. Update both AllPermissions() in
 // internal/auth/permissions.go and the perm* constants +
-// allCitiusPermissions() in bootstrap/zitadel/setup-sdk/operations.go.
+// allCitiusPermissions() in bootstrap/zitadel/setup-auth/operations.go.
 func TestCatalogParity_BootstrapMatchesAuth(t *testing.T) {
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
 	repoRoot := filepath.Join(filepath.Dir(thisFile), "..", "..")
-	opsPath := filepath.Join(repoRoot, "bootstrap", "zitadel", "setup-sdk", "operations.go")
+	opsPath := filepath.Join(repoRoot, "bootstrap", "zitadel", "setup-auth", "operations.go")
 
 	fset := token.NewFileSet()
 	f, err := parser.ParseFile(fset, opsPath, nil, parser.ParseComments)
@@ -75,10 +75,10 @@ func TestCatalogParity_BootstrapMatchesAuth(t *testing.T) {
 	}
 
 	if missing := diff(authSet, bootstrap); len(missing) > 0 {
-		t.Errorf("permissions in auth.AllPermissions() but not in bootstrap setup-sdk: %v", missing)
+		t.Errorf("permissions in auth.AllPermissions() but not in bootstrap setup-auth: %v", missing)
 	}
 	if extra := diff(bootstrap, authSet); len(extra) > 0 {
-		t.Errorf("permissions in bootstrap setup-sdk but not in auth.AllPermissions(): %v", extra)
+		t.Errorf("permissions in bootstrap setup-auth but not in auth.AllPermissions(): %v", extra)
 	}
 }
 

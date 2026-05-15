@@ -1,17 +1,17 @@
 // Package main is the Citius bootstrap CLI for Zitadel. It owns three
 // commands:
 //
-//	setup-sdk validate -acl PATH
-//	    Parse and validate an ACL file. No network calls, no PAT needed.
-//	    Use this in CI to fail a PR that introduces a typo'd permission.
+//	 setup-auth validate -acl PATH
+//	     Parse and validate an ACL file. No network calls, no PAT needed.
+//	     Use this in CI to fail a PR that introduces a typo'd permission.
 //
-//	setup-sdk apply    -acl PATH [-dry-run]
-//	    Bootstrap the citius-api project and per-RPC permission catalog
-//	    (idempotent), then onboard every user in the ACL. Writes the same
-//	    ../generated-config.json that bootstrap.sh slices into
-//	    citius-zitadel.env.
+//	 setup-auth apply    -acl PATH [-dry-run]
+//	     Bootstrap the citius-api project and per-RPC permission catalog
+//	     (idempotent), then onboard every user in the ACL. Writes the same
+//	     ../generated-config.json that bootstrap.sh slices into
+//	     citius-zitadel.env.
 //
-//	setup-sdk users    -acl PATH [-dry-run]
+//	 setup-auth users    -acl PATH [-dry-run]
 //	    Onboard users only, reusing the project_id from existing
 //	    ../generated-config.json. Use this for incremental ACL edits
 //	    when the project + catalog are already provisioned.
@@ -54,8 +54,8 @@ const (
 	// single subcommand invocation.
 	bootstrapTimeout = 2 * time.Minute
 
-	// defaultACL is resolved relative to the setup-sdk/ working directory
-	// (../acl.yaml). The CLI is normally invoked from setup-sdk/ via
+	// defaultACL is resolved relative to the setup-auth/ working directory
+	// (../acl.yaml). The CLI is normally invoked from setup-auth/ via
 	// bootstrap.sh; the operator can always override with -acl.
 	defaultACL = "../acl.yaml"
 
@@ -91,12 +91,12 @@ func main() {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `setup-sdk - Citius Zitadel bootstrap CLI
+	fmt.Fprintf(os.Stderr, `setup-auth - Citius Zitadel bootstrap CLI
 
 Usage:
-  setup-sdk validate -acl PATH
-  setup-sdk apply    -acl PATH [-dry-run]
-  setup-sdk users    -acl PATH [-dry-run]
+  setup-auth validate -acl PATH
+  setup-auth apply    -acl PATH [-dry-run]
+  setup-auth users    -acl PATH [-dry-run]
 
 Commands:
   validate   Parse and validate an ACL file. No network calls.

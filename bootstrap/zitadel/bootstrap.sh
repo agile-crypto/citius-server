@@ -211,23 +211,23 @@ wait_for_setup() {
 }
 
 # ---------------------------------------------------------------------------
-# setup-sdk invocation
+# setup-auth invocation
 # ---------------------------------------------------------------------------
 run_setup_sdk() {
-  log "running setup-sdk"
+  log "running setup-auth"
   # The SDK connects from the host, so the port it must dial is the
   # host-published HTTPS port (ZITADEL_HTTPS_PORT), not the container-
   # internal ZITADEL_EXTERNALPORT (which is the port the proxy
   # advertises in OIDC issuer URLs).
   (
-    cd "${SCRIPT_DIR}/setup-sdk"
+    cd "${SCRIPT_DIR}/setup-auth"
     ZITADEL_ADMIN_PAT="$(<"${PAT_DIR}/admin.pat")" \
     ZITADEL_DOMAIN="${ZITADEL_DOMAIN}" \
     ZITADEL_PORT="${ZITADEL_HTTPS_PORT:-${ZITADEL_EXTERNALPORT:-443}}" \
     ZITADEL_INSECURE="${ZITADEL_INSECURE:-false}" \
       go run . apply -acl "${ACL_FILE:-../acl.yaml}"
   )
-  [[ -f "$GENERATED_CONFIG" ]] || die "setup-sdk did not produce ${GENERATED_CONFIG}"
+  [[ -f "$GENERATED_CONFIG" ]] || die "setup-auth did not produce ${GENERATED_CONFIG}"
 }
 
 # ---------------------------------------------------------------------------
