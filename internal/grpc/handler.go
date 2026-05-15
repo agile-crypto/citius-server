@@ -8,16 +8,18 @@ import (
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	engerr "github.ibm.com/citius/citius-server/internal/errors"
+	"github.ibm.com/citius/citius-server/internal/policy"
 	"github.ibm.com/citius/citius-server/internal/service"
 	"github.ibm.com/citius/citius-server/internal/storage"
 	"google.golang.org/protobuf/proto"
 )
 
 // ScopeGateway is the per-request subset of *app.RequestScope used by the Handler.
-// *app.RequestScope satisfies this interface via its Keys() and Crypto() methods.
+// *app.RequestScope satisfies this interface via its Keys(), Crypto(), and Policy() methods.
 type ScopeGateway interface {
 	Keys() service.KeyOrchestrator
 	Crypto() service.CryptoOrchestrator
+	Policy() policy.Engine
 }
 
 // ServiceGateway abstracts app.Service for testability.
@@ -267,4 +269,104 @@ func extractVerifyScopeParams(sp any, req *crypto.VerifyRequest) {
 	default:
 		// nil or unrecognised variant.
 	}
+}
+
+// CreateCryptoPolicy handles the CreateCryptoPolicy RPC.
+//
+// Proto mapping:
+//
+//	messages.CreateCryptoPolicyRequest.name            => policy.Policy.Name() / PublicID()
+//	messages.CreateCryptoPolicyRequest.policy_document => policy.Policy.RulesJSON() (bytes)
+func (h *Handler) CreateCryptoPolicy(ctx context.Context, req *messagespb.CreateCryptoPolicyRequest) (*messagespb.CreateCryptoPolicyResponse, error) {
+	const createOp engerr.Op = handlerOp + ".CreateCryptoPolicy"
+
+	name := req.GetName()
+	if name == "" {
+		return nil, ToStatusError(engerr.New(ctx, createOp, engerr.CodeInvalidArgument, "name is required"))
+	}
+	if err := authorizePolicyName(ctx, createOp, name); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	p := policy.NewPolicy(name, name, []byte(req.GetPolicyDocument()))
+	if _, err := scope.Policy().CreatePolicy(ctx, p); err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, createOp, err))
+	}
+
+	return &messagespb.CreateCryptoPolicyResponse{
+		Success: true,
+		Message: "policy created",
+	}, nil
+}
+
+// ReadCryptoPolicy handles the ReadCryptoPolicy RPC.
+//
+// Proto mapping:
+//
+//	messages.ReadCryptoPolicyRequest.name => policy.Manager.GetPolicy(ctx, name)
+//	policy.Policy.RulesJSON()             => messages.ReadCryptoPolicyResponse.policy_document
+func (h *Handler) ReadCryptoPolicy(ctx context.Context, req *messagespb.ReadCryptoPolicyRequest) (*messagespb.ReadCryptoPolicyResponse, error) {
+	const readOp engerr.Op = handlerOp + ".ReadCryptoPolicy"
+
+	name := req.GetName()
+	if name == "" {
+		return nil, ToStatusError(engerr.New(ctx, readOp, engerr.CodeInvalidArgument, "name is required"))
+	}
+	if err := authorizePolicyName(ctx, readOp, name); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	p, err := scope.Policy().GetPolicy(ctx, name)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, readOp, err))
+	}
+
+	return &messagespb.ReadCryptoPolicyResponse{
+		Name:           p.Name(),
+		PolicyDocument: string(p.RulesJSON()),
+	}, nil
+}
+
+// UpdateCryptoPolicy handles the UpdateCryptoPolicy RPC.
+// Replaces the policy document entirely (no merge semantics).
+//
+// Proto mapping:
+//
+//	messages.UpdateCryptoPolicyRequest.name            => policy.Policy.Name()
+//	messages.UpdateCryptoPolicyRequest.policy_document => policy.Policy.RulesJSON()
+func (h *Handler) UpdateCryptoPolicy(ctx context.Context, req *messagespb.UpdateCryptoPolicyRequest) (*messagespb.UpdateCryptoPolicyResponse, error) {
+	const updateOp engerr.Op = handlerOp + ".UpdateCryptoPolicy"
+
+	name := req.GetName()
+	if name == "" {
+		return nil, ToStatusError(engerr.New(ctx, updateOp, engerr.CodeInvalidArgument, "name is required"))
+	}
+	if err := authorizePolicyName(ctx, updateOp, name); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	p := policy.NewPolicy(name, name, []byte(req.GetPolicyDocument()))
+	if err := scope.Policy().UpdatePolicy(ctx, p); err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, updateOp, err))
+	}
+
+	return &messagespb.UpdateCryptoPolicyResponse{
+		Success: true,
+		Message: "policy updated",
+	}, nil
 }

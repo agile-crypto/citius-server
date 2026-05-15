@@ -13,6 +13,7 @@ import (
 	engerr "github.ibm.com/citius/citius-server/internal/errors"
 	grpchandler "github.ibm.com/citius/citius-server/internal/grpc"
 	"github.ibm.com/citius/citius-server/internal/key"
+	"github.ibm.com/citius/citius-server/internal/policy"
 	"github.ibm.com/citius/citius-server/internal/service"
 	"github.ibm.com/citius/citius-server/internal/storage"
 	"google.golang.org/grpc/codes"
@@ -23,15 +24,17 @@ import (
 // Mock types
 // ============================================================================
 
-// mockScope implements the grpchandler.scopeGateway interface (Keys + Crypto).
+// mockScope implements the grpchandler.scopeGateway interface (Keys + Crypto + Policy).
 // We rely on the package-private interface being satisfied via duck-typing.
 type mockScope struct {
 	keys   service.KeyOrchestrator
 	crypto service.CryptoOrchestrator
+	policy policy.Engine
 }
 
 func (s *mockScope) Keys() service.KeyOrchestrator      { return s.keys }
 func (s *mockScope) Crypto() service.CryptoOrchestrator { return s.crypto }
+func (s *mockScope) Policy() policy.Engine              { return s.policy }
 
 // mockSvc implements the grpchandler.serviceGateway interface (ForStorage).
 // It returns the pre-built scope without touching storage.
@@ -43,6 +46,49 @@ func (s *mockSvc) ForStorage(_ context.Context, _ storage.Storage) (grpchandler.
 
 var _ grpchandler.ServiceGateway = (*mockSvc)(nil) // compile-time check
 var _ grpchandler.ScopeGateway = (*mockScope)(nil) // compile-time check
+
+// mockPolicyManager stubs policy.Manager. Only the three CRUD methods exercised
+// by CreateCryptoPolicy/ReadCryptoPolicy/UpdateCryptoPolicy are wired;
+// DeletePolicy and ListPolicies panic to catch accidental calls.
+type mockPolicyManager struct {
+	createFn func(ctx context.Context, p *policy.Policy) (*policy.Policy, error)
+	getFn    func(ctx context.Context, name string) (*policy.Policy, error)
+	updateFn func(ctx context.Context, p *policy.Policy) error
+}
+
+func (m *mockPolicyManager) CreatePolicy(ctx context.Context, p *policy.Policy) (*policy.Policy, error) {
+	if m.createFn != nil {
+		return m.createFn(ctx, p)
+	}
+	panic("mockPolicyManager.CreatePolicy: not implemented")
+}
+func (m *mockPolicyManager) GetPolicy(ctx context.Context, name string) (*policy.Policy, error) {
+	if m.getFn != nil {
+		return m.getFn(ctx, name)
+	}
+	panic("mockPolicyManager.GetPolicy: not implemented")
+}
+func (m *mockPolicyManager) UpdatePolicy(ctx context.Context, p *policy.Policy) error {
+	if m.updateFn != nil {
+		return m.updateFn(ctx, p)
+	}
+	panic("mockPolicyManager.UpdatePolicy: not implemented")
+}
+func (m *mockPolicyManager) DeletePolicy(_ context.Context, _ string) error {
+	panic("mockPolicyManager.DeletePolicy: not implemented")
+}
+func (m *mockPolicyManager) ListPolicies(_ context.Context) ([]*policy.Policy, error) {
+	panic("mockPolicyManager.ListPolicies: not implemented")
+}
+func (m *mockPolicyManager) ValidateOperation(_ context.Context, _ string, _ core.Operation, _, _ string) error {
+	panic("mockPolicyManager.ValidateOperation: not implemented")
+}
+func (m *mockPolicyManager) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyCreationSpec) error {
+	panic("mockPolicyManager.ValidateKeyCreation: not implemented")
+}
+func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ core.ScopeSpec) ([]string, error) {
+	panic("mockPolicyManager.AllowedTemplates: not implemented")
+}
 
 // mockKeyOrchestrator stubs KeyOrchestrator for tests.
 // Only createFn and readFn are wired; all other methods panic.
@@ -149,7 +195,11 @@ func (m *mockCryptoOps) GenerateRandom(_ context.Context, _ int) ([]byte, error)
 // ============================================================================
 
 func wireHandler(keys service.KeyOrchestrator, cr service.CryptoOrchestrator) *grpchandler.Handler {
-	svc := &mockSvc{scope: &mockScope{keys: keys, crypto: cr}}
+	return wireHandlerWithPolicy(keys, cr, nil)
+}
+
+func wireHandlerWithPolicy(keys service.KeyOrchestrator, cr service.CryptoOrchestrator, pm policy.Engine) *grpchandler.Handler {
+	svc := &mockSvc{scope: &mockScope{keys: keys, crypto: cr, policy: pm}}
 	return grpchandler.New(svc, nil)
 }
 
@@ -168,7 +218,7 @@ func TestHandler_CreateKey_Success(t *testing.T) {
 				t.Errorf("expected template ecdsa-p256-sha256-der, got %s", spec.TemplateID)
 			}
 			return key.NewKey(&storepb.Key{
-				PublicId: "key_123",
+				PublicId: spec.Name,
 				Name:     spec.Name,
 			}), nil
 		},
@@ -184,8 +234,8 @@ func TestHandler_CreateKey_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateKey handler: %v", err)
 	}
-	if resp.GetKeyMetadata().GetName() != "key_123" {
-		t.Errorf("expected key public ID key_123, got %s", resp.GetKeyMetadata().GetName())
+	if resp.GetKeyMetadata().GetName() != "my-key" {
+		t.Errorf("expected key name my-key, got %s", resp.GetKeyMetadata().GetName())
 	}
 	if !resp.GetSuccess() {
 		t.Error("expected Success: true in CreateKeyResponse")
