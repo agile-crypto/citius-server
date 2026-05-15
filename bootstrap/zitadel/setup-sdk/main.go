@@ -1,22 +1,37 @@
-// Package main provisions the Citius project, per-RPC permission catalog,
-// pre-userinfo action, API application, and seed service users in a Zitadel
-// instance brought up by ../bootstrap.sh.
+// Package main is the Citius bootstrap CLI for Zitadel. It owns three
+// commands:
 //
-// It is a separate Go module so that bootstrap-only dependencies
-// (godotenv, the Zitadel admin SDK) do not pollute the main citius-server
-// go.mod. It is run once after `bootstrap.sh up` and is idempotent.
+//	setup-sdk validate -acl PATH
+//	    Parse and validate an ACL file. No network calls, no PAT needed.
+//	    Use this in CI to fail a PR that introduces a typo'd permission.
 //
-//	cd bootstrap/zitadel/setup-sdk
-//	go run .
+//	setup-sdk apply    -acl PATH [-dry-run]
+//	    Bootstrap the citius-api project and per-RPC permission catalog
+//	    (idempotent), then onboard every user in the ACL. Writes the same
+//	    ../generated-config.json that bootstrap.sh slices into
+//	    citius-zitadel.env.
 //
-// On success the program writes ../generated-config.json with the project,
-// app credentials, and per-user client_id / client_secret values that
-// bootstrap.sh slices into ../citius-zitadel.env.
+//	setup-sdk users    -acl PATH [-dry-run]
+//	    Onboard users only, reusing the project_id from existing
+//	    ../generated-config.json. Use this for incremental ACL edits
+//	    when the project + catalog are already provisioned.
+//
+// Required environment for `apply` and `users`:
+//
+//	ZITADEL_ADMIN_PAT       - PAT with org-owner / project-owner scope
+//	ZITADEL_DOMAIN          - default citius-auth.localhost
+//	ZITADEL_PORT            - default 443
+//	ZITADEL_INSECURE        - "true" to disable TLS (local-only)
+//
+// The CLI is a separate Go module (see go.mod) so bootstrap-only deps
+// (yaml, the Zitadel admin SDK) don't pollute the main citius-server build.
 package main
 
 import (
 	"context"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -35,14 +50,112 @@ const (
 	// the Citius server uses for token introspection.
 	projectName = "citius-api"
 
-	// bootstrapTimeout bounds the total provisioning attempt.
+	// bootstrapTimeout bounds the total provisioning attempt for any
+	// single subcommand invocation.
 	bootstrapTimeout = 2 * time.Minute
+
+	// defaultACL is resolved relative to the setup-sdk/ working directory
+	// (../acl.yaml). The CLI is normally invoked from setup-sdk/ via
+	// bootstrap.sh; the operator can always override with -acl.
+	defaultACL = "../acl.yaml"
+
+	// generatedConfigPath is the contract with bootstrap.sh.
+	generatedConfigPath = "../generated-config.json"
 )
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmicroseconds)
 
+	if len(os.Args) < 2 {
+		usage()
+		os.Exit(2)
+	}
+	cmd := os.Args[1]
+	args := os.Args[2:]
+
+	switch cmd {
+	case "validate":
+		os.Exit(runValidate(args))
+	case "apply":
+		os.Exit(runApply(args))
+	case "users":
+		os.Exit(runUsers(args))
+	case "-h", "--help", "help":
+		usage()
+		os.Exit(0)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command %q\n\n", cmd)
+		usage()
+		os.Exit(2)
+	}
+}
+
+func usage() {
+	fmt.Fprintf(os.Stderr, `setup-sdk - Citius Zitadel bootstrap CLI
+
+Usage:
+  setup-sdk validate -acl PATH
+  setup-sdk apply    -acl PATH [-dry-run]
+  setup-sdk users    -acl PATH [-dry-run]
+
+Commands:
+  validate   Parse and validate an ACL file. No network calls.
+  apply      Bootstrap project + RPC catalog, then onboard users from ACL.
+  users      Onboard users from ACL against an already-bootstrapped project.
+
+Environment (apply, users):
+  ZITADEL_ADMIN_PAT  required - PAT with org/project owner scope
+  ZITADEL_DOMAIN     default citius-auth.localhost
+  ZITADEL_PORT       default 443
+  ZITADEL_INSECURE   "true" to disable TLS (local-only)
+
+Default ACL path: %s
+`, defaultACL)
+}
+
+// ---------------------------------------------------------------------------
+// validate
+// ---------------------------------------------------------------------------
+
+func runValidate(args []string) int {
+	fs := flag.NewFlagSet("validate", flag.ContinueOnError)
+	aclPath := fs.String("acl", defaultACL, "path to ACL file")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	users, err := loadACL(*aclPath)
+	if err != nil {
+		log.Printf("validate: %v", err)
+		return 1
+	}
+	log.Printf("ACL OK: %d user(s) in %s", len(users), *aclPath)
+	for _, u := range users {
+		log.Printf("  %s: %d permission(s), key_allow=%v, policy_allow=%v",
+			u.Username, len(u.Permissions),
+			u.KeyAccess.AllowedKeyPatterns, u.PolicyAccess.AllowedPolicyPatterns)
+	}
+	return 0
+}
+
+// ---------------------------------------------------------------------------
+// apply
+// ---------------------------------------------------------------------------
+
+func runApply(args []string) int {
+	fs := flag.NewFlagSet("apply", flag.ContinueOnError)
+	aclPath := fs.String("acl", defaultACL, "path to ACL file")
+	dryRun := fs.Bool("dry-run", false, "validate ACL + connect, but skip mutations")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
 	loadEnv()
+	users, err := loadACL(*aclPath)
+	if err != nil {
+		log.Printf("apply: %v", err)
+		return 1
+	}
 
 	pat := mustEnv("ZITADEL_ADMIN_PAT")
 	domain := envOr("ZITADEL_DOMAIN", "citius-auth.localhost")
@@ -53,16 +166,19 @@ func main() {
 	defer cancel()
 
 	bs, err := admin.NewClient(ctx, admin.Config{
-		Domain:    domain,
-		Port:      port,
-		Insecure:  insecure,
-		PAT:       pat,
-		Namespace: claimNamespace,
+		Domain: domain, Port: port, Insecure: insecure, PAT: pat, Namespace: claimNamespace,
 	})
 	if err != nil {
-		log.Fatalf("admin.NewClient (bootstrap): %v", err)
+		log.Printf("admin.NewClient (bootstrap): %v", err)
+		return 1
 	}
 	defer func() { _ = bs.Close() }()
+
+	if *dryRun {
+		log.Printf("dry-run: would bootstrap project %q with %d operations and onboard %d user(s)",
+			projectName, len(citiusOperations()), len(users))
+		return 0
+	}
 
 	res, err := bs.Bootstrap(ctx, admin.BootstrapInput{
 		ProjectName:    projectName,
@@ -70,57 +186,158 @@ func main() {
 		Operations:     citiusOperations(),
 	})
 	if err != nil {
-		log.Fatalf("admin.Bootstrap: %v", err)
+		log.Printf("admin.Bootstrap: %v", err)
+		return 1
 	}
 	log.Printf("project provisioned: id=%s api_app_client_id=%s", res.ProjectID, res.APIApp.ClientID)
 
-	on, err := admin.NewClient(ctx, admin.Config{
-		Domain:    domain,
-		Port:      port,
-		Insecure:  insecure,
-		PAT:       pat,
-		Namespace: claimNamespace,
-		ProjectID: res.ProjectID,
-	})
-	if err != nil {
-		log.Fatalf("admin.NewClient (onboard): %v", err)
-	}
-	defer func() { _ = on.Close() }()
-
-	users := map[string]admin.OnboardResult{}
-	for _, spec := range citiusUsers() {
-		u, err := on.Onboard(ctx, spec)
-		if err != nil {
-			log.Fatalf("onboard %s: %v", spec.Username, err)
-		}
-		log.Printf("onboarded service user: %s (client_id=%s)", spec.Username, u.ClientID)
-		users[spec.Username] = *u
+	onboarded, rc := onboardAll(ctx, domain, port, insecure, pat, res.ProjectID, users)
+	if rc != 0 {
+		return rc
 	}
 
 	out := generatedConfig{
 		ProjectID: res.ProjectID,
 		ActionID:  res.ActionID,
 		APIApp:    res.APIApp,
-		Users:     users,
+		Users:     onboarded,
 	}
-	data, err := json.MarshalIndent(out, "", "  ")
+	if err := writeGeneratedConfig(out); err != nil {
+		log.Printf("write %s: %v", generatedConfigPath, err)
+		return 1
+	}
+	log.Printf("wrote %s", generatedConfigPath)
+	return 0
+}
+
+// ---------------------------------------------------------------------------
+// users
+// ---------------------------------------------------------------------------
+
+func runUsers(args []string) int {
+	fs := flag.NewFlagSet("users", flag.ContinueOnError)
+	aclPath := fs.String("acl", defaultACL, "path to ACL file")
+	dryRun := fs.Bool("dry-run", false, "validate ACL + connect, but skip mutations")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	loadEnv()
+	users, err := loadACL(*aclPath)
 	if err != nil {
-		log.Fatalf("marshal generated-config.json: %v", err)
+		log.Printf("users: %v", err)
+		return 1
 	}
-	outPath := filepath.Join("..", "generated-config.json")
-	if err := os.WriteFile(outPath, data, 0o600); err != nil {
-		log.Fatalf("write %s: %v", outPath, err)
+
+	existing, err := readGeneratedConfig()
+	if err != nil {
+		log.Printf("users: %v (run `apply` first to bootstrap the project)", err)
+		return 1
 	}
-	log.Printf("wrote %s", outPath)
+
+	pat := mustEnv("ZITADEL_ADMIN_PAT")
+	domain := envOr("ZITADEL_DOMAIN", "citius-auth.localhost")
+	port := envOr("ZITADEL_PORT", "443")
+	insecure := os.Getenv("ZITADEL_INSECURE") == "true"
+
+	ctx, cancel := context.WithTimeout(context.Background(), bootstrapTimeout)
+	defer cancel()
+
+	if *dryRun {
+		log.Printf("dry-run: would onboard %d user(s) into project %s", len(users), existing.ProjectID)
+		return 0
+	}
+
+	onboarded, rc := onboardAll(ctx, domain, port, insecure, pat, existing.ProjectID, users)
+	if rc != 0 {
+		return rc
+	}
+
+	// Merge over any users that disappeared from the ACL but stay in the
+	// file. We deliberately do NOT delete users from Zitadel here — that
+	// is destructive and should be an explicit operator action.
+	if existing.Users == nil {
+		existing.Users = map[string]admin.OnboardResult{}
+	}
+	for k, v := range onboarded {
+		existing.Users[k] = v
+	}
+	if err := writeGeneratedConfig(*existing); err != nil {
+		log.Printf("write %s: %v", generatedConfigPath, err)
+		return 1
+	}
+	log.Printf("wrote %s", generatedConfigPath)
+	return 0
+}
+
+// ---------------------------------------------------------------------------
+// shared
+// ---------------------------------------------------------------------------
+
+// onboardAll opens an org-scoped admin client (ProjectID set) and runs
+// Onboard for each user. On the first failure it logs and returns a
+// non-zero rc; the partial result is discarded by the caller because a
+// half-provisioned ACL is worse than none.
+func onboardAll(
+	ctx context.Context,
+	domain, port string,
+	insecure bool,
+	pat, projectID string,
+	users []admin.OnboardInput,
+) (map[string]admin.OnboardResult, int) {
+	on, err := admin.NewClient(ctx, admin.Config{
+		Domain: domain, Port: port, Insecure: insecure, PAT: pat,
+		Namespace: claimNamespace, ProjectID: projectID,
+	})
+	if err != nil {
+		log.Printf("admin.NewClient (onboard): %v", err)
+		return nil, 1
+	}
+	defer func() { _ = on.Close() }()
+
+	out := make(map[string]admin.OnboardResult, len(users))
+	for _, spec := range users {
+		u, err := on.Onboard(ctx, spec)
+		if err != nil {
+			log.Printf("onboard %s: %v", spec.Username, err)
+			return nil, 1
+		}
+		log.Printf("onboarded service user: %s (client_id=%s)", spec.Username, u.ClientID)
+		out[spec.Username] = *u
+	}
+	return out, 0
 }
 
 // generatedConfig is the on-disk shape of generated-config.json.
-// bootstrap.sh slices it into citius-zitadel.env.
+// bootstrap.sh slices this file into citius-zitadel.env.
 type generatedConfig struct {
 	ProjectID string                         `json:"project_id"`
 	ActionID  string                         `json:"action_id"`
 	APIApp    admin.AppCredentials           `json:"api_app"`
 	Users     map[string]admin.OnboardResult `json:"users"`
+}
+
+func writeGeneratedConfig(c generatedConfig) error {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+	return os.WriteFile(generatedConfigPath, data, 0o600)
+}
+
+func readGeneratedConfig() (*generatedConfig, error) {
+	raw, err := os.ReadFile(generatedConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("read %s: %w", generatedConfigPath, err)
+	}
+	var c generatedConfig
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", generatedConfigPath, err)
+	}
+	if c.ProjectID == "" {
+		return nil, fmt.Errorf("%s has empty project_id", generatedConfigPath)
+	}
+	return &c, nil
 }
 
 // loadEnv loads ../.env if present, falling back to ./.env. Missing file is

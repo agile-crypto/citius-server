@@ -1,0 +1,83 @@
+# Citius access-control list, applied by bootstrap/zitadel/setup-sdk.
+#
+# This file is the source of truth for which Zitadel service users exist,
+# what gRPC permissions they hold, and which key/policy name patterns they
+# may touch. Apply with:
+#
+#   cd bootstrap/zitadel/setup-sdk
+#   go run . apply -acl ../acl.yaml
+#
+# Or validate without any network calls:
+#
+#   go run . validate -acl ../acl.yaml
+#
+# The RPC -> permission mapping itself (which RPC requires which permission)
+# lives in setup-sdk/operations.go because it is tied to the proto compile-
+# time invariant and is verified against the generated *_grpc.pb.go method
+# constants by an integration test. Do not duplicate it here.
+#
+# Permission key reference (use "*" below to grant all of them):
+#   citius:keys:create        - CreateKey, DeleteKey, ImportKey
+#   citius:keys:rotate        - RotateKey, TransformKey, MigrateKey
+#   citius:keys:update-policy - UpdateKeyPolicy
+#   citius:keys:read          - ReadKey, ListKeys, ValidateKeyOperation, ExportKey
+#   citius:crypto:encrypt     - Encrypt*, EncryptMessage*
+#   citius:crypto:decrypt     - Decrypt*, DecryptMessage*
+#   citius:crypto:sign        - Sign*, DigestSign, SignMessage*
+#   citius:crypto:verify      - Verify*, DigestVerify, VerifyMessage*
+#   citius:crypto:misc        - Digest*, Xof*, MAC, KDF, Wrap, KEM, Random
+#   citius:policy:read        - ReadCryptoPolicy, ListCryptoPolicies, EvaluatePolicy
+#   citius:policy:write       - CreateCryptoPolicy, UpdateCryptoPolicy, DeleteCryptoPolicy
+#   citius:discovery:read     - ListTemplates, GetTemplate, ListScopes
+#   citius:provider:read      - List/Get providers and instances
+#   citius:provider:write     - Register/Update/Delete provider instance
+#
+# key_access / policy_access patterns are glob-style (* matches any segment).
+# An empty `allow:` list means the user has NO key/policy access at all
+# (denies don't grant). Omit the section entirely to skip emitting any
+# resource-scoping claim for that user (server treats it as unscoped).
+
+version: 1
+
+users:
+  # Catch-all admin: full grant + access to every key and policy.
+  - username: svc-admin
+    display_name: "Citius admin (full grant)"
+    permissions: ["*"]
+    key_access:
+      allow: ["*"]
+    policy_access:
+      allow: ["*"]
+
+  # Integration-test rig: scoped to itest-* keys and policies.
+  - username: svc-tester
+    display_name: "Citius integration tester"
+    permissions:
+      - citius:keys:create
+      - citius:keys:rotate
+      - citius:keys:update-policy
+      - citius:keys:read
+      - citius:crypto:encrypt
+      - citius:crypto:decrypt
+      - citius:crypto:sign
+      - citius:crypto:verify
+      - citius:policy:read
+    key_access:
+      allow: ["itest-*"]
+    policy_access:
+      allow: ["itest-*"]
+
+  # Observers: read-only across every read permission.
+  - username: svc-readonly
+    display_name: "Citius read-only consumer"
+    permissions:
+      - citius:keys:read
+      - citius:policy:read
+      - citius:discovery:read
+      - citius:provider:read
+
+  # Negative-path control: authenticated but holds no permissions.
+  # Integration suite asserts requests from this user are rejected with
+  # PermissionDenied (not Unauthenticated).
+  - username: svc-noperm
+    display_name: "Citius negative-path user (no permissions)"
