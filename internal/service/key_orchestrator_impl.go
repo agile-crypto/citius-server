@@ -204,7 +204,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 
 func (r *keyOrchestrator) ReadKey(ctx context.Context, publicID string) (*key.Key, error) {
 	const op errors.Op = "service.(keyOrchestrator).ReadKey"
-	k, err := r.repo.GetKey(ctx, publicID)
+	k, err := r.repo.GetKeyById(ctx, publicID)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -233,7 +233,7 @@ func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyID string, 
 	const op errors.Op = "service.(keyOrchestrator).GetKeyWithMaterial"
 
 	// 1. Fetch key metadata.
-	k, err := r.repo.GetKey(ctx, keyID)
+	k, err := r.repo.GetKeyById(ctx, keyID)
 	if err != nil {
 		return nil, nil, errors.Wrap(ctx, op, err)
 	}

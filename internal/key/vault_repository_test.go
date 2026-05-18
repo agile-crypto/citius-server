@@ -88,7 +88,7 @@ func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	got, err := r.GetKey(ctx, "key_01HXYZ")
+	got, err := r.GetKeyById(ctx, "key_01HXYZ")
 	if err != nil {
 		t.Fatalf("GetKey: %v", err)
 	}
@@ -156,7 +156,7 @@ func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
 }
 func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 	r := repoFn()
-	_, err := r.GetKey(context.Background(), "key_doesnotexist")
+	_, err := r.GetKeyById(context.Background(), "key_doesnotexist")
 	if err == nil {
 		t.Fatal("expected error for missing key")
 	}
@@ -190,10 +190,10 @@ func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "original", "signature")
 
-	got, _ := r.GetKey(ctx, "key_01HXYZ")
+	got, _ := r.GetKeyById(ctx, "key_01HXYZ")
 	got.Name = "mutated"
 
-	got2, _ := r.GetKey(ctx, "key_01HXYZ")
+	got2, _ := r.GetKeyById(ctx, "key_01HXYZ")
 	if got2.Name != "original" {
 		t.Errorf("stored key was mutated: got %q want %q", got2.Name, "original")
 	}
@@ -211,7 +211,7 @@ func Test_VaultRepository_DeleteKey_success(t *testing.T) {
 	if err := r.DeleteKey(ctx, "key_01HXYZ"); err != nil {
 		t.Fatalf("DeleteKey: %v", err)
 	}
-	_, err := r.GetKey(ctx, "key_01HXYZ")
+	_, err := r.GetKeyById(ctx, "key_01HXYZ")
 	if !errors.IsKeyNotFound(err) {
 		t.Errorf("expected KeyNotFound after delete, got: %v", err)
 	}
@@ -240,12 +240,12 @@ func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	require.NoError(err, "error creating key version 3")
 	err = r.AddVersion(ctx, vNext2)
 	require.NoError(err, "got error when adding second version")
-	k, err := r.GetKey(ctx, kid)
+	k, err := r.GetKeyById(ctx, kid)
 	require.NoErrorf(err, "error when getting key with id=%s", kid)
 	assert.Equal(uint32(v2.Version+1), k.CurrentVersion, "current version should be 2")
 	err = r.DeleteKey(ctx, "key_01HXYZ")
 	require.NoError(err, "DeleteKey should not return error")
-	_, err = r.GetKey(ctx, "key_01HXYZ")
+	_, err = r.GetKeyById(ctx, "key_01HXYZ")
 	require.True(errors.IsKeyNotFound(err), "expected KeyNotFound after delete, got: %v", err)
 	// Both versions should be gone.
 	_, err = r.GetVersion(ctx, "key_01HXYZ", 1)
@@ -338,7 +338,7 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 		t.Fatalf("UpdateKey: %v", err)
 	}
 
-	got, err := r.GetKey(ctx, "key_01HXYZ")
+	got, err := r.GetKeyById(ctx, "key_01HXYZ")
 	if err != nil {
 		t.Fatalf("GetKey after update: %v", err)
 	}
@@ -452,6 +452,137 @@ func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 	}
 }
 
+// ============================================================================
+// GetKeyByName
+// ============================================================================
+
+func Test_VaultRepository_GetKeyByName_existing(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "my-key", "signature")
+
+	got, err := r.GetKeyByName(ctx, "my-key")
+	require.NoError(t, err)
+	assert.Equal(t, "key_01", got.PublicId)
+	assert.Equal(t, "my-key", got.Name)
+}
+
+func Test_VaultRepository_GetKeyByName_notFound(t *testing.T) {
+	r := repoFn()
+	_, err := r.GetKeyByName(context.Background(), "does-not-exist")
+	require.Error(t, err)
+	require.True(t, errors.IsKeyNotFound(err), "expected KeyNotFound, got: %v", err)
+}
+
+func Test_VaultRepository_GetKeyByName_multipleKeys_returnsCorrectOne(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "alpha", "signature")
+	mustCreateKey(t, r, "key_02", "beta", "signature")
+
+	got, err := r.GetKeyByName(ctx, "beta")
+	require.NoError(t, err)
+	assert.Equal(t, "key_02", got.PublicId)
+}
+
+// ============================================================================
+// Name-to-ID mapping: storage and caching through key lifecycle
+// ============================================================================
+
+func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "signing-key", "signature")
+
+	updated := NewKey(&storepb.Key{
+		PublicId:       "key_01",
+		Name:           "signing-key",
+		Primitive:      "signature",
+		Status:         storepb.KeyStatus_KEY_STATUS_SUSPENDED,
+		CurrentVersion: 1,
+	})
+	require.NoError(t, r.UpdateKey(ctx, updated))
+
+	got, err := r.GetKeyByName(ctx, "signing-key")
+	require.NoError(t, err)
+	assert.Equal(t, "key_01", got.PublicId)
+	assert.Equal(t, storepb.KeyStatus_KEY_STATUS_SUSPENDED, got.GetStatus())
+}
+
+func Test_VaultRepository_GetKeyByName_afterDeletion_notFound(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "signing-key", "signature")
+
+	require.NoError(t, r.DeleteKey(ctx, "key_01"))
+
+	_, err := r.GetKeyByName(ctx, "signing-key")
+	require.Error(t, err)
+	require.True(t, errors.IsKeyNotFound(err), "expected KeyNotFound after deletion, got: %v", err)
+}
+
+func Test_VaultRepository_CreateKey_duplicateName_notAllowed(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "signing-key", "signature")
+
+	scopeSpec := &core.ScopeSpec{Primitive: core.PrimitiveSignature, Scope: core.SignatureScopeStandard}
+	k2, v2 := mustNewCreateKeyInputs(t, ctx, "key_02", "signing-key", "template-id", "software", "policy-test", scopeSpec, 1, []byte("other-key-bytes"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	err := r.CreateKey(ctx, k2, v2, WithInitialVersion(1))
+	require.Error(t, err)
+	require.True(t, errors.IsAlreadyExists(err), "expected AlreadyExists for duplicate name, got: %v", err)
+}
+
+func Test_VaultRepository_CreateKey_sameNameAllowedAfterDeletion(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "signing-key", "signature")
+	require.NoError(t, r.DeleteKey(ctx, "key_01"))
+
+	scopeSpec := &core.ScopeSpec{Primitive: core.PrimitiveSignature, Scope: core.SignatureScopeStandard}
+	k2, v2 := mustNewCreateKeyInputs(t, ctx, "key_02", "signing-key", "template-id", "software", "policy-test", scopeSpec, 1, []byte("new-key-bytes"), storepb.KeyStatus_KEY_STATUS_ACTIVE)
+	require.NoError(t, r.CreateKey(ctx, k2, v2, WithInitialVersion(1)))
+
+	got, err := r.GetKeyByName(ctx, "signing-key")
+	require.NoError(t, err)
+	assert.Equal(t, "key_02", got.PublicId)
+}
+
+func Test_VaultRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "original-name", "signature")
+
+	renamed := NewKey(&storepb.Key{
+		PublicId:       "key_01",
+		Name:           "new-name",
+		Primitive:      "signature",
+		Status:         storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		CurrentVersion: 1,
+	})
+	err := r.UpdateKey(ctx, renamed)
+	require.Error(t, err)
+	require.True(t, errors.IsInvalidArgument(err), "expected InvalidArgument for name change, got: %v", err)
+}
+
+func Test_VaultRepository_GetKeyByName_afterAddVersion_returnsUpdatedCurrentVersion(t *testing.T) {
+	r := repoFn()
+	ctx := context.Background()
+	mustCreateKey(t, r, "key_01", "my-key", "signature")
+
+	v2, err := newVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key-v2-bytes"), WithStatus(storepb.KeyStatus_KEY_STATUS_ACTIVE))
+	require.NoError(t, err)
+	require.NoError(t, r.AddVersion(ctx, v2))
+
+	got, err := r.GetKeyByName(ctx, "my-key")
+	require.NoError(t, err)
+	assert.Equal(t, uint32(2), got.CurrentVersion)
+
+	current, err := r.GetCurrentVersion(ctx, got.PublicId)
+	require.NoError(t, err)
+	assert.Equal(t, uint32(2), current.Version)
+}
+
 func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
 	testCases := []struct {
 		keyID              string
@@ -487,5 +618,4 @@ func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
 			}
 		})
 	}
-
 }
