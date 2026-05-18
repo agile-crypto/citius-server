@@ -22,28 +22,36 @@ type Option func(*options)
 
 // options = how options are represented
 type options struct {
-	withLock            *sync.RWMutex
-	withTemplateID      string
-	withStatus          store.KeyStatus
-	withLabels          map[string]string
-	withName            string
-	withWrappingKeyID   string
-	withPublicID        string
-	withDigestAlgorithm string
-	withCurrentVersion  uint32
-	withInitialVersion  uint32
-	withVetForWrite     bool
+	withLock                 *sync.RWMutex
+	withTemplateID           string
+	withStatus               store.KeyStatus
+	withLabels               map[string]string
+	withName                 string
+	withWrappingKeyID        string
+	withPublicID             string
+	withDigestAlgorithm      string
+	withCurrentVersion       uint32
+	withInitialVersion       uint32
+	withVetForWrite          bool
+	withKeyNameToIdFunc      func(name string) (string, error)
+	withKeyNameToIdCacheSize int
+	withCacheFactoryFunc     func(size int) cache[string, string]
 }
 
 func getDefaultOptions() options {
 	return options{
-		withLock:            &sync.RWMutex{},
-		withStatus:          store.KeyStatus_KEY_STATUS_UNSPECIFIED,
-		withLabels:          make(map[string]string),
-		withDigestAlgorithm: "HMAC-SHA256",
-		withCurrentVersion:  0,
-		withVetForWrite:     true, // default: vet for write
-		withInitialVersion:  1,
+		withLock:                 &sync.RWMutex{},
+		withStatus:               store.KeyStatus_KEY_STATUS_UNSPECIFIED,
+		withLabels:               make(map[string]string),
+		withDigestAlgorithm:      "HMAC-SHA256",
+		withCurrentVersion:       0,
+		withVetForWrite:          true, // default: vet for write
+		withInitialVersion:       1,
+		withKeyNameToIdFunc:      nil,
+		withKeyNameToIdCacheSize: 1000,
+		withCacheFactoryFunc: func(size int) cache[string, string] {
+			return newLRUCache[string, string](size)
+		},
 	}
 }
 
@@ -109,5 +117,23 @@ func WithInitialVersion(version uint32) Option {
 func WithVetForWrite(vet bool) Option {
 	return func(o *options) {
 		o.withVetForWrite = vet
+	}
+}
+
+func WithKeyNameToIdFunc(f func(name string) (string, error)) Option {
+	return func(o *options) {
+		o.withKeyNameToIdFunc = f
+	}
+}
+
+func WithKeyNameToIdCacheSize(size int) Option {
+	return func(o *options) {
+		o.withKeyNameToIdCacheSize = size
+	}
+}
+
+func WithCacheFactoryFunc(f func(size int) cache[string, string]) Option {
+	return func(o *options) {
+		o.withCacheFactoryFunc = f
 	}
 }
