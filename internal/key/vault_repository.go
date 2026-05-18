@@ -19,15 +19,15 @@ type VaultRepository struct {
 	keys        logical.Storage // Storage view for keys (prefix: "key/")
 	keyVersions logical.Storage // Storage view for key versions (prefix: "key_version/")
 
-	keyNameToId      logical.Storage       // storage view for name to id mapping (prefix: "key_name_to_id/")
-	keyNameToIdCache cache[string, string] // cache for name to id mapping
+	keyNameToID      logical.Storage       // storage view for name to id mapping (prefix: "key_name_to_id/")
+	keyNameToIDCache cache[string, string] // cache for name to id mapping
 	// optional override function to resolve key name to public ID. Defaults to nil, in which case a dedicated storage is used.
-	keyNameToIdFunc func(name string) (string, error)
+	keyNameToIDFunc func(name string) (string, error)
 }
 
 const keyStoragePrefix string = "key/"
 const keyVersionStoragePrefix string = "key_version/"
-const keyNameToIdStoragePrefix string = "key_name_to_id/"
+const keyNameToIDStoragePrefix string = "key_name_to_id/"
 const versionSep string = ":"
 
 var _ Repository = (*VaultRepository)(nil)
@@ -38,13 +38,13 @@ var _ Repository = (*VaultRepository)(nil)
 //
 // Available options:
 //   - withLock (optional): defaults to a new RWMutex. Supply a shared lock to coordinate with other repositories.
-//   - withKeyNameToIdFunc (optional): overwrites the default name to id mapping behavior.
+//   - withKeyNameToIDFunc (optional): overwrites the default name to id mapping behavior.
 //     By default, the repository stores a mapping from key name to public ID in vault, and uses that for name-based lookups.
 //     If this function is provided, it is used to resolve key names to IDs instead, and the repository does not store the mapping in vault.
 //     This can be used to integrate with an external system of record for key name to ID mapping, for example.
-//   - withKeyNameToIdCacheSize (optional): cache size for name to id mapping; only used if withKeyNameToIdFunc is nil.
+//   - withKeyNameToIDCacheSize (optional): cache size for name to id mapping; only used if withKeyNameToIDFunc is nil.
 //   - withCacheFactoryFunc (optional): factory function for creating the name to id cache. Defaults to an in-memory LRU
-//     cache. Only used if withKeyNameToIdFunc is nil.
+//     cache. Only used if withKeyNameToIDFunc is nil.
 //
 // Note about name to id mapping storage and caching:
 //   - Mapping is cached when it is stored for the first time.
@@ -61,36 +61,36 @@ func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Opt
 	keyVersions := logical.NewStorageView(storage, keyVersionStoragePrefix)
 	opts := getOpts(opt...)
 
-	if opts.withKeyNameToIdFunc != nil {
+	if opts.withKeyNameToIDFunc != nil {
 		return &VaultRepository{
 			mu:               opts.withLock,
 			keys:             keys,
 			keyVersions:      keyVersions,
-			keyNameToIdFunc:  opts.withKeyNameToIdFunc,
-			keyNameToId:      nil,
-			keyNameToIdCache: nil,
+			keyNameToIDFunc:  opts.withKeyNameToIDFunc,
+			keyNameToID:      nil,
+			keyNameToIDCache: nil,
 		}, nil
 	}
 
-	cache := opts.withCacheFactoryFunc(opts.withKeyNameToIdCacheSize)
-	keyNameToIdStorage := logical.NewStorageView(storage, keyNameToIdStoragePrefix)
+	cache := opts.withCacheFactoryFunc(opts.withKeyNameToIDCacheSize)
+	keyNameToIDStorage := logical.NewStorageView(storage, keyNameToIDStoragePrefix)
 	return &VaultRepository{
 		mu:               opts.withLock,
 		keys:             keys,
 		keyVersions:      keyVersions,
-		keyNameToIdFunc:  nil,
-		keyNameToId:      keyNameToIdStorage,
-		keyNameToIdCache: cache,
+		keyNameToIDFunc:  nil,
+		keyNameToID:      keyNameToIDStorage,
+		keyNameToIDCache: cache,
 	}, nil
 
 }
 
-// storeKeyNameToId stores the mapping from key name to public ID in storage, if a custom name to id function is not provided.
+// storeKeyNameToID stores the mapping from key name to public ID in storage, if a custom name to id function is not provided.
 // If a custom function is provided, this is a no-op, as we assume the function can resolve the mapping.
 // Caches the mapping if no custom function is provided. Caller should handle cache invalidation if needed.
-func (r *VaultRepository) storeKeyNameToId(ctx context.Context, name, id string) error {
-	const op errors.Op = "key.(VaultRepository).storeKeyNameToId"
-	if r.keyNameToIdFunc != nil {
+func (r *VaultRepository) storeKeyNameToID(ctx context.Context, name, id string) error {
+	const op errors.Op = "key.(VaultRepository).storeKeyNameToID"
+	if r.keyNameToIDFunc != nil {
 		// if a custom name to id function is provided, we do not store the mapping in vault, as we assume the function can resolve it.
 		return nil
 	}
@@ -100,7 +100,7 @@ func (r *VaultRepository) storeKeyNameToId(ctx context.Context, name, id string)
 	if id == "" {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "id must not be empty")
 	}
-	v, err := r.keyNameToId.Get(ctx, name)
+	v, err := r.keyNameToID.Get(ctx, name)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -111,16 +111,16 @@ func (r *VaultRepository) storeKeyNameToId(ctx context.Context, name, id string)
 		Key:   name,
 		Value: []byte(id),
 	}
-	if err := r.keyNameToId.Put(ctx, entry); err != nil {
+	if err := r.keyNameToID.Put(ctx, entry); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	r.keyNameToIdCache.put(name, id)
+	r.keyNameToIDCache.put(name, id)
 	return nil
 }
 
-func (r *VaultRepository) deleteKeyNameToId(ctx context.Context, name string) error {
-	const op errors.Op = "key.(VaultRepository).deleteKeyNameToId"
-	if r.keyNameToIdFunc != nil {
+func (r *VaultRepository) deleteKeyNameToID(ctx context.Context, name string) error {
+	const op errors.Op = "key.(VaultRepository).deleteKeyNameToID"
+	if r.keyNameToIDFunc != nil {
 		// if a custom name to id function is provided, we do not store the mapping in vault, so no need to delete.
 		return nil
 	}
@@ -128,8 +128,8 @@ func (r *VaultRepository) deleteKeyNameToId(ctx context.Context, name string) er
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "name must not be empty")
 	}
 	// invalidate cache
-	r.keyNameToIdCache.remove(name)
-	if err := r.keyNameToId.Delete(ctx, name); err != nil {
+	r.keyNameToIDCache.remove(name)
+	if err := r.keyNameToID.Delete(ctx, name); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
@@ -138,20 +138,20 @@ func (r *VaultRepository) deleteKeyNameToId(ctx context.Context, name string) er
 // resolveKeyNameToId resolves the key name to public ID, using the custom function if provided, or looking up in storage if not.
 // Uses the cache for storage lookups. Caches the result of storage lookups, in case of cache misses.
 // Caller should handle cache invalidation if needed.
-func (r *VaultRepository) resolveKeyNameToId(ctx context.Context, name string) (string, error) {
-	const op errors.Op = "key.(VaultRepository).resolveKeyNameToId"
-	if r.keyNameToIdFunc != nil {
+func (r *VaultRepository) resolveKeyNameToID(ctx context.Context, name string) (string, error) {
+	const op errors.Op = "key.(VaultRepository).resolveKeyNameToID"
+	if r.keyNameToIDFunc != nil {
 		// if a custom name to id function is provided, use it to resolve the name to id.
-		return r.keyNameToIdFunc(name)
+		return r.keyNameToIDFunc(name)
 	}
 	if name == "" {
 		return "", errors.New(ctx, op, errors.CodeInvalidArgument, "name must not be empty")
 	}
-	if id, ok := r.keyNameToIdCache.get(name); ok {
+	if id, ok := r.keyNameToIDCache.get(name); ok {
 		return id, nil
 	}
 	// if cache miss, look up in storage
-	entry, err := r.keyNameToId.Get(ctx, name)
+	entry, err := r.keyNameToID.Get(ctx, name)
 	if err != nil {
 		return "", errors.Wrap(ctx, op, err)
 	}
@@ -159,7 +159,7 @@ func (r *VaultRepository) resolveKeyNameToId(ctx context.Context, name string) (
 		return "", errors.New(ctx, op, errors.CodeKeyNotFound, "key name not found: "+name)
 	}
 	id := string(entry.Value)
-	r.keyNameToIdCache.put(name, id)
+	r.keyNameToIDCache.put(name, id)
 	return id, nil
 }
 
@@ -247,11 +247,11 @@ func (r *VaultRepository) putKey(ctx context.Context, value *Key, vetForWrite bo
 	value.CreateTime = now
 	value.UpdateTime = now
 
-	if err := r.storeKeyNameToId(ctx, value.Name, value.PublicId); err != nil {
+	if err := r.storeKeyNameToID(ctx, value.Name, value.PublicId); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	if err := put(ctx, r.keys, value.PublicId, value.Key); err != nil {
-		_ = r.deleteKeyNameToId(ctx, value.Name) // best effort cleanup
+		_ = r.deleteKeyNameToID(ctx, value.Name) // best effort cleanup
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
@@ -291,7 +291,7 @@ func (r *VaultRepository) deleteKey(ctx context.Context, id string) error {
 		return errors.Wrap(ctx, "key.(VaultRepository).deleteKey", err)
 	}
 	// delete name to id mapping
-	if err := r.deleteKeyNameToId(ctx, key.Name); err != nil {
+	if err := r.deleteKeyNameToID(ctx, key.Name); err != nil {
 		return errors.Wrap(ctx, "key.(VaultRepository).deleteKey", err)
 	}
 
@@ -364,7 +364,7 @@ func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersio
 
 // ── Key metadata reads ──
 
-func (r *VaultRepository) GetKeyById(ctx context.Context, publicID string) (*Key, error) {
+func (r *VaultRepository) GetKeyByID(ctx context.Context, publicID string) (*Key, error) {
 	const op errors.Op = "key.(VaultRepository).GetKey"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -385,11 +385,11 @@ func (r *VaultRepository) GetKeyByName(ctx context.Context, name string) (*Key, 
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	id, err := r.resolveKeyNameToId(ctx, name)
+	id, err := r.resolveKeyNameToID(ctx, name)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return r.GetKeyById(ctx, id)
+	return r.GetKeyByID(ctx, id)
 }
 
 func (r *VaultRepository) ListKeys(ctx context.Context) ([]*Key, error) {

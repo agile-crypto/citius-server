@@ -29,8 +29,8 @@ type Repository interface {
 
 	// ── Key metadata reads ──
 
-	// GetKeyById retrieves a key by public ID (metadata only, no material).
-	GetKeyById(ctx context.Context, id string) (*Key, error)
+	// GetKeyByID retrieves a key by public ID (metadata only, no material).
+	GetKeyByID(ctx context.Context, id string) (*Key, error)
 
 	// GetKeyByName retrieves a key by name (metadata only, no material).
 	GetKeyByName(ctx context.Context, name string) (*Key, error)

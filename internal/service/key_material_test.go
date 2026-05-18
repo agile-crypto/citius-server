@@ -124,7 +124,7 @@ func TestGetKeyWithMaterial_destroyedKey_returnsFailedPrecondition(t *testing.T)
 	}
 
 	// Transition to terminal: ACTIVE → COMPROMISED → DESTROYED (per NIST SP 800-57).
-	k, err := repo.GetKeyById(ctx, created.GetPublicId())
+	k, err := repo.GetKeyByID(ctx, created.GetPublicId())
 	if err != nil {
 		t.Fatalf("repo.GetKey: %v", err)
 	}
@@ -164,7 +164,7 @@ func TestGetKeyWithMaterial_suspendedKey_returnsFailedPrecondition(t *testing.T)
 	}
 
 	// Transition: ACTIVE → SUSPENDED.
-	k, err := repo.GetKeyById(ctx, created.GetPublicId())
+	k, err := repo.GetKeyByID(ctx, created.GetPublicId())
 	if err != nil {
 		t.Fatalf("repo.GetKey: %v", err)
 	}

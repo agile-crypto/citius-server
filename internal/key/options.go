@@ -33,8 +33,8 @@ type options struct {
 	withCurrentVersion       uint32
 	withInitialVersion       uint32
 	withVetForWrite          bool
-	withKeyNameToIdFunc      func(name string) (string, error)
-	withKeyNameToIdCacheSize int
+	withKeyNameToIDFunc      func(name string) (string, error)
+	withKeyNameToIDCacheSize int
 	withCacheFactoryFunc     func(size int) cache[string, string]
 }
 
@@ -47,8 +47,8 @@ func getDefaultOptions() options {
 		withCurrentVersion:       0,
 		withVetForWrite:          true, // default: vet for write
 		withInitialVersion:       1,
-		withKeyNameToIdFunc:      nil,
-		withKeyNameToIdCacheSize: 1000,
+		withKeyNameToIDFunc:      nil,
+		withKeyNameToIDCacheSize: 1000,
 		withCacheFactoryFunc: func(size int) cache[string, string] {
 			return newLRUCache[string, string](size)
 		},
@@ -120,15 +120,15 @@ func WithVetForWrite(vet bool) Option {
 	}
 }
 
-func WithKeyNameToIdFunc(f func(name string) (string, error)) Option {
+func WithKeyNameToIDFunc(f func(name string) (string, error)) Option {
 	return func(o *options) {
-		o.withKeyNameToIdFunc = f
+		o.withKeyNameToIDFunc = f
 	}
 }
 
-func WithKeyNameToIdCacheSize(size int) Option {
+func WithKeyNameToIDCacheSize(size int) Option {
 	return func(o *options) {
-		o.withKeyNameToIdCacheSize = size
+		o.withKeyNameToIDCacheSize = size
 	}
 }
 

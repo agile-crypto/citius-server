@@ -88,7 +88,7 @@ func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	got, err := r.GetKeyById(ctx, "key_01HXYZ")
+	got, err := r.GetKeyByID(ctx, "key_01HXYZ")
 	if err != nil {
 		t.Fatalf("GetKey: %v", err)
 	}
@@ -156,7 +156,7 @@ func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
 }
 func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 	r := repoFn()
-	_, err := r.GetKeyById(context.Background(), "key_doesnotexist")
+	_, err := r.GetKeyByID(context.Background(), "key_doesnotexist")
 	if err == nil {
 		t.Fatal("expected error for missing key")
 	}
@@ -190,10 +190,10 @@ func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "original", "signature")
 
-	got, _ := r.GetKeyById(ctx, "key_01HXYZ")
+	got, _ := r.GetKeyByID(ctx, "key_01HXYZ")
 	got.Name = "mutated"
 
-	got2, _ := r.GetKeyById(ctx, "key_01HXYZ")
+	got2, _ := r.GetKeyByID(ctx, "key_01HXYZ")
 	if got2.Name != "original" {
 		t.Errorf("stored key was mutated: got %q want %q", got2.Name, "original")
 	}
@@ -211,7 +211,7 @@ func Test_VaultRepository_DeleteKey_success(t *testing.T) {
 	if err := r.DeleteKey(ctx, "key_01HXYZ"); err != nil {
 		t.Fatalf("DeleteKey: %v", err)
 	}
-	_, err := r.GetKeyById(ctx, "key_01HXYZ")
+	_, err := r.GetKeyByID(ctx, "key_01HXYZ")
 	if !errors.IsKeyNotFound(err) {
 		t.Errorf("expected KeyNotFound after delete, got: %v", err)
 	}
@@ -240,12 +240,12 @@ func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	require.NoError(err, "error creating key version 3")
 	err = r.AddVersion(ctx, vNext2)
 	require.NoError(err, "got error when adding second version")
-	k, err := r.GetKeyById(ctx, kid)
+	k, err := r.GetKeyByID(ctx, kid)
 	require.NoErrorf(err, "error when getting key with id=%s", kid)
 	assert.Equal(uint32(v2.Version+1), k.CurrentVersion, "current version should be 2")
 	err = r.DeleteKey(ctx, "key_01HXYZ")
 	require.NoError(err, "DeleteKey should not return error")
-	_, err = r.GetKeyById(ctx, "key_01HXYZ")
+	_, err = r.GetKeyByID(ctx, "key_01HXYZ")
 	require.True(errors.IsKeyNotFound(err), "expected KeyNotFound after delete, got: %v", err)
 	// Both versions should be gone.
 	_, err = r.GetVersion(ctx, "key_01HXYZ", 1)
@@ -338,7 +338,7 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 		t.Fatalf("UpdateKey: %v", err)
 	}
 
-	got, err := r.GetKeyById(ctx, "key_01HXYZ")
+	got, err := r.GetKeyByID(ctx, "key_01HXYZ")
 	if err != nil {
 		t.Fatalf("GetKey after update: %v", err)
 	}
