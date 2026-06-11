@@ -110,4 +110,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.ibm.com/citius/zitadel-grpc-auth => ../../zitadel-experiments/zitadel-grpc-auth
+replace github.ibm.com/citius/zitadel-grpc-auth => ../zitadel-grpc-auth
