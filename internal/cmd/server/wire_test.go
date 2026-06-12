@@ -69,6 +69,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 	ctx := context.Background()
 	h := buildServer(t)
 
+	// TODO: change to CreatePolicy
 	policyName := seedPolicy(t, ctx, h, "ecdsa-allow", []string{"ecdsa-p256-sha256-der"})
 
 	// CreateKey

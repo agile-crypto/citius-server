@@ -49,14 +49,21 @@ func NewServer(ctx context.Context, cfg Config) (*grpchandler.Handler, error) {
 	}
 
 	// app.Service
-	svc, err := buildAppService(ctx, templateReg, providerReg)
+	//
+	// Use a shared in-memory store across both bootstrap (templates) and
+	// the per-request scope so that policies/keys created via one RPC are
+	// visible to subsequent RPCs. Without this, every getScope() call
+	// would receive a fresh empty store and policies would vanish
+	// between CreateCryptoPolicy and CreateKey.
+	sharedStore := &logical.InmemStorage{}
+	svc, err := buildAppService(ctx, templateReg, providerReg, sharedStore)
 	if err != nil {
 		return nil, err
 	}
 
 	// Adapter => Handler
 	gateway := &appServiceAdapter{svc: svc}
-	storageFactory := func() storage.Storage { return &logical.InmemStorage{} }
+	storageFactory := func() storage.Storage { return sharedStore }
 
 	return grpchandler.New(gateway, storageFactory), nil
 }
