@@ -203,13 +203,35 @@ func TestAdminCanCreateAndRead(t *testing.T) {
 
 	keyName := "tenants/admin/integ-" + time.Now().UTC().Format("20060102T150405")
 
-	if _, err := cli.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	policyDoc := `{
+		"version": "1",
+		"allowed_templates": ["ecdsa-p256-sha256-der"],
+		"allowed_operations": {
+			"key_operations": ["create_key", "read_key", "sign", "verify"]
+		}
+	}`
+	if _, err := cli.CreateCryptoPolicy(ctx, &messagespb.CreateCryptoPolicyRequest{
+		Name:           "default",
+		PolicyDocument: policyDoc,
+	}); err != nil && status.Code(err) != codes.AlreadyExists {
+		t.Fatalf("CreateCryptoPolicy as admin: %v", err)
+	}
+
+	createResp, err := cli.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   keyName,
 		Policy: "default",
-	}); err != nil {
+		KeySpecification: &messagespb.CreateKeyRequest_TemplateId{
+			TemplateId: "ecdsa-p256-sha256-der",
+		},
+	})
+	if err != nil {
 		t.Fatalf("CreateKey as admin: %v", err)
 	}
-	if _, err := cli.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: keyName}); err != nil {
+	// The server stores keys under a generated PublicId (returned in
+	// KeyMetadata.Name); subsequent reads must use that identifier, not
+	// the user-supplied display name.
+	storedName := createResp.GetKeyMetadata().GetName()
+	if _, err := cli.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: storedName}); err != nil {
 		t.Fatalf("ReadKey as admin: %v", err)
 	}
 }
