@@ -82,7 +82,7 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, key.Repositor
 	}
 
 	// Load the standard algorithm catalog — includes "ml-dsa-65".
-	err = template.LoadStandardCatalog(catalogPath(), reg)
+	err = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -250,7 +250,7 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 
 	repo, _ := key.NewVaultRepository(ctx, storage)
 	reg, _ := template.NewVaultRegistry(ctx, storage)
-	_ = template.LoadStandardCatalog(catalogPath(), reg)
+	_ = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
 	eval := policy.NewSimpleRulesEvaluator()

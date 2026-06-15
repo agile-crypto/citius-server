@@ -85,7 +85,7 @@ func buildTemplateRegistry(
 		return nil, engerr.Wrap(ctx, op, err)
 	}
 	if catalogPath != "" {
-		if err := template.LoadStandardCatalog(catalogPath, reg); err != nil {
+		if err := template.LoadStandardCatalog(ctx, catalogPath, reg); err != nil {
 			return nil, engerr.Wrap(ctx, op, err)
 		}
 	}

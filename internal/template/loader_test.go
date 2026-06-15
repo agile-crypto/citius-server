@@ -117,7 +117,7 @@ func verifyMlDsa65Template(t *testing.T, r template.Registry, ctx context.Contex
 
 func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 	r := newTestRegistry(t)
-	err := template.LoadStandardCatalog(catalogPath(), r)
+	err := template.LoadStandardCatalog(context.Background(), catalogPath(), r)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestLoadStandardCatalog_loadsM1Templates(t *testing.T) {
 
 func TestLoadStandardCatalog_loadsAllTemplates(t *testing.T) {
 	r := newTestRegistry(t)
-	err := template.LoadStandardCatalog(catalogPath(), r)
+	err := template.LoadStandardCatalog(context.Background(), catalogPath(), r)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -142,21 +142,21 @@ func TestLoadStandardCatalog_loadsAllTemplates(t *testing.T) {
 
 func TestLoadStandardCatalog_fileNotFound(t *testing.T) {
 	r := newTestRegistry(t)
-	err := template.LoadStandardCatalog("/nonexistent/path/catalog.json", r)
+	err := template.LoadStandardCatalog(context.Background(), "/nonexistent/path/catalog.json", r)
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
 }
 
 func TestParseStandardCatalog_invalidJSON(t *testing.T) {
-	_, err := template.ParseStandardCatalog([]byte(`{invalid json`))
+	_, err := template.ParseStandardCatalog(context.Background(), []byte(`{invalid json`))
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
 	}
 }
 
 func TestParseStandardCatalog_emptyCatalog(t *testing.T) {
-	catalog, err := template.ParseStandardCatalog([]byte(`{}`))
+	catalog, err := template.ParseStandardCatalog(context.Background(), []byte(`{}`))
 	if err != nil {
 		t.Fatalf("ParseStandardCatalog empty: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestParseStandardCatalog_emptyCatalog(t *testing.T) {
 }
 
 func TestParseStandardCatalog_hasVersion(t *testing.T) {
-	catalog, err := template.ParseStandardCatalog(readCatalog(t))
+	catalog, err := template.ParseStandardCatalog(context.Background(), readCatalog(t))
 	if err != nil {
 		t.Fatalf("ParseStandardCatalog: %v", err)
 	}

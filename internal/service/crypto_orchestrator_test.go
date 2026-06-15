@@ -36,7 +36,7 @@ func setupCryptoOrchestratorFull(t *testing.T) (service.CryptoOrchestrator, serv
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
 
-	err = template.LoadStandardCatalog(catalogPath(), reg)
+	err = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
