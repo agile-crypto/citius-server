@@ -27,13 +27,16 @@ type Error struct {
 }
 
 // New creates a new Error. ctx is reserved for future tracing instrumentation.
-func New(_ context.Context, op Op, code Code, msg string) *Error {
+func New(_ context.Context, op Op, code Code, msg string, args ...any) *Error {
+	if len(args) > 0 {
+		msg = fmt.Sprintf(msg, args...)
+	}
 	return &Error{Op: op, Code: code, Message: msg}
 }
 
 // Wrap wraps an existing error, inheriting its Code if it is an *Error.
 // Returns nil if err is nil.
-func Wrap(_ context.Context, op Op, err error) *Error {
+func Wrap(_ context.Context, op Op, err error, opts ...Option) *Error {
 	if err == nil {
 		return nil
 	}
@@ -42,7 +45,8 @@ func Wrap(_ context.Context, op Op, err error) *Error {
 	if As(err, &e) {
 		code = e.Code
 	}
-	return &Error{Op: op, Code: code, Wrapped: err}
+	o := getOpts(opts)
+	return &Error{Op: op, Code: code, Message: o.withMessage, Wrapped: err}
 }
 
 // Error implements the error interface.
