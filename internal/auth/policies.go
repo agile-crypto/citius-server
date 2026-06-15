@@ -74,7 +74,7 @@ func policyRegistry() map[string][]PolicyFunc {
 	providerWrite := []PolicyFunc{requirePerm(PermProviderWrite)}
 
 	return map[string][]PolicyFunc{
-		// CryptoService — key lifecycle.
+		// KeyManagementService — key lifecycle.
 		MethodCreateKey:            keysCreate,
 		MethodDeleteKey:            keysCreate,
 		MethodImportKey:            keysCreate,
@@ -87,7 +87,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodValidateKeyOperation: keysRead,
 		MethodExportKey:            keysRead,
 
-		// CryptoService — crypto-policy lifecycle.
+		// CryptoPolicyService — crypto-policy lifecycle.
 		MethodCreateCryptoPolicy:  policyWrite,
 		MethodReadCryptoPolicy:    policyRead,
 		MethodDeleteCryptoPolicy:  policyWrite,
@@ -96,7 +96,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodEvaluatePolicy:      policyRead,
 		MethodBatchEvaluatePolicy: policyRead,
 
-		// CryptoService — encrypt.
+		// Encrypt operations.
 		MethodEncrypt:             cryptoEncrypt,
 		MethodEncryptInit:         cryptoEncrypt,
 		MethodEncryptUpdate:       cryptoEncrypt,
@@ -107,7 +107,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodEncryptMessageNext:  cryptoEncrypt,
 		MethodEncryptMessageFinal: cryptoEncrypt,
 
-		// CryptoService — decrypt.
+		// Decrypt operations.
 		MethodDecrypt:             cryptoDecrypt,
 		MethodDecryptInit:         cryptoDecrypt,
 		MethodDecryptUpdate:       cryptoDecrypt,
@@ -118,7 +118,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodDecryptMessageNext:  cryptoDecrypt,
 		MethodDecryptMessageFinal: cryptoDecrypt,
 
-		// CryptoService — sign.
+		// Sign operations.
 		MethodSign:             cryptoSign,
 		MethodDigestSign:       cryptoSign,
 		MethodSignInit:         cryptoSign,
@@ -130,7 +130,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodSignMessageNext:  cryptoSign,
 		MethodSignMessageFinal: cryptoSign,
 
-		// CryptoService — verify.
+		// Verify operations.
 		MethodVerify:             cryptoVerify,
 		MethodDigestVerify:       cryptoVerify,
 		MethodVerifyInit:         cryptoVerify,
@@ -142,7 +142,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodVerifyMessageNext:  cryptoVerify,
 		MethodVerifyMessageFinal: cryptoVerify,
 
-		// CryptoService — digest / xof / mac / random / wrap / kdf / kem.
+		// Other crypto-related operations that don't fit the above buckets.
 		MethodDigest:              cryptoMisc,
 		MethodDigestInit:          cryptoMisc,
 		MethodDigestUpdate:        cryptoMisc,
@@ -156,16 +156,18 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodDecryptDigestUpdate: cryptoMisc,
 		MethodSignEncryptUpdate:   cryptoMisc,
 		MethodDecryptVerifyUpdate: cryptoMisc,
-		MethodWrapKey:             cryptoMisc,
-		MethodUnwrapKey:           cryptoMisc,
-		MethodDeriveKey:           cryptoMisc,
-		MethodKeyAgreement:        cryptoMisc,
-		MethodEncapsulateKey:      cryptoMisc,
-		MethodDecapsulateKey:      cryptoMisc,
 		MethodGenerateRandom:      cryptoMisc,
 		MethodSeedRandom:          cryptoMisc,
 		MethodGenerateMAC:         cryptoMisc,
 		MethodVerifyMAC:           cryptoMisc,
+
+		// KeyEstablishmentService — wrap / unwrap / derive etc.
+		MethodWrapKey:        cryptoMisc,
+		MethodUnwrapKey:      cryptoMisc,
+		MethodDeriveKey:      cryptoMisc,
+		MethodKeyAgreement:   cryptoMisc,
+		MethodEncapsulateKey: cryptoMisc,
+		MethodDecapsulateKey: cryptoMisc,
 
 		// AlgorithmDiscoveryService.
 		MethodListTemplates: discoveryRead,
