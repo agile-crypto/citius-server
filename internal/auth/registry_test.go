@@ -22,8 +22,12 @@ func TestPolicyRegistry_CoversEveryRPC(t *testing.T) {
 
 	descs := []*grpc.ServiceDesc{
 		&servicespb.CryptoService_ServiceDesc,
+		&servicespb.CryptoPolicyService_ServiceDesc,
 		&servicespb.AlgorithmDiscoveryService_ServiceDesc,
 		&servicespb.ProviderService_ServiceDesc,
+		&servicespb.KeyEstablishmentService_ServiceDesc,
+		&servicespb.KeyManagementService_ServiceDesc,
+		&servicespb.StreamingCryptoService_ServiceDesc,
 	}
 
 	for _, sd := range descs {
@@ -47,8 +51,12 @@ func TestPolicyRegistry_NoUnknownMethods(t *testing.T) {
 	known := map[string]struct{}{}
 	descs := []*grpc.ServiceDesc{
 		&servicespb.CryptoService_ServiceDesc,
+		&servicespb.CryptoPolicyService_ServiceDesc,
 		&servicespb.AlgorithmDiscoveryService_ServiceDesc,
 		&servicespb.ProviderService_ServiceDesc,
+		&servicespb.KeyEstablishmentService_ServiceDesc,
+		&servicespb.KeyManagementService_ServiceDesc,
+		&servicespb.StreamingCryptoService_ServiceDesc,
 	}
 	for _, sd := range descs {
 		for _, m := range sd.Methods {
