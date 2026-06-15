@@ -388,7 +388,7 @@
                   "hash": "HASH_ALGORITHM_SHA256",
                   "mgf": "MGF_MGF1",
                   "mgfHash": "HASH_ALGORITHM_SHA256",
-                  "saltLength": 32
+                  "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
                 }
               },
               "label": "classical",
@@ -1559,7 +1559,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_44",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -1640,7 +1640,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_65",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -1721,7 +1721,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_87",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -2045,7 +2045,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_44",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -2126,7 +2126,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_65",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -2207,7 +2207,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_87",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -2909,7 +2909,7 @@
           "hash": "HASH_ALGORITHM_SHA256",
           "mgf": "MGF_MGF1",
           "mgfHash": "HASH_ALGORITHM_SHA256",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -2962,7 +2962,7 @@
           "hash": "HASH_ALGORITHM_SHA256",
           "mgf": "MGF_MGF1",
           "mgfHash": "HASH_ALGORITHM_SHA256",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -3015,7 +3015,7 @@
           "hash": "HASH_ALGORITHM_SHA384",
           "mgf": "MGF_MGF1",
           "mgfHash": "HASH_ALGORITHM_SHA384",
-          "saltLength": 48
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -3302,7 +3302,7 @@
         "rsaPss": {
           "keySizeBits": 2048,
           "mgf": "MGF_MGF1",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -3353,7 +3353,7 @@
         "rsaPss": {
           "keySizeBits": 3072,
           "mgf": "MGF_MGF1",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -3404,7 +3404,7 @@
         "rsaPss": {
           "keySizeBits": 4096,
           "mgf": "MGF_MGF1",
-          "saltLength": 48
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
