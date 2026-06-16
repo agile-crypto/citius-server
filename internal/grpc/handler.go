@@ -206,8 +206,9 @@ func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messa
 	return &messagespb.SignResponse{
 		Signature: result.Signature,
 		Metadata: &messagespb.OperationMetadata{
-			KeyVersion:     0, // TODO: populate from result.KeyVersionID once version tracking is wired
+			KeyVersion:     result.KeyVersionID,
 			ProviderOutput: result.Output,
+			//TODO: Add API version
 		},
 	}, nil
 }
@@ -251,6 +252,7 @@ func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*m
 		Valid: result.Valid,
 		Metadata: &messagespb.OperationMetadata{
 			ProviderOutput: result.Output,
+			//TODO: Add API version
 		},
 	}, nil
 }
