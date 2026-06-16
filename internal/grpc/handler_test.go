@@ -231,11 +231,17 @@ func TestHandler_CreateKey_Success(t *testing.T) {
 	}
 	h := wireHandler(km, nil)
 
+	templateID := "ecdsa-p256-sha256-der"
 	resp, err := h.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name: "my-key",
-		KeySpecification: &messagespb.CreateKeyRequest_TemplateId{
-			TemplateId: "ecdsa-p256-sha256-der",
+		ScopeSpec: &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Signature{
+				Signature: &typespb.SignatureScopeSpec{
+					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+				},
+			},
 		},
+		TemplateId: &templateID,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey handler: %v", err)
