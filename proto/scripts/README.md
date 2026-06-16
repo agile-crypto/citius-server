@@ -5,6 +5,7 @@ This folder contains scripts used to modify import paths and packages of proto a
 ## 1. Go package option in proto files
 
 - `remove_go_package.py`: remove the `option go_package=` statement of the target `.proto` file(s)
+<<<<<<< HEAD
     - Helper: `python remove_go_package.py -h`
     - Standard usage: `python remove_go_package.py -f path_to_file` or `python remove_go_package.py -r path_to_dir`
 - `add_go_package.py`: add the provided package as `option go_package=...` to the `.proto` file(s)
@@ -38,3 +39,10 @@ This folder contains scripts used to modify import paths and packages of proto a
    - Usage to pull proto files from API repo: 
    `python3 update_api_proto.py --branch main --go-module github.ibm.com/citius/citius-server --proto-packages messages,services,types git@github.ibm.com:citius/api.git proto`
 
+=======
+- `add_go_package.py`: add the provided package as `option go_package=...` to the `.proto` file(s)
+
+## 2. Replace import statements in Go files
+
+- `replace_import_go.py`: replace import statements in `.go` files
+>>>>>>> 711584f (Proto-layout restructuration (split server and api))

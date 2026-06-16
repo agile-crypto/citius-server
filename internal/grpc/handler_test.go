@@ -5,6 +5,10 @@ import (
 	"testing"
 
 	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
+<<<<<<< HEAD
+=======
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
+>>>>>>> 711584f (Proto-layout restructuration (split server and api))
 
 	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
 	"github.ibm.com/citius/citius-server/internal/core"

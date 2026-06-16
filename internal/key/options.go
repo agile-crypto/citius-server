@@ -3,7 +3,11 @@ package key
 import (
 	"sync"
 
+<<<<<<< HEAD
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
+=======
+	"github.ibm.com/citius/citius-server/gen/go/server/store"
+>>>>>>> 711584f (Proto-layout restructuration (split server and api))
 )
 
 // getOpts - iterate the inbound Options and return a struct

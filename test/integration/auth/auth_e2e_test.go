@@ -35,7 +35,11 @@ import (
 	"time"
 
 	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
+<<<<<<< HEAD
 	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
+=======
+	servicespb "github.ibm.com/citius/citius-server/gen/go/services"
+>>>>>>> 711584f (Proto-layout restructuration (split server and api))
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"

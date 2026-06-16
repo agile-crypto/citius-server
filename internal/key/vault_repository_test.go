@@ -7,9 +7,13 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+<<<<<<< HEAD
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
+=======
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
+>>>>>>> 711584f (Proto-layout restructuration (split server and api))
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 )

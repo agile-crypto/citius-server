@@ -4,10 +4,15 @@ import (
 	"context"
 	"fmt"
 
+<<<<<<< HEAD
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
 	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
+=======
+	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
+>>>>>>> 711584f (Proto-layout restructuration (split server and api))
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
