@@ -99,6 +99,8 @@ func main() {
 
 	srv := grpc.NewServer(serverOpts...)
 	servicespb.RegisterCryptoServiceServer(srv, handler)
+	servicespb.RegisterKeyManagementServiceServer(srv, handler)
+	servicespb.RegisterCryptoPolicyServiceServer(srv, handler)
 	if *enableReflection {
 		reflection.Register(srv)
 		log.Println("gRPC reflection registered")

@@ -8,6 +8,7 @@ import (
 
 	protovalidate "buf.build/go/protovalidate"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	typespb "github.ibm.com/citius/citius-server/gen/go/types"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -26,7 +27,7 @@ func TestKey_roundtrip(t *testing.T) {
 		PublicId:           "key_01HXYZ",
 		Name:               "my-signing-key",
 		ScopeSpecification: []byte("scope-spec"),
-		Status:             storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		Status:             typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	}
 	b, err := proto.Marshal(orig)
 	if err != nil {
@@ -175,8 +176,8 @@ func TestKey_noMaterialFields(t *testing.T) {
 
 func TestAllEnums_unspecifiedIsZero(t *testing.T) {
 	// All enums must have _UNSPECIFIED = 0 as the first variant.
-	if storepb.KeyStatus_KEY_STATUS_UNSPECIFIED != 0 {
-		t.Errorf("KeyStatus_UNSPECIFIED != 0: got %d", storepb.KeyStatus_KEY_STATUS_UNSPECIFIED)
+	if typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED != 0 {
+		t.Errorf("KeyLifecycleState_UNSPECIFIED != 0: got %d", typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED)
 	}
 	if storepb.PolicyScope_POLICY_SCOPE_UNSPECIFIED != 0 {
 		t.Errorf("PolicyScope_UNSPECIFIED != 0: got %d", storepb.PolicyScope_POLICY_SCOPE_UNSPECIFIED)

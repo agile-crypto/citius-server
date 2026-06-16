@@ -76,7 +76,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	const op errors.Op = "service.(cryptoOrchestrator).Sign"
 
 	// 1. Validate request.
-	if req.KeyPublicID == "" {
+	if req.KeyName == "" {
 		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"KeyPublicID must not be empty")
 	}
@@ -88,7 +88,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	// 2. Fetch key + material.
 	//    lifecycle checks (IsTerminal, CanPerformCrypto) are
 	//    enforced inside GetKeyWithMaterial — Sign does not duplicate them.
-	k, kv, err := o.keys.GetKeyWithMaterial(ctx, req.KeyPublicID, 0) // 0 = latest
+	k, kv, err := o.keys.GetKeyWithMaterial(ctx, req.KeyName, 0) // 0 = latest
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -148,7 +148,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	// 8. Return result with metadata.
 	return crypto.SignResult{
 		Signature:    signResp.GetSignature(),
-		KeyPublicID:  req.KeyPublicID,
+		KeyName:      req.KeyName,
 		KeyVersionID: kv.GetVersion(),
 		Algorithm:    templateID,
 		ProviderName: prov.Name(),
@@ -160,7 +160,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	const op errors.Op = "service.(cryptoOrchestrator).Verify"
 
 	// 1. Validate request.
-	if req.KeyPublicID == "" {
+	if req.KeyName == "" {
 		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"KeyPublicID must not be empty")
 	}
@@ -168,7 +168,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	// 2. Fetch key + material (includes public key bytes for verification).
 	//    Lifecycle checks (IsTerminal, CanPerformCrypto) are enforced inside
 	//    GetKeyWithMaterial — Verify does not duplicate them.
-	k, kv, err := o.keys.GetKeyWithMaterial(ctx, req.KeyPublicID, 0) // 0 = latest
+	k, kv, err := o.keys.GetKeyWithMaterial(ctx, req.KeyName, 0) // 0 = latest
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -230,7 +230,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	// 8. Return result — invalid signature is NOT an error.
 	return crypto.VerifyResult{
 		Valid:        verifyResp.GetValid(),
-		KeyPublicID:  req.KeyPublicID,
+		KeyName:      req.KeyName,
 		Algorithm:    templateID,
 		ProviderName: prov.Name(),
 		Output:       verifyResp.GetOutput(),

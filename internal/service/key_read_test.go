@@ -25,7 +25,7 @@ func TestReadKey_happyPath(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	got, err := orch.ReadKey(ctx, created.GetPublicId())
+	got, err := orch.ReadKey(ctx, created.GetName())
 	if err != nil {
 		t.Fatalf("ReadKey: %v", err)
 	}
@@ -97,13 +97,13 @@ func TestDeleteKey_happyPath(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	err = orch.DeleteKey(ctx, created.GetPublicId())
+	err = orch.DeleteKey(ctx, created.GetName())
 	if err != nil {
 		t.Fatalf("DeleteKey: %v", err)
 	}
 
 	// Key should no longer be readable.
-	_, err = orch.ReadKey(ctx, created.GetPublicId())
+	_, err = orch.ReadKey(ctx, created.GetName())
 	if !errors.IsKeyNotFound(err) {
 		t.Errorf("expected CodeKeyNotFound after delete, got: %v", err)
 	}
@@ -120,7 +120,7 @@ func TestDeleteKey_removedFromList(t *testing.T) {
 		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName,
 	})
 
-	_ = orch.DeleteKey(ctx, created.GetPublicId())
+	_ = orch.DeleteKey(ctx, created.GetName())
 
 	keys, err := orch.ListKeys(ctx)
 	if err != nil {

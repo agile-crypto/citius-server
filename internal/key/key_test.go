@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
@@ -15,7 +16,7 @@ func TestKey_VetForWrite_Create_happyPath(t *testing.T) {
 		PublicId:           "key_01HXYZ",
 		Name:               "signing-key",
 		Primitive:          "signature",
-		Status:             storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		Status:             types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 		ScopeSpecification: []byte(`{"primitive":"signature"}`),
 	})
 	if err := k.VetForWrite(context.Background(), core.OpCreate); err != nil {
@@ -117,7 +118,7 @@ var _ core.VetForWriter = (*key.Key)(nil)
 func TestKey_CanRotate_active(t *testing.T) {
 	k := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
-		Status: storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	})
 	if err := k.CanRotate(); err != nil {
 		t.Errorf("CanRotate on ACTIVE key: unexpected error: %v", err)
@@ -127,7 +128,7 @@ func TestKey_CanRotate_active(t *testing.T) {
 func TestKey_CanRotate_suspended(t *testing.T) {
 	k := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
-		Status: storepb.KeyStatus_KEY_STATUS_SUSPENDED,
+		Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
 	})
 	if err := k.CanRotate(); err == nil {
 		t.Error("CanRotate on SUSPENDED key should return error")
@@ -137,7 +138,7 @@ func TestKey_CanRotate_suspended(t *testing.T) {
 func TestKey_CanPerformCrypto_active(t *testing.T) {
 	k := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
-		Status: storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	})
 	if err := k.CanPerformCrypto(); err != nil {
 		t.Errorf("CanPerformCrypto on ACTIVE key: unexpected error: %v", err)
@@ -147,7 +148,7 @@ func TestKey_CanPerformCrypto_active(t *testing.T) {
 func TestKey_CanPerformCrypto_destroyed(t *testing.T) {
 	k := key.NewKey(&storepb.Key{
 		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
-		Status: storepb.KeyStatus_KEY_STATUS_DESTROYED,
+		Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED,
 	})
 	if err := k.CanPerformCrypto(); err == nil {
 		t.Error("CanPerformCrypto on DESTROYED key should return error")
@@ -157,18 +158,18 @@ func TestKey_CanPerformCrypto_destroyed(t *testing.T) {
 // ---- Lifecycle Test ---//
 func TestKey_TransitionTo_validTransitions(t *testing.T) {
 	tests := []struct {
-		from storepb.KeyStatus
-		to   storepb.KeyStatus
+		from types.KeyLifecycleState
+		to   types.KeyLifecycleState
 	}{
-		{storepb.KeyStatus_KEY_STATUS_PRE_ACTIVE, storepb.KeyStatus_KEY_STATUS_ACTIVE},
-		{storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_SUSPENDED},
-		{storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_DEACTIVATED},
-		{storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
-		{storepb.KeyStatus_KEY_STATUS_SUSPENDED, storepb.KeyStatus_KEY_STATUS_ACTIVE},
-		{storepb.KeyStatus_KEY_STATUS_SUSPENDED, storepb.KeyStatus_KEY_STATUS_DEACTIVATED},
-		{storepb.KeyStatus_KEY_STATUS_DEACTIVATED, storepb.KeyStatus_KEY_STATUS_DESTROYED},
-		{storepb.KeyStatus_KEY_STATUS_COMPROMISED, storepb.KeyStatus_KEY_STATUS_DESTROYED},
-		{storepb.KeyStatus_KEY_STATUS_COMPROMISED, storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED},
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED},
 	}
 	for _, tt := range tests {
 		t.Run(tt.from.String()+"→"+tt.to.String(), func(t *testing.T) {
@@ -188,14 +189,14 @@ func TestKey_TransitionTo_validTransitions(t *testing.T) {
 
 func TestKey_TransitionTo_invalidTransitions(t *testing.T) {
 	tests := []struct {
-		from storepb.KeyStatus
-		to   storepb.KeyStatus
+		from types.KeyLifecycleState
+		to   types.KeyLifecycleState
 	}{
-		{storepb.KeyStatus_KEY_STATUS_DESTROYED, storepb.KeyStatus_KEY_STATUS_ACTIVE},             // terminal → anything
-		{storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED, storepb.KeyStatus_KEY_STATUS_ACTIVE}, // terminal → anything
-		{storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_PRE_ACTIVE},            // backwards
-		{storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_DESTROYED},             // skip deactivated
-		{storepb.KeyStatus_KEY_STATUS_PRE_ACTIVE, storepb.KeyStatus_KEY_STATUS_SUSPENDED},         // must activate first
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE},             // terminal → anything
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE}, // terminal → anything
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE},            // backwards
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED},             // skip deactivated
+		{types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED},         // must activate first
 	}
 	for _, tt := range tests {
 		t.Run(tt.from.String()+"→"+tt.to.String(), func(t *testing.T) {
@@ -216,15 +217,15 @@ func TestKey_TransitionTo_invalidTransitions(t *testing.T) {
 }
 
 func TestKey_IsTerminal(t *testing.T) {
-	destroyed := key.NewKey(&storepb.Key{Status: storepb.KeyStatus_KEY_STATUS_DESTROYED})
+	destroyed := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED})
 	if !destroyed.IsTerminal() {
 		t.Error("DESTROYED key should be terminal")
 	}
-	destroyedCompromised := key.NewKey(&storepb.Key{Status: storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED})
+	destroyedCompromised := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED})
 	if !destroyedCompromised.IsTerminal() {
 		t.Error("DESTROYED_COMPROMISED key should be terminal")
 	}
-	active := key.NewKey(&storepb.Key{Status: storepb.KeyStatus_KEY_STATUS_ACTIVE})
+	active := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE})
 	if active.IsTerminal() {
 		t.Error("ACTIVE key should not be terminal")
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"
@@ -104,7 +105,7 @@ func (k *Key) VetForWrite(ctx context.Context, op core.WriteOp) error {
 // CanRotate returns an error if the key cannot be rotated in its current state.
 // A key can only be rotated when it is ACTIVE.
 func (k *Key) CanRotate() error {
-	if k.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
+	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
 		return fmt.Errorf("cannot rotate key in status %s: only ACTIVE keys can be rotated", k.GetStatus())
 	}
 	return nil
@@ -113,7 +114,7 @@ func (k *Key) CanRotate() error {
 // CanPerformCrypto returns an error if the key cannot be used for cryptographic
 // operations in its current lifecycle state. Only ACTIVE keys can encrypt/sign.
 func (k *Key) CanPerformCrypto() error {
-	if k.GetStatus() != storepb.KeyStatus_KEY_STATUS_ACTIVE {
+	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
 		return fmt.Errorf("key is in status %s: cryptographic operations require ACTIVE status", k.GetStatus())
 	}
 	return nil
@@ -145,20 +146,20 @@ func (k *Key) CanDelete() error {
 //	COMPROMISED: DESTROYED, DESTROYED_COMPROMISED
 //	DESTROYED:   (terminal)
 //	DESTROYED_COMPROMISED: (terminal)
-var validTransitions = map[storepb.KeyStatus][]storepb.KeyStatus{
-	storepb.KeyStatus_KEY_STATUS_PRE_ACTIVE:            {storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_DESTROYED},
-	storepb.KeyStatus_KEY_STATUS_ACTIVE:                {storepb.KeyStatus_KEY_STATUS_SUSPENDED, storepb.KeyStatus_KEY_STATUS_DEACTIVATED, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
-	storepb.KeyStatus_KEY_STATUS_SUSPENDED:             {storepb.KeyStatus_KEY_STATUS_ACTIVE, storepb.KeyStatus_KEY_STATUS_DEACTIVATED, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
-	storepb.KeyStatus_KEY_STATUS_DEACTIVATED:           {storepb.KeyStatus_KEY_STATUS_DESTROYED, storepb.KeyStatus_KEY_STATUS_COMPROMISED},
-	storepb.KeyStatus_KEY_STATUS_COMPROMISED:           {storepb.KeyStatus_KEY_STATUS_DESTROYED, storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED},
-	storepb.KeyStatus_KEY_STATUS_DESTROYED:             {}, // terminal — no transitions out
-	storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED: {}, // terminal — no transitions out
+var validTransitions = map[types.KeyLifecycleState][]types.KeyLifecycleState{
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE:            {types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED},
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE:                {types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED},
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED:             {types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED},
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED:           {types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED},
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED:           {types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED},
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED:             {}, // terminal — no transitions out
+	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED: {}, // terminal — no transitions out
 }
 
 // TransitionTo attempts to move the key to a new lifecycle status.
 // Returns an error if the transition is not valid per the NIST SP 800-57 state machine.
 // On success, updates the key's status in place.
-func (k *Key) TransitionTo(newStatus storepb.KeyStatus) error {
+func (k *Key) TransitionTo(newStatus types.KeyLifecycleState) error {
 	current := k.GetStatus()
 	allowed, ok := validTransitions[current]
 	if !ok {
@@ -176,7 +177,7 @@ func (k *Key) TransitionTo(newStatus storepb.KeyStatus) error {
 // IsTerminal returns true if the key is in a terminal state (DESTROYED or DESTROYED_COMPROMISED).
 func (k *Key) IsTerminal() bool {
 	s := k.GetStatus()
-	return s == storepb.KeyStatus_KEY_STATUS_DESTROYED || s == storepb.KeyStatus_KEY_STATUS_DESTROYED_COMPROMISED
+	return s == types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED || s == types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED
 }
 
 // Compile-time assertion.

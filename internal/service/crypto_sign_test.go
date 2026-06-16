@@ -59,7 +59,7 @@ func setupCryptoWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
-	return ops, created.GetPublicId()
+	return ops, created.GetName()
 }
 
 // ============================================================================
@@ -67,11 +67,11 @@ func setupCryptoWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
 // ============================================================================
 
 func TestSign_MLDSA_happyPath(t *testing.T) {
-	ops, keyID := setupCryptoWithKey(t)
+	ops, keyName := setupCryptoWithKey(t)
 	ctx := context.Background()
 
 	result, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              []byte("post-quantum signing"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -81,8 +81,8 @@ func TestSign_MLDSA_happyPath(t *testing.T) {
 	if len(result.Signature) == 0 {
 		t.Error("expected non-empty signature")
 	}
-	if result.KeyPublicID != keyID {
-		t.Errorf("KeyPublicID: got %q want %q", result.KeyPublicID, keyID)
+	if result.KeyName != keyName {
+		t.Errorf("KeyName: got %q want %q", result.KeyName, keyName)
 	}
 	if result.Algorithm == "" {
 		t.Error("Algorithm must be populated in SignResult")
@@ -98,8 +98,8 @@ func TestSign_MLDSA_happyPath(t *testing.T) {
 func TestSign_keyNotFound_returnsError(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
 	_, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID: "key_nonexistent",
-		Payload:     []byte("data"),
+		KeyName: "key_nonexistent",
+		Payload: []byte("data"),
 	})
 	if err == nil {
 		t.Fatal("expected error for unknown key")
@@ -112,8 +112,8 @@ func TestSign_keyNotFound_returnsError(t *testing.T) {
 func TestSign_emptyKeyPublicID_returnsError(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
 	_, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID: "",
-		Payload:     []byte("data"),
+		KeyName: "",
+		Payload: []byte("data"),
 	})
 	if err == nil {
 		t.Fatal("expected error for empty KeyPublicID")
@@ -126,8 +126,8 @@ func TestSign_emptyKeyPublicID_returnsError(t *testing.T) {
 func TestSign_emptyPayload_returnsError(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
 	_, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID: "key_doesntmatter",
-		Payload:     nil,
+		KeyName: "key_doesntmatter",
+		Payload: nil,
 	})
 	if err == nil {
 		t.Fatal("expected error for empty Payload")
@@ -168,7 +168,7 @@ func TestSign_policyDeniesSign_returnsError(t *testing.T) {
 
 	// Sign should fail with policy violation.
 	_, err = ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          created.GetPublicId(),
+		KeyName:              created.GetName(),
 		Payload:              []byte("should fail"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -181,10 +181,10 @@ func TestSign_policyDeniesSign_returnsError(t *testing.T) {
 }
 
 func TestSign_noScopeParams_returnsError(t *testing.T) {
-	ops, keyID := setupCryptoWithKey(t)
+	ops, keyName := setupCryptoWithKey(t)
 	_, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID: keyID,
-		Payload:     []byte("data"),
+		KeyName: keyName,
+		Payload: []byte("data"),
 		// no scope_params set
 	})
 	if err == nil {
@@ -198,9 +198,9 @@ func TestSign_noScopeParams_returnsError(t *testing.T) {
 func TestSign_MLDSA_noContext_succeeds(t *testing.T) {
 	// The key was created via template ml-dsa-65 whose primary scope is
 	// "standard", so NoContext (standard) matches the key's declared scope.
-	ops, keyID := setupCryptoWithKey(t)
+	ops, keyName := setupCryptoWithKey(t)
 	result, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              []byte("standard scope signing"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -215,9 +215,9 @@ func TestSign_MLDSA_noContext_succeeds(t *testing.T) {
 func TestSign_scopeMismatch_returnsError(t *testing.T) {
 	// Key created via template ml-dsa-65 has primary scope "standard".
 	// DomainContext maps to "with_context" — scope mismatch.
-	ops, keyID := setupCryptoWithKey(t)
+	ops, keyName := setupCryptoWithKey(t)
 	_, err := ops.Sign(context.Background(), crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              []byte("data"),
 		SignatureScopeFields: crypto.SignatureScopeFields{DomainContext: &types.SignatureDomainContext{}},
 	})

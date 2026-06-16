@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 )
@@ -26,7 +26,7 @@ func TestGetKeyWithMaterial_latestVersion(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	k, v, err := orch.GetKeyWithMaterial(ctx, created.GetPublicId(), 0) // 0 = latest
+	k, v, err := orch.GetKeyWithMaterial(ctx, created.GetName(), 0) // 0 = latest
 	if err != nil {
 		t.Fatalf("GetKeyWithMaterial: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestGetKeyWithMaterial_specificVersion(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	k, v, err := orch.GetKeyWithMaterial(ctx, created.GetPublicId(), 1) // explicit version 1
+	k, v, err := orch.GetKeyWithMaterial(ctx, created.GetName(), 1) // explicit version 1
 	if err != nil {
 		t.Fatalf("GetKeyWithMaterial: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestGetKeyWithMaterial_versionNotFound(t *testing.T) {
 	}
 
 	// Version 99 does not exist — only version 1 was created.
-	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetPublicId(), 99)
+	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetName(), 99)
 	if err == nil {
 		t.Fatal("expected error for non-existent version")
 	}
@@ -128,11 +128,11 @@ func TestGetKeyWithMaterial_destroyedKey_returnsFailedPrecondition(t *testing.T)
 	if err != nil {
 		t.Fatalf("repo.GetKey: %v", err)
 	}
-	err = k.TransitionTo(storepb.KeyStatus_KEY_STATUS_COMPROMISED)
+	err = k.TransitionTo(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED)
 	if err != nil {
 		t.Fatalf("TransitionTo COMPROMISED: %v", err)
 	}
-	err = k.TransitionTo(storepb.KeyStatus_KEY_STATUS_DESTROYED)
+	err = k.TransitionTo(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED)
 	if err != nil {
 		t.Fatalf("TransitionTo DESTROYED: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestGetKeyWithMaterial_destroyedKey_returnsFailedPrecondition(t *testing.T)
 		t.Fatalf("repo.UpdateKey: %v", err)
 	}
 
-	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetPublicId(), 0)
+	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetName(), 0)
 	if err == nil {
 		t.Fatal("expected error for destroyed key")
 	}
@@ -168,7 +168,7 @@ func TestGetKeyWithMaterial_suspendedKey_returnsFailedPrecondition(t *testing.T)
 	if err != nil {
 		t.Fatalf("repo.GetKey: %v", err)
 	}
-	err = k.TransitionTo(storepb.KeyStatus_KEY_STATUS_SUSPENDED)
+	err = k.TransitionTo(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED)
 	if err != nil {
 		t.Fatalf("TransitionTo SUSPENDED: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestGetKeyWithMaterial_suspendedKey_returnsFailedPrecondition(t *testing.T)
 		t.Fatalf("repo.UpdateKey: %v", err)
 	}
 
-	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetPublicId(), 0)
+	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetName(), 0)
 	if err == nil {
 		t.Fatal("expected error for suspended key")
 	}

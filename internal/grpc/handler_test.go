@@ -93,8 +93,9 @@ func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ core
 // mockKeyOrchestrator stubs KeyOrchestrator for tests.
 // Only createFn and readFn are wired; all other methods panic.
 type mockKeyOrchestrator struct {
-	createFn func(ctx context.Context, spec core.KeyCreationSpec) (*key.Key, error)
-	readFn   func(ctx context.Context, name string) (*key.Key, error)
+	createFn             func(ctx context.Context, spec core.KeyCreationSpec) (*key.Key, error)
+	readFn               func(ctx context.Context, name string) (*key.Key, error)
+	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
 }
 
 func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*key.Key, error) {
@@ -118,7 +119,10 @@ func (m *mockKeyOrchestrator) ListKeys(_ context.Context) ([]*key.Key, error) {
 func (m *mockKeyOrchestrator) DeleteKey(_ context.Context, _ string) error {
 	panic("mockKeyOrchestrator.DeleteKey: not implemented")
 }
-func (m *mockKeyOrchestrator) GetKeyWithMaterial(_ context.Context, _ string, _ uint32) (*key.Key, *key.Version, error) {
+func (m *mockKeyOrchestrator) GetKeyWithMaterial(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error) {
+	if m.getKeyWithMaterialFn != nil {
+		return m.getKeyWithMaterialFn(ctx, name, version)
+	}
 	panic("mockKeyOrchestrator.GetKeyWithMaterial: not implemented")
 }
 func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*key.Key, error) {
@@ -222,6 +226,16 @@ func TestHandler_CreateKey_Success(t *testing.T) {
 				Name:     spec.Name,
 			}), nil
 		},
+		getKeyWithMaterialFn: func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error) {
+			return key.NewKey(&storepb.Key{
+					PublicId: name,
+					Name:     name,
+				}), key.NewVersion(&storepb.KeyVersion{
+					Version:    1,
+					TemplateId: "ecdsa-p256-sha256-der",
+					ProviderId: "software",
+				}), nil
+		},
 	}
 	h := wireHandler(km, nil)
 
@@ -264,8 +278,8 @@ func TestHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) 
 func TestHandler_ReadKey_NotFound_ReturnsNotFound(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		readFn: func(ctx context.Context, name string) (*key.Key, error) {
-			return nil, engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
+		getKeyWithMaterialFn: func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error) {
+			return nil, nil, engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
 		},
 	}
 	h := wireHandler(km, nil)
@@ -295,7 +309,7 @@ func TestHandler_Sign_Success(t *testing.T) {
 			}
 			return crypto.SignResult{
 				Signature:    []byte("fake-sig"),
-				KeyPublicID:  req.KeyPublicID,
+				KeyName:      req.KeyName,
 				Algorithm:    "ecdsa-p256-sha256-der",
 				ProviderName: "software",
 				Output:       providerOutput,

@@ -20,8 +20,8 @@ type SignatureScopeFields struct {
 // SignRequest carries the inputs for a Sign operation at the orchestrator level.
 // The orchestrator resolves key material and passes scope_params through to the provider.
 type SignRequest struct {
-	KeyPublicID string // identifies which key to use (proto: key_name)
-	Payload     []byte // data to sign (proto: input)
+	KeyName string // identifies which key to use (proto: key_name)
+	Payload []byte // data to sign (proto: input)
 
 	// Scope-based context for domain separation — exactly one must be non-nil.
 	// Maps to the scope_params oneof in caas.crypto.v1.SignRequest.
@@ -33,7 +33,7 @@ type SignRequest struct {
 // Output carries NoAlgorithmOutput + encoding (signing has no system-generated params).
 type SignResult struct {
 	Signature    []byte
-	KeyPublicID  string                   // echo back for caller context
+	KeyName      string                   // echo back for caller context
 	KeyVersionID uint32                   // version that was used
 	Algorithm    string                   // template ID (e.g., "ecdsa-p256-sha256")
 	ProviderName string                   // which provider performed the operation
@@ -41,9 +41,9 @@ type SignResult struct {
 }
 
 type VerifyRequest struct {
-	KeyPublicID string
-	Payload     []byte // original data that was signed
-	Signature   []byte
+	KeyName   string
+	Payload   []byte // original data that was signed
+	Signature []byte
 
 	// Scope must match the scope used during signing.
 	SignatureScopeFields
@@ -53,14 +53,14 @@ type VerifyRequest struct {
 // Invalid signature is NOT an error — it returns Valid=false.
 type VerifyResult struct {
 	Valid        bool
-	KeyPublicID  string
+	KeyName      string
 	Algorithm    string
 	ProviderName string
 	Output       *messages.ProviderOutput // from provider
 }
 
 type EncryptRequest struct {
-	KeyID     string
+	KeyName   string
 	Plaintext []byte
 
 	// Scope-based operation parameters — exactly one must be non-nil.
@@ -81,7 +81,7 @@ type EncryptResult struct {
 }
 
 type DecryptRequest struct {
-	KeyID      string
+	KeyName    string
 	Ciphertext []byte
 	Output     *messages.ProviderOutput // stored ProviderOutput from EncryptResult (carries IV/nonce)
 

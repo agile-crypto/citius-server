@@ -6,6 +6,8 @@ import (
 
 	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
+
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
@@ -181,7 +183,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		ScopeSpecification: scopeBytes,
 		PolicyId:           req.PolicyID,
 		CurrentVersion:     1,
-		Status:             storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		Status:             types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 		Labels:             req.Labels,
 	})
 
@@ -192,7 +194,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		ProviderId:  prov.Name(),
 		TemplateId:  tmpl.TemplateID(),
 		KeyMaterial: genRespBytes,
-		Status:      storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		Status:      types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	})
 
 	if err := r.repo.CreateKey(ctx, k, v); err != nil {
@@ -202,9 +204,9 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	return k, nil
 }
 
-func (r *keyOrchestrator) ReadKey(ctx context.Context, publicID string) (*key.Key, error) {
+func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string) (*key.Key, error) {
 	const op errors.Op = "service.(keyOrchestrator).ReadKey"
-	k, err := r.repo.GetKeyByID(ctx, publicID)
+	k, err := r.repo.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -221,19 +223,25 @@ func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*key.Key, error) {
 	return keys, nil
 }
 
-func (r *keyOrchestrator) DeleteKey(ctx context.Context, publicID string) error {
+func (r *keyOrchestrator) DeleteKey(ctx context.Context, keyName string) error {
 	const op errors.Op = "service.(keyOrchestrator).DeleteKey"
-	if err := r.repo.DeleteKey(ctx, publicID); err != nil {
+	// 1. Fetch key metadata.
+	k, err := r.repo.GetKeyByName(ctx, keyName)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+
+	if err := r.repo.DeleteKey(ctx, k.GetPublicId()); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
 }
 
-func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyID string, version uint32) (*key.Key, *key.Version, error) {
+func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyName string, version uint32) (*key.Key, *key.Version, error) {
 	const op errors.Op = "service.(keyOrchestrator).GetKeyWithMaterial"
 
 	// 1. Fetch key metadata.
-	k, err := r.repo.GetKeyByID(ctx, keyID)
+	k, err := r.repo.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return nil, nil, errors.Wrap(ctx, op, err)
 	}
@@ -254,9 +262,9 @@ func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyID string, 
 	//    version == 0 means "current/latest"; otherwise fetch a specific version.
 	var v *key.Version
 	if version == 0 {
-		v, err = r.repo.GetCurrentVersion(ctx, keyID)
+		v, err = r.repo.GetCurrentVersion(ctx, k.GetPublicId())
 	} else {
-		v, err = r.repo.GetVersion(ctx, keyID, version)
+		v, err = r.repo.GetVersion(ctx, k.GetPublicId(), version)
 	}
 	if err != nil {
 		return nil, nil, errors.Wrap(ctx, op, err)
