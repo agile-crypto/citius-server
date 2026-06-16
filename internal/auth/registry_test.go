@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
-	servicespb "github.ibm.com/citius/citius-server/gen/go/services"
+	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
 	"github.ibm.com/citius/citius-server/internal/auth"
 	"google.golang.org/grpc"
 )

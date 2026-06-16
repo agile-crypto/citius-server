@@ -3,7 +3,7 @@ package template_test
 import (
 	"testing"
 
-	api "github.ibm.com/citius/citius-server/gen/go/types"
+	api "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/template"
 )

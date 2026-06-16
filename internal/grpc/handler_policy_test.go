@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	engerr "github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/policy"
 	"google.golang.org/grpc/codes"

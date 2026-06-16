@@ -1,0 +1,256 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+option go_package = "github.ibm.com/citius/citius-server/gen/go/server/provider;provider";
+
+import "buf/validate/validate.proto";
+import "api/types/operation_params.proto";
+import "api/types/algorithm_params.proto";
+import "api/types/templates.proto";
+import "api/messages/metadata.proto";
+
+
+// ============================================================================
+// Signing Operations
+// ============================================================================
+
+// SignRequest asks the provider to sign a message (full, unhashed input).
+//
+// The core engine resolves the algorithm from the template — the provider
+// receives the raw message bytes and signs using the key material it holds.
+//
+// For pre-hashed input, use DigestSignRequest instead.
+//
+// PKCS #11 equivalent: C_Sign (single-part, message-level)
+message SignRequest {
+  // Opaque key material — raw bytes for software providers,
+  // serialized handle for HSM providers.  The core passes
+  // StoredKeyVersion.plaintext_material as-is.
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+
+  // The message to sign — full, unhashed data.
+  // The provider applies the template-configured hash internally
+  // (e.g., CKM_ECDSA_SHA256 hashes before signing).
+  bytes input = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // Scope-based context parameters for domain separation.
+  // REQUIRED: always set one option to make intent explicit.
+  //
+  // PKCS #11 mapping:
+  //   no_context       → CKM_ECDSA, CKM_RSA_PKCS_PSS, CKM_DSA (no mechanism param)
+  //   domain_context   → CK_EDDSA_PARAMS.pContextData (EdDSA)
+  //                      CK_ML_DSA_PARAMS.pContext     (ML-DSA)
+  //                      CK_SLH_DSA_PARAMS.pContext    (SLH-DSA)
+  //   vendor_context   → vendor-specific mechanism params
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_context     = 3;
+    caas.crypto.v1.SignatureDomainContext   domain_context = 4;
+    caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
+  }
+
+  // Typed algorithm specification for provider dispatch.
+  // The core resolves this from the template and passes it through.
+  // The provider SHOULD validate it matches the key_material type.
+  caas.crypto.v1.AlgorithmDetails algorithm = 6;
+}
+
+// SignResponse contains the signature and provider output.
+message SignResponse {
+  bytes signature = 1 [(buf.validate.field).bytes.min_len = 1];
+
+  // Provider-generated output — algorithm parameters and encoding.
+  // The core wraps this into OperationMetadata for the API response.
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// VerifyRequest asks the provider to verify a signature against a message.
+//
+// PKCS #11 equivalent: C_Verify (single-part)
+message VerifyRequest {
+  bytes  key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque; same bytes returned from GenerateKey
+  bytes  input        = 2 [(buf.validate.field).bytes.min_len = 1];  // original message (unhashed)
+  bytes  signature = 3 [(buf.validate.field).bytes.min_len = 1];
+
+  // Must match the scope used during signing.
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_context     = 4;
+    caas.crypto.v1.SignatureDomainContext   domain_context = 5;
+    caas.crypto.v1.VendorSignatureContext   vendor_context = 6;
+  }
+
+  // Typed algorithm specification — must match the algorithm used during signing.
+  caas.crypto.v1.AlgorithmDetails algorithm = 7;
+
+  // Provider-generated output — algorithm parameters and encoding, retuned during signing.  The core extracts this from the stored OperationMetadata and passes it through for verification.
+  caas.crypto.v1.ProviderOutput output = 8;
+}
+
+// VerifyResponse reports whether the signature is valid.
+message VerifyResponse {
+  bool valid = 1;
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// DigestSignRequest asks the provider to sign a pre-computed digest.
+//
+// Use when the caller has already hashed the message (prehash mode).
+// The provider applies the raw signature primitive (e.g., CKM_ECDSA, CKM_RSA_PKCS_PSS).
+//
+// PKCS #11 equivalent: C_Sign with pre-hashed data and CKM_ECDSA (no hash prefix)
+message DigestSignRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+
+  // The digest bytes — output of the hash algorithm below.
+  bytes digest = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // Scope-based context (same as SignRequest).
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_context     = 3;
+    caas.crypto.v1.SignatureDomainContext   domain_context = 4;
+    caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
+  }
+
+  // Hash algorithm used to produce the digest — REQUIRED.
+  //
+  // Purpose:
+  //   1. Digest size validation (prevents SHA-1 digest claiming to be SHA-256)
+  //   2. Policy enforcement (reject weak hash algorithms)
+  //   3. RSA-PKCS1v15: determines the DigestInfo ASN.1 prefix
+  //
+  // PKCS #11: embedded in mechanism selection (CKM_SHA256_RSA_PKCS vs CKM_ECDSA)
+  caas.crypto.v1.HashAlgorithm hash_algorithm = 6;
+
+  // Optional OID for extensibility (when hash_algorithm is HASH_ALGORITHM_OTHER).
+  // Example: "2.16.840.1.101.3.4.2.1" for SHA-256
+  string hash_algorithm_oid = 7;
+}
+
+// DigestSignResponse contains the signature over the digest.
+message DigestSignResponse {
+  bytes signature = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// DigestVerifyRequest asks the provider to verify a signature over a pre-computed digest.
+//
+// PKCS #11 equivalent: C_Verify with pre-hashed data
+message DigestVerifyRequest {
+  bytes  key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  bytes  digest       = 2 [(buf.validate.field).bytes.min_len = 1];
+  bytes  signature    = 3 [(buf.validate.field).bytes.min_len = 1];
+
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_context     = 4;
+    caas.crypto.v1.SignatureDomainContext   domain_context = 5;
+    caas.crypto.v1.VendorSignatureContext   vendor_context = 6;
+  }
+
+  // Must match the hash_algorithm from the corresponding DigestSignRequest.
+  caas.crypto.v1.HashAlgorithm hash_algorithm = 7;
+  string hash_algorithm_oid = 8;
+}
+
+// DigestVerifyResponse reports whether the digest signature is valid.
+message DigestVerifyResponse {
+  bool valid = 1;
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Encryption Operations
+// ============================================================================
+
+// EncryptRequest asks the provider to encrypt plaintext.
+//
+// The `scope_params` oneof selects which family of user-provided parameters
+// applies.  System-generated values (IV, nonce) are NOT set by the caller —
+// the provider generates them and returns them in ProviderOutput.
+//
+// PKCS #11 equivalents:
+//   no_params         → CKM_AES_CBC, CKM_AES_CTR (IV is system-generated)
+//   aead_params       → CK_GCM_PARAMS.pAAD (AES-GCM), CK_CCM_PARAMS.pAAD (AES-CCM),
+//                        CK_SALSA20_CHACHA20_POLY1305_PARAMS.pAAD (ChaCha20-Poly1305)
+//   xts_params        → CK_AES_XTS_PARAMS tweak value
+//   asymmetric_params → CK_RSA_PKCS_OAEP_PARAMS.pSourceData (OAEP label)
+message EncryptRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  bytes plaintext    = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // Scope-based operation parameters.
+  // REQUIRED: always set one option to make intent explicit.
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_params         = 3;
+    caas.crypto.v1.AeadEncryptParams       aead_params       = 4;
+    caas.crypto.v1.XtsEncryptParams        xts_params        = 5;
+    caas.crypto.v1.AsymmetricEncryptParams asymmetric_params = 6;
+    caas.crypto.v1.VendorEncryptionParams  vendor_params     = 7;
+  }
+}
+
+// EncryptResponse returns ciphertext and system-generated output.
+//
+// The output carries IV/nonce, tag length, encoding format — everything
+// needed for decryption.  The core wraps this into OperationMetadata
+// and the client stores it alongside the ciphertext.
+message EncryptResponse {
+  bytes ciphertext = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// DecryptRequest asks the provider to decrypt ciphertext.
+//
+// The core extracts the ProviderOutput from the stored OperationMetadata
+// and passes it to the provider.  This carries the IV/nonce needed for
+// decryption.
+//
+// The scope_params must match encryption (AAD must be identical for AEAD
+// authentication, tweak must match for XTS, label must match for OAEP).
+message DecryptRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  bytes ciphertext   = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // ProviderOutput extracted from the stored OperationMetadata.
+  // Contains IV/nonce in algorithm_output.
+  caas.crypto.v1.ProviderOutput output = 3;
+
+  // Scope-based operation parameters (must match encryption).
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_params         = 4;
+    caas.crypto.v1.AeadEncryptParams       aead_params       = 5;
+    caas.crypto.v1.XtsEncryptParams        xts_params        = 6;
+    caas.crypto.v1.AsymmetricEncryptParams asymmetric_params = 7;
+    caas.crypto.v1.VendorEncryptionParams  vendor_params     = 8;
+  }
+}
+
+// DecryptResponse returns plaintext and provider output.
+message DecryptResponse {
+  bytes plaintext = 1;
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+// CryptoService — primitive cryptographic operations at the provider level.
+//
+// The CaaS core engine calls these RPCs after resolving template, policy,
+// and key material.  Each provider implements the subset it supports.
+//
+// Sign + Verify (+ DigestSign/DigestVerify for prehash).
+// Encrypt + Decrypt are included for completeness
+// TODO: Add more rpcs for other primitive operations (e.g., MAC, KDF, key agreement).
+service CryptoService {
+  // Full-message signing (provider hashes internally per template config).
+  rpc Sign(SignRequest)               returns (SignResponse);
+  rpc Verify(VerifyRequest)           returns (VerifyResponse);
+
+  // Pre-hashed signing (caller already computed digest).
+  rpc DigestSign(DigestSignRequest)   returns (DigestSignResponse);
+  rpc DigestVerify(DigestVerifyRequest) returns (DigestVerifyResponse);
+
+  // Encryption / Decryption (all scope families via oneof).
+  rpc Encrypt(EncryptRequest)         returns (EncryptResponse);
+  rpc Decrypt(DecryptRequest)         returns (DecryptResponse);
+}

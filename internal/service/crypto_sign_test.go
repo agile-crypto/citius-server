@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	types "github.ibm.com/citius/citius-server/gen/go/types"
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	"github.ibm.com/citius/citius-server/internal/errors"

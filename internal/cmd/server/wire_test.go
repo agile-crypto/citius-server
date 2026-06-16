@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"testing"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
-	typespb "github.ibm.com/citius/citius-server/gen/go/types"
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
+	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/cmd/server"
 )
 

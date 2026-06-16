@@ -3,8 +3,8 @@ package grpc
 import (
 	"context"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
-	servicespb "github.ibm.com/citius/citius-server/gen/go/services"
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
+	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	engerr "github.ibm.com/citius/citius-server/internal/errors"

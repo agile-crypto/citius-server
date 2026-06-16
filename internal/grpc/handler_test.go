@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	typespb "github.ibm.com/citius/citius-server/gen/go/types"
+	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	engerr "github.ibm.com/citius/citius-server/internal/errors"

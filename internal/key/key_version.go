@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"

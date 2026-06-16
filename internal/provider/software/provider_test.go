@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
+	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/provider"
 	"github.ibm.com/citius/citius-server/internal/provider/software"

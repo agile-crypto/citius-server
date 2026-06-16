@@ -1,7 +1,7 @@
 package provider
 
 import (
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	"google.golang.org/protobuf/proto"
 )
 
