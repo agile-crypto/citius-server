@@ -36,10 +36,14 @@ import (
 
 	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
 <<<<<<< HEAD
+<<<<<<< HEAD
 	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
 =======
 	servicespb "github.ibm.com/citius/citius-server/gen/go/services"
 >>>>>>> 711584f (Proto-layout restructuration (split server and api))
+=======
+	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
+>>>>>>> 5c982f9 (Update API protos to the latest version (date of commit))
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
