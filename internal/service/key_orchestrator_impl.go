@@ -62,7 +62,7 @@ func NewKeyOrchestrator(
 	}, nil
 }
 
-func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpec) (*key.Key, error) {
+func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpec) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).CreateKey"
 
 	// 1. Validate request
@@ -132,6 +132,38 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	return r.generateAndPersistKey(ctx, op, req, tmpl, scopeSpec)
 }
 
+// toKeyMetadata projects a key.Key and its current key.Version into the
+// API-facing KeyMetadata. v may be nil; version-scoped fields are
+// then left at their zero values.
+func (r *keyOrchestrator) toKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
+	md := &KeyMetadata{
+		Name:           k.GetName(),
+		KeyID:          k.GetPublicId(),
+		Primitive:      k.GetPrimitive(),
+		Policy:         k.GetPolicyId(),
+		LifecycleState: k.GetStatus(),
+		Labels:         k.GetLabels(),
+	}
+
+	if data := k.GetScopeSpecification(); len(data) > 0 {
+		// ScopeSpecification is stored as JSON-encoded core.ScopeSpec.
+		if scopeSpec, err := core.ParseScopeSpec(ctx, data); err == nil {
+			md.ScopeSpec = template.ScopeSpecToProto(scopeSpec)
+		}
+	}
+
+	if v != nil {
+		md.Version = v.GetVersion()
+		md.TemplateID = v.GetTemplateId()
+		md.Provider = v.GetProviderId()
+		if tmpl, err := r.templates.Get(ctx, v.GetTemplateId()); err == nil {
+			md.TemplateInfo = tmpl.Proto()
+		}
+	}
+
+	return md, nil
+}
+
 // generateAndPersistKey handles provider key generation, proto marshaling, and
 // repository persistence.  Extracted from CreateKey to keep cyclomatic
 // complexity within linter limits.
@@ -141,7 +173,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	req core.KeyCreationSpec,
 	tmpl *template.Template,
 	scopeSpec core.ScopeSpec,
-) (*key.Key, error) {
+) (*KeyMetadata, error) {
 	// 1. Find a provider that supports this template.
 	prov, err := r.providers.MatchForTemplate(ctx, tmpl.TemplateID())
 	if err != nil {
@@ -201,26 +233,41 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	return k, nil
+	return r.toKeyMetadata(ctx, k, v)
 }
 
-func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string) (*key.Key, error) {
+func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ReadKey"
 	k, err := r.repo.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return k, nil
+	v, err := r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return r.toKeyMetadata(ctx, k, v)
 }
 
-func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*key.Key, error) {
+func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ListKeys"
-	// Repository.ListKeys returns []*key.Key directly — no N+1 fetch needed.
 	keys, err := r.repo.ListKeys(ctx)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return keys, nil
+	out := make([]*KeyMetadata, 0, len(keys))
+	for _, k := range keys {
+		v, verr := r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+		if verr != nil {
+			return nil, errors.Wrap(ctx, op, verr)
+		}
+		md, merr := r.toKeyMetadata(ctx, k, v)
+		if merr != nil {
+			return nil, errors.Wrap(ctx, op, merr)
+		}
+		out = append(out, md)
+	}
+	return out, nil
 }
 
 func (r *keyOrchestrator) DeleteKey(ctx context.Context, keyName string) error {
@@ -273,7 +320,7 @@ func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyName string
 	return k, v, nil
 }
 
-func (r *keyOrchestrator) RotateKey(ctx context.Context, _ string) (*key.Key, error) {
+func (r *keyOrchestrator) RotateKey(ctx context.Context, _ string) (*KeyMetadata, error) {
 	return nil, errors.New(ctx, "service.(keyOrchestrator).RotateKey", errors.CodeNotImplemented,
 		"RotateKey not yet implemented")
 }
@@ -293,7 +340,7 @@ func (r *keyOrchestrator) DestroyKey(ctx context.Context, _ string) error {
 		"DestroyKey not yet implemented")
 }
 
-func (r *keyOrchestrator) ImportKey(ctx context.Context, _ core.ImportKeySpec) (*key.Key, error) {
+func (r *keyOrchestrator) ImportKey(ctx context.Context, _ core.ImportKeySpec) (*KeyMetadata, error) {
 	return nil, errors.New(ctx, "service.(keyOrchestrator).ImportKey", errors.CodeNotImplemented,
 		"ImportKey not yet implemented")
 }

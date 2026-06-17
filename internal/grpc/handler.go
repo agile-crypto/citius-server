@@ -113,12 +113,7 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 		}
 	}
 
-	k, err := scope.Keys().CreateKey(ctx, spec)
-	if err != nil {
-		return nil, ToStatusError(engerr.Wrap(ctx, createOp, err))
-	}
-
-	key, version, err := scope.Keys().GetKeyWithMaterial(ctx, req.GetName(), k.GetCurrentVersion())
+	md, err := scope.Keys().CreateKey(ctx, spec)
 	if err != nil {
 		return nil, ToStatusError(engerr.Wrap(ctx, createOp, err))
 	}
@@ -126,12 +121,12 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 	return &messagespb.CreateKeyResponse{
 		Success: true,
 		KeyMetadata: &messagespb.KeyMetadata{
-			Name:       key.GetName(),
-			Version:    version.GetVersion(),
-			Policy:     key.GetPolicyId(),
-			KeyId:      key.GetPublicId(),
-			TemplateId: version.GetTemplateId(),
-			Provider:   version.GetProviderId(),
+			Name:       md.Name,
+			Version:    md.Version,
+			Policy:     md.Policy,
+			KeyId:      md.KeyID,
+			TemplateId: md.TemplateID,
+			Provider:   md.Provider,
 		},
 	}, nil
 }
@@ -153,19 +148,19 @@ func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (
 		return nil, ToStatusError(err)
 	}
 
-	key, version, err := scope.Keys().GetKeyWithMaterial(ctx, req.GetName(), 0)
+	md, err := scope.Keys().ReadKey(ctx, req.GetName())
 	if err != nil {
 		return nil, ToStatusError(engerr.Wrap(ctx, readOp, err))
 	}
 
 	return &messagespb.ReadKeyResponse{
 		KeyMetadata: &messagespb.KeyMetadata{
-			Name:       key.GetName(),
-			Version:    version.GetVersion(),
-			Policy:     key.GetPolicyId(),
-			KeyId:      key.GetPublicId(),
-			TemplateId: version.GetTemplateId(),
-			Provider:   version.GetProviderId(),
+			Name:       md.Name,
+			Version:    md.Version,
+			Policy:     md.Policy,
+			KeyId:      md.KeyID,
+			TemplateId: md.TemplateID,
+			Provider:   md.Provider,
 		},
 	}, nil
 }

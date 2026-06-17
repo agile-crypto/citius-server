@@ -60,7 +60,7 @@ func setupCryptoWithKeyForVerify(t *testing.T) (service.CryptoOrchestrator, stri
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
-	return ops, created.GetName()
+	return ops, created.Name
 }
 
 // ============================================================================
@@ -228,7 +228,7 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Sign first (allowed).
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyName:              created.GetName(),
+		KeyName:              created.Name,
 		Payload:              []byte("data"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -238,7 +238,7 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Verify should fail with policy violation.
 	_, err = ops.Verify(ctx, crypto.VerifyRequest{
-		KeyName:              created.GetName(),
+		KeyName:              created.Name,
 		Payload:              []byte("data"),
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},

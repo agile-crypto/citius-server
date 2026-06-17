@@ -59,7 +59,7 @@ func setupCryptoWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
-	return ops, created.GetName()
+	return ops, created.Name
 }
 
 // ============================================================================
@@ -168,7 +168,7 @@ func TestSign_policyDeniesSign_returnsError(t *testing.T) {
 
 	// Sign should fail with policy violation.
 	_, err = ops.Sign(ctx, crypto.SignRequest{
-		KeyName:              created.GetName(),
+		KeyName:              created.Name,
 		Payload:              []byte("should fail"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})

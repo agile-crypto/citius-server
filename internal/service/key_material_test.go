@@ -26,7 +26,7 @@ func TestGetKeyWithMaterial_latestVersion(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	k, v, err := orch.GetKeyWithMaterial(ctx, created.GetName(), 0) // 0 = latest
+	k, v, err := orch.GetKeyWithMaterial(ctx, created.Name, 0) // 0 = latest
 	if err != nil {
 		t.Fatalf("GetKeyWithMaterial: %v", err)
 	}
@@ -38,8 +38,8 @@ func TestGetKeyWithMaterial_latestVersion(t *testing.T) {
 		t.Fatal("returned nil version")
 		return // unreachable; satisfies static-analysis nil-flow
 	}
-	if k.GetPublicId() != created.GetPublicId() {
-		t.Errorf("key PublicId: got %q want %q", k.GetPublicId(), created.GetPublicId())
+	if k.GetPublicId() != created.KeyID {
+		t.Errorf("key PublicId: got %q want %q", k.GetPublicId(), created.KeyID)
 	}
 	if v.GetVersion() != 1 {
 		t.Errorf("version: got %d want 1", v.GetVersion())
@@ -66,12 +66,12 @@ func TestGetKeyWithMaterial_specificVersion(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	k, v, err := orch.GetKeyWithMaterial(ctx, created.GetName(), 1) // explicit version 1
+	k, v, err := orch.GetKeyWithMaterial(ctx, created.Name, 1) // explicit version 1
 	if err != nil {
 		t.Fatalf("GetKeyWithMaterial: %v", err)
 	}
-	if k.GetPublicId() != created.GetPublicId() {
-		t.Errorf("key PublicId: got %q want %q", k.GetPublicId(), created.GetPublicId())
+	if k.GetPublicId() != created.KeyID {
+		t.Errorf("key PublicId: got %q want %q", k.GetPublicId(), created.KeyID)
 	}
 	if v.GetVersion() != 1 {
 		t.Errorf("version: got %d want 1", v.GetVersion())
@@ -101,7 +101,7 @@ func TestGetKeyWithMaterial_versionNotFound(t *testing.T) {
 	}
 
 	// Version 99 does not exist — only version 1 was created.
-	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetName(), 99)
+	_, _, err = orch.GetKeyWithMaterial(ctx, created.Name, 99)
 	if err == nil {
 		t.Fatal("expected error for non-existent version")
 	}
@@ -124,7 +124,7 @@ func TestGetKeyWithMaterial_destroyedKey_returnsFailedPrecondition(t *testing.T)
 	}
 
 	// Transition to terminal: ACTIVE → COMPROMISED → DESTROYED (per NIST SP 800-57).
-	k, err := repo.GetKeyByID(ctx, created.GetPublicId())
+	k, err := repo.GetKeyByID(ctx, created.KeyID)
 	if err != nil {
 		t.Fatalf("repo.GetKey: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestGetKeyWithMaterial_destroyedKey_returnsFailedPrecondition(t *testing.T)
 		t.Fatalf("repo.UpdateKey: %v", err)
 	}
 
-	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetName(), 0)
+	_, _, err = orch.GetKeyWithMaterial(ctx, created.Name, 0)
 	if err == nil {
 		t.Fatal("expected error for destroyed key")
 	}
@@ -164,7 +164,7 @@ func TestGetKeyWithMaterial_suspendedKey_returnsFailedPrecondition(t *testing.T)
 	}
 
 	// Transition: ACTIVE → SUSPENDED.
-	k, err := repo.GetKeyByID(ctx, created.GetPublicId())
+	k, err := repo.GetKeyByID(ctx, created.KeyID)
 	if err != nil {
 		t.Fatalf("repo.GetKey: %v", err)
 	}
@@ -177,7 +177,7 @@ func TestGetKeyWithMaterial_suspendedKey_returnsFailedPrecondition(t *testing.T)
 		t.Fatalf("repo.UpdateKey: %v", err)
 	}
 
-	_, _, err = orch.GetKeyWithMaterial(ctx, created.GetName(), 0)
+	_, _, err = orch.GetKeyWithMaterial(ctx, created.Name, 0)
 	if err == nil {
 		t.Fatal("expected error for suspended key")
 	}
