@@ -23,6 +23,7 @@
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
 .PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env test-integration-auth-e2e
+.PHONY: update-api-proto
 
 # Default goal: print help when `make` is run with no arguments.
 .DEFAULT_GOAL := help
@@ -140,6 +141,18 @@ fmt: ## Format Go source (gofmt + goimports)
 proto: ## Generate Go code from proto definitions (buf generate)
 	cd proto && buf generate
 	@echo "Proto generation complete"
+
+# ---------------------------------------------------------------------------
+# Proto code generation
+# ---------------------------------------------------------------------------
+
+API_REPO_URL := git@github.ibm.com:citius/api.git
+PROTO_PACKAGES := messages,services,types
+PROTO_FOLDER := proto
+TMP_DIR_PROTO := tmp_proto
+
+proto-update-api:
+	@bash scripts/update_api_proto.sh "$(API_REPO_URL)" "$(MODULE)" "$(PROTO_PACKAGES)" "$(PROTO_FOLDER)" "$(TMP_DIR_PROTO)"
 
 # ---------------------------------------------------------------------------
 # Go generate

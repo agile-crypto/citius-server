@@ -34,7 +34,7 @@ The script performs the following steps in order:
 
 SESSION RESUME
 --------------
-After a failed run (proto/api-backup exists), subsequent invocations MUST
+After a failed run (proto/api-backup exists) or a successful run with --keep-state, subsequent invocations MUST
 supply one of:
 
   --continue   Re-run buf lint against the current proto/api.
@@ -70,9 +70,14 @@ OPTIONS
   --branch BRANCH   Git branch to check out (default: repository default).
   --continue        Resume a previously interrupted session (re-lint only).
   --abort           Restore the previous state after a failed session.
+  --keep-state      Interrupt the session, even after a successful update, without cleaning up temporary state. Use this if you want to inspect the changes. The session must be terminated with "--continue" or "--abort" options.
   --debug           Enable debug-level output (internal step details, paths,
                     per-file actions). Hidden by default.
   -h, --help        Show this help message and exit.
+  --go-module       Go module name of the current repo, used to construct go_package options
+                    (default: github.ibm.com/citius/citius-server).
+  --proto-packages  Comma-separated list of proto packages to copy from the fetched repo and update (default: messages,services,types).
+  --tmp-dir         Directory to use for temporary state (default: proto/).
 
 EXAMPLES
 --------
@@ -103,14 +108,16 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent          # proto/scripts/
 PROTO_DIR = SCRIPT_DIR.parent                          # proto/
 API_DIR = PROTO_DIR / 'api'                            # proto/api/
-API_BACKUP_DIR = PROTO_DIR / 'api-backup'              # proto/api-backup/
-FETCHED_REPO_DIR = PROTO_DIR / 'fetched-repo'         # proto/fetched-repo/
+
+API_BACKUP_DIRNAME = 'api-backup'
+FETCHED_REPO_DIRNAME = 'fetched-repo'
 
 PROTO_SUBFOLDERS_SERVER = ['api', 'server']
-PROTO_PACKAGES_API = ['messages', 'services', 'types']
+DEFAULT_PROTO_PACKAGES_API = ['messages', 'services', 'types']
 
-GO_MODULE = 'github.ibm.com/citius/citius-server'
-GO_PKG_API_ROOT = f'{GO_MODULE}/gen/go/api'
+DEFAULT_GO_MODULE = 'github.ibm.com/citius/citius-server'
+GO_PKG_API_ROOT_RELATIVE = 'gen/go/api'
+DEFAULT_GO_PKG_API_ROOT = f'{DEFAULT_GO_MODULE}/{GO_PKG_API_ROOT_RELATIVE}'
 
 REMOVE_GO_PKG_SCRIPT = SCRIPT_DIR / 'remove_go_package.py'
 ADD_GO_PKG_SCRIPT = SCRIPT_DIR / 'add_go_package.py'
@@ -158,6 +165,14 @@ def die(msg: str) -> None:
     logger.error(msg)
     sys.exit(1)
 
+def go_pkg_api_root(go_module: str) -> str:
+    return f'{go_module}/{GO_PKG_API_ROOT_RELATIVE}'
+
+def get_api_backup_dir(tmp_dir: Path) -> Path:
+    return tmp_dir / API_BACKUP_DIRNAME
+
+def get_fetched_repo_dir(tmp_dir: Path) -> Path:
+    return tmp_dir / FETCHED_REPO_DIRNAME
 
 def run(cmd: list[str], cwd: Path | None = None, check: bool = True) -> subprocess.CompletedProcess:
     """Run a command, streaming its output. Raises on non-zero exit if check=True."""
@@ -188,14 +203,6 @@ def ask_yes_no(question: str) -> bool:
         print('Please answer yes or no.')
 
 
-def get_api_subfolders() -> list[str]:
-    """Return the list of direct subfolder names inside proto/api/."""
-    if not API_DIR.is_dir():
-        die(f'proto/api directory not found: {API_DIR}')
-    subfolders = [p.name for p in sorted(API_DIR.iterdir()) if p.is_dir()]
-    return subfolders
-
-
 def get_api_root_protos() -> list[Path]:
     """Return .proto files directly in proto/api/ (not in subdirectories)."""
     if not API_DIR.is_dir():
@@ -207,157 +214,164 @@ def get_api_root_protos() -> list[Path]:
 # Step implementations
 # ---------------------------------------------------------------------------
 
-def step_backup() -> None:
+def step_backup(tmp_dir: Path) -> None:
+    api_backup_dir = get_api_backup_dir(tmp_dir)
     logger.debug('\n[Step 1] Renaming proto/api → proto/api-backup ...')
     if not API_DIR.exists():
         die(f'proto/api not found at {API_DIR}. Nothing to back up.')
-    if API_BACKUP_DIR.exists():
+    if api_backup_dir.exists():
         die(
-            f'proto/api-backup already exists at {API_BACKUP_DIR}. '
+            f'proto/api-backup already exists at {api_backup_dir}. '
             'A previous session may have been interrupted. '
             'Run with --continue to resume or --abort to restore.'
         )
-    API_DIR.rename(API_BACKUP_DIR)
-    logger.debug(f'  Backed up to {API_BACKUP_DIR}')
+    API_DIR.rename(api_backup_dir)
+    logger.debug(f'  Backed up to {api_backup_dir}')
 
 
-def step_clone(repo_url: str, branch: str | None) -> None:
+def step_clone(repo_url: str, branch: str | None, tmp_dir: Path) -> None:
+    fetched_repo_dir = get_fetched_repo_dir(tmp_dir)
     logger.debug(f'\n[Step 2] Cloning {repo_url} into proto/fetched-repo ...')
-    if FETCHED_REPO_DIR.exists():
-        logger.debug(f'  Removing stale {FETCHED_REPO_DIR} ...')
-        shutil.rmtree(FETCHED_REPO_DIR)
+    if fetched_repo_dir.exists():
+        logger.debug(f'  Removing stale {fetched_repo_dir} ...')
+        shutil.rmtree(fetched_repo_dir)
     cmd = ['git', 'clone', '--depth', '1']
     if branch:
         cmd += ['--branch', branch]
-    cmd += [repo_url, str(FETCHED_REPO_DIR)]
-    try:
-        run(cmd)
-    except subprocess.CalledProcessError:
-        die(f'git clone failed for {repo_url}')
-    logger.debug(f'  Cloned into {FETCHED_REPO_DIR}')
+    cmd += [repo_url, str(fetched_repo_dir)]
+    ret, _, stderr = run_captured(cmd)
+    if ret != 0:
+        die(f'git clone failed for {repo_url}: {stderr}')
+    logger.debug(f'  Cloned into {fetched_repo_dir}')
 
 
-def step_copy(proto_folder: str) -> None:
+def step_copy(proto_folder: str, proto_packages: list[str], tmp_dir: Path) -> None:
     logger.debug(f'\n[Step 3] Copying proto/fetched-repo/{proto_folder} → proto/api ...')
-    src = FETCHED_REPO_DIR / proto_folder
+    fetched_repo_dir = get_fetched_repo_dir(tmp_dir)
+    src = fetched_repo_dir / proto_folder
     if not src.exists():
         die(
             f'Folder "{proto_folder}" not found inside the cloned repository.\n'
             f'  Expected: {src}\n'
             f'  Available top-level entries: '
-            + ', '.join(p.name for p in sorted(FETCHED_REPO_DIR.iterdir()))
+            + ', '.join(p.name for p in sorted(fetched_repo_dir.iterdir()))
         )
     if not src.is_dir():
         die(f'"{proto_folder}" exists in the cloned repo but is not a directory: {src}')
     if API_DIR.exists():
         logger.debug(f'  Removing stale {API_DIR} ...')
         shutil.rmtree(API_DIR)
-    for pkg in PROTO_PACKAGES_API:
+    for pkg in proto_packages:
         pkg_src = src / pkg
         if not pkg_src.is_dir():
             die(f'Expected package subfolder "{pkg}" not found in {src}.')
         shutil.copytree(pkg_src, API_DIR / pkg)
         logger.debug(f'  Copied {pkg_src} → {API_DIR / pkg}')
+    root_protos = [p for p in src.iterdir() if p.is_file() and p.suffix == '.proto']
+    for proto in root_protos:
+        shutil.copy2(proto, API_DIR / proto.name)
+        logger.debug(f'  Copied {proto} → {API_DIR / proto.name}')
 
 
 def step_remove_go_package() -> None:
     logger.debug('\n[Step 4] Removing all go_package options from proto/api/**/*.proto ...')
     require_script(REMOVE_GO_PKG_SCRIPT)
-    try:
-        run([sys.executable, str(REMOVE_GO_PKG_SCRIPT), '-r', str(API_DIR)])
-    except subprocess.CalledProcessError:
-        die('remove_go_package.py failed.')
+    cmd = [sys.executable, str(REMOVE_GO_PKG_SCRIPT), '-r', str(API_DIR)]
+    ret, stdout, stderr = run_captured(cmd)
+    if ret != 0:
+        logger.debug('  remove_go_package.py (stdout): ' + stdout)
+        logger.debug('  remove_go_package.py (stderr): ' + stderr)
+        die('remove_go_package.py failed')
 
-
-def step_add_go_packages_and_fix_imports(subfolders: list[str]) -> None:
+def step_add_go_packages_and_fix_imports(proto_packages: list[str], go_package_api_root: str) -> None:
     logger.debug('\n[Step 5] Adding go_package options and fixing import paths in proto/api subfolders ...')
     require_script(ADD_GO_PKG_SCRIPT)
 
-    for pkg in PROTO_PACKAGES_API:
+    for pkg in proto_packages:
         pkg_dir = API_DIR / pkg
         if not pkg_dir.is_dir():
             die(f'Expected subfolder not found: {pkg_dir}')
 
         # 5a — add go_package
-        go_pkg = f'{GO_PKG_API_ROOT}/{pkg};api'
+        go_pkg = f'{go_package_api_root}/{pkg};api'
         logger.debug(f'\n  [{pkg}] Adding go_package = "{go_pkg}" ...')
-        try:
-            run([sys.executable, str(ADD_GO_PKG_SCRIPT), go_pkg, '-r', str(pkg_dir)])
-        except subprocess.CalledProcessError:
+
+        cmd = [sys.executable, str(ADD_GO_PKG_SCRIPT), go_pkg, '-r', str(pkg_dir)]
+        ret, stdout, stderr = run_captured(cmd)
+        if ret != 0:
+            logger.debug(f'  {ADD_GO_PKG_SCRIPT} (stdout): {stdout}')
+            logger.debug(f'  {ADD_GO_PKG_SCRIPT} (stderr): {stderr}')
             die(f'add_go_package.py failed for subfolder "{pkg}".')
 
         # 5b — rewrite imports: for every *other* subfolder S, rewrite S/... → api/S/...
         logger.debug(f'  [{pkg}] Rewriting cross-subfolder import paths ...')
-        for p in PROTO_PACKAGES_API:
+        for p in proto_packages:
             _rewrite_imports_in_dir(pkg_dir, old_prefix=p, new_prefix=f'api/{p}')
 
 
-def step_fix_root_api_protos(subfolders: list[str]) -> None:
+def step_fix_root_api_protos(proto_packages: list[str], go_package_api_root: str) -> None:
     root_protos = get_api_root_protos()
     if not root_protos:
         logger.debug('\n[Step 6] No root-level .proto files in proto/api/ — skipping.')
         return
 
-    print(f'\n[Step 6] Processing {len(root_protos)} root-level .proto file(s) in proto/api/ ...')
-    require_script(REMOVE_GO_PKG_SCRIPT)
+    logger.debug(f'\n[Step 6] Processing {len(root_protos)} root-level .proto file(s) in proto/api/ ...')
     require_script(ADD_GO_PKG_SCRIPT)
 
-    go_pkg = f'{GO_PKG_API_ROOT};api'
+    go_pkg = f'{go_package_api_root};api'
 
     for proto_file in root_protos:
         logger.debug(f'\n  [{proto_file.name}]')
 
-        # 6a — remove existing go_package, then add the correct one
-        try:
-            run([sys.executable, str(REMOVE_GO_PKG_SCRIPT), '-f', str(proto_file)])
-        except subprocess.CalledProcessError:
-            die(f'remove_go_package.py failed for {proto_file}.')
-        try:
-            run([sys.executable, str(ADD_GO_PKG_SCRIPT), go_pkg, '-f', str(proto_file)])
-        except subprocess.CalledProcessError:
+        # 6a — add go package (old one removed in step 4)
+        cmd = [sys.executable, str(ADD_GO_PKG_SCRIPT), go_pkg, '-f', str(proto_file)]
+        ret, stdout, stderr = run_captured(cmd)
+        if ret != 0:
+            logger.debug(f'  {ADD_GO_PKG_SCRIPT} (stdout): {stdout}')
+            logger.debug(f'  {ADD_GO_PKG_SCRIPT} (stderr): {stderr}')
             die(f'add_go_package.py failed for {proto_file}.')
 
         # 6b — rewrite imports: S/... → api/S/... for each subfolder S
-        for s in subfolders:
+        for s in proto_packages:
             _rewrite_imports_in_file(proto_file, old_prefix=s, new_prefix=f'api/{s}')
 
 
-def step_lint() -> tuple[bool, str]:
-    lint_paths = [PROTO_DIR / subfolder for subfolder in PROTO_SUBFOLDERS_SERVER]
-    logger.debug('\n[Step 7] Running buf lint on: ' + ', '.join(str(p) for p in lint_paths))
-    lint_opts = [['--path', str(p)] for p in lint_paths]
-    lint_opts = [opt for sublist in lint_opts for opt in sublist]
-    rc, stdout, stderr = run_captured(['buf', 'lint'] + lint_opts, cwd=PROTO_DIR)
+def step_lint(api_dir: Path) -> tuple[bool, str]:
+    lint_cmd = ['buf', 'lint', '--path', str(api_dir)]
+    logger.debug('\n[Step 7] Running buf lint on ' + str(api_dir))
+    rc, stdout, stderr = run_captured(lint_cmd)
     output = (stdout + stderr).strip()
     if rc == 0:
         logger.debug('  buf lint passed.')
         return True, ''
     logger.debug('  buf lint FAILED:')
-    print(output)
     return False, output
 
 
-def step_cleanup() -> None:
+def step_cleanup(tmp_dir: Path) -> None:
     logger.debug('\n[Step 8] Cleaning up backup and fetched-repo ...')
-    if API_BACKUP_DIR.exists():
-        shutil.rmtree(API_BACKUP_DIR)
-        logger.debug(f'  Removed {API_BACKUP_DIR}')
-    if FETCHED_REPO_DIR.exists():
-        shutil.rmtree(FETCHED_REPO_DIR)
-        logger.debug(f'  Removed {FETCHED_REPO_DIR}')
+    api_backup_dir = get_api_backup_dir(tmp_dir)
+    if api_backup_dir.exists():
+        shutil.rmtree(api_backup_dir)
+        logger.debug(f'  Removed {api_backup_dir}')
+    fetched_repo_dir = get_fetched_repo_dir(tmp_dir)
+    if fetched_repo_dir.exists():
+        shutil.rmtree(fetched_repo_dir)
+        logger.debug(f'  Removed {fetched_repo_dir}')
 
 
-def step_restore() -> None:
-    print('\nRestoring previous state ...')
+def step_restore(tmp_dir: Path) -> None:
+    api_backup_dir = get_api_backup_dir(tmp_dir)
+    fetched_repo_dir = get_fetched_repo_dir(tmp_dir)
     if API_DIR.exists():
         shutil.rmtree(API_DIR)
         logger.debug(f'  Removed {API_DIR}')
-    if FETCHED_REPO_DIR.exists():
-        shutil.rmtree(FETCHED_REPO_DIR)
-        logger.debug(f'  Removed {FETCHED_REPO_DIR}')
-    if API_BACKUP_DIR.exists():
-        API_BACKUP_DIR.rename(API_DIR)
-        logger.debug(f'  Restored {API_BACKUP_DIR} → {API_DIR}')
+    if fetched_repo_dir.exists():
+        shutil.rmtree(fetched_repo_dir)
+        logger.debug(f'  Removed {fetched_repo_dir}')
+    if api_backup_dir.exists():
+        api_backup_dir.rename(API_DIR)
+        logger.debug(f'  Restored {api_backup_dir} → {API_DIR}')
     else:
         logger.warning('proto/api-backup not found — nothing to restore.')
     print('State restored.')
@@ -369,25 +383,29 @@ def step_restore() -> None:
 
 def _rewrite_imports_in_file(proto_file: Path, old_prefix: str, new_prefix: str) -> None:
     require_script(REPLACE_IMPORT_PROTO_SCRIPT)
-    try:
-        run([
-            sys.executable, str(REPLACE_IMPORT_PROTO_SCRIPT),
-            '--parametrized', '-f', str(proto_file),
-            f'{old_prefix}/*', f'{new_prefix}/*',
-        ])
-    except subprocess.CalledProcessError:
+    cmd = [
+        sys.executable, str(REPLACE_IMPORT_PROTO_SCRIPT),
+        '--parametrized', '-f', str(proto_file),
+        f'{old_prefix}/*', f'{new_prefix}/*',
+    ]
+    ret, stdout, stderr = run_captured(cmd)
+    if ret != 0:
+        logger.debug(f'  {REPLACE_IMPORT_PROTO_SCRIPT} (stdout): {stdout}')
+        logger.debug(f'  {REPLACE_IMPORT_PROTO_SCRIPT} (stderr): {stderr}')
         die(f'replace_import_proto.py failed for {proto_file} ({old_prefix} → {new_prefix})')
 
 
 def _rewrite_imports_in_dir(directory: Path, old_prefix: str, new_prefix: str) -> None:
     require_script(REPLACE_IMPORT_PROTO_SCRIPT)
-    try:
-        run([
-            sys.executable, str(REPLACE_IMPORT_PROTO_SCRIPT),
+    cmd = [
+        sys.executable, str(REPLACE_IMPORT_PROTO_SCRIPT),
             '--parametrized', '-r', str(directory),
             f'{old_prefix}/*', f'{new_prefix}/*',
-        ])
-    except subprocess.CalledProcessError:
+        ]
+    ret, stdout, stderr = run_captured(cmd)
+    if ret != 0:
+        logger.debug(f'  {REPLACE_IMPORT_PROTO_SCRIPT} (stdout): {stdout}')
+        logger.debug(f'  {REPLACE_IMPORT_PROTO_SCRIPT} (stderr): {stderr}')
         die(f'replace_import_proto.py failed for {directory} ({old_prefix} → {new_prefix})')
 
 
@@ -395,33 +413,39 @@ def _rewrite_imports_in_dir(directory: Path, old_prefix: str, new_prefix: str) -
 # Session modes
 # ---------------------------------------------------------------------------
 
-def run_continue() -> None:
-    if not API_BACKUP_DIR.exists():
+def run_continue(proto_packages: list[str], tmp_dir: Path) -> None:
+    api_backup_dir = get_api_backup_dir(tmp_dir)
+    if not api_backup_dir.exists():
         die(
             'proto/api-backup does not exist — no interrupted session to continue.\n'
+            'If the temporary directory is not the default, you must provide the same --tmp-dir that was used in the original run.\n'
             'Run without --continue to start a fresh update.'
         )
-    ok, err = step_lint()
+    ok, err = step_lint(API_DIR)
     if ok:
-        step_cleanup()
-        print('\nDone. proto/api is up to date.')
+        step_cleanup(tmp_dir)
+        print('\nDone: proto/api is up to date.')
     else:
+        print(err)
         print('\nbuf lint still fails. Fix the issues and run --continue again.')
         sys.exit(1)
 
 
-def run_abort() -> None:
-    if not API_BACKUP_DIR.exists():
+def run_abort(tmp_dir: Path) -> None:
+    api_backup_dir = get_api_backup_dir(tmp_dir)
+    if not api_backup_dir.exists():
         die(
             'proto/api-backup does not exist — no interrupted session to abort.\n'
+            'If the temporary directory is not the default, you must provide the same --tmp-dir that was used in the original run.\n'
             'Nothing to restore.'
         )
-    step_restore()
+    step_restore(tmp_dir)
 
 
-def run_main(repo_url: str, proto_folder: str, branch: str | None) -> None:
+def run_main(repo_url: str, proto_folder: str, branch: str | None, go_module: str, proto_packages: list[str], go_package_api_root: str, keep_state: bool, tmp_dir: Path) -> None:
     # Guard: if a previous session left api-backup, require explicit flag
-    if API_BACKUP_DIR.exists():
+    api_backup_dir = get_api_backup_dir(tmp_dir)
+    if api_backup_dir.exists():
         die(
             'A session is in progress.\n'
             '  --continue  Re-run buf lint; clean up on success.\n'
@@ -432,24 +456,22 @@ def run_main(repo_url: str, proto_folder: str, branch: str | None) -> None:
     require_script(REMOVE_GO_PKG_SCRIPT)
     require_script(ADD_GO_PKG_SCRIPT)
 
-    step_backup()
-    step_clone(repo_url, branch)
-    step_copy(proto_folder)
-
-    # Discover subfolders AFTER copying (they come from the fetched repo)
-    subfolders = get_api_subfolders()
-    if not subfolders:
-        die(f'No subfolders found inside proto/api after copy from "{proto_folder}".')
-    logger.debug(f'\n  Discovered api subfolders: {", ".join(subfolders)}')
+    print(f'Updating proto/api from repository {repo_url}...')
+    step_backup(tmp_dir)
+    step_clone(repo_url, branch, tmp_dir)
+    step_copy(proto_folder, proto_packages, tmp_dir)
 
     step_remove_go_package()
-    step_add_go_packages_and_fix_imports(subfolders)
-    step_fix_root_api_protos(subfolders)
+    step_add_go_packages_and_fix_imports(proto_packages, go_package_api_root)
+    step_fix_root_api_protos(proto_packages, go_package_api_root)
 
-    ok, lint_err = step_lint()
+    ok, lint_err = step_lint(API_DIR)
     if ok:
-        step_cleanup()
-        print('\nDone. proto/api updated successfully.')
+        if not keep_state:
+            step_cleanup(tmp_dir)
+        print('Done: proto/api updated successfully.')
+        if keep_state:
+            print('Note: Terminate the session with --continue or --abort when you are done inspecting the changes.')
         return
 
     # Lint failed — ask what to do
@@ -457,13 +479,14 @@ def run_main(repo_url: str, proto_folder: str, branch: str | None) -> None:
     print(lint_err)
     restore = ask_yes_no('\n\nRestore previous state?')
     if restore:
-        step_restore()
+        step_restore(tmp_dir)
         print('\nPrevious state restored.')
     else:
+        fetched_repo_dir = get_fetched_repo_dir(tmp_dir)
         # Keep proto/api and proto/api-backup as-is, remove fetched-repo only
-        if FETCHED_REPO_DIR.exists():
-            shutil.rmtree(FETCHED_REPO_DIR)
-            logger.debug(f'  Removed {FETCHED_REPO_DIR}')
+        if fetched_repo_dir.exists():
+            shutil.rmtree(fetched_repo_dir)
+            logger.debug(f'  Removed {fetched_repo_dir}')
         print(
             '\nFix the issues manually, then run:\n'
             '  update_api_proto.py --continue   to re-lint and finish\n'
@@ -507,7 +530,18 @@ def build_parser() -> argparse.ArgumentParser:
                         help='URL of the git repository to clone.')
     parser.add_argument('proto_folder', nargs='?',
                         help='Folder name inside the cloned repo to use as proto/api.')
+    
+    parser.add_argument('--go-module', metavar='GO_MODULE', default=DEFAULT_GO_MODULE,
+                        help='Go module name for the updated proto files.')
+    
+    parser.add_argument('--proto-packages', metavar='PKG1,PKG2,...', default=','.join(DEFAULT_PROTO_PACKAGES_API),
+                        help='Comma-separated list of proto packages to update.')
 
+    parser.add_argument('--keep-state', default=False, action='store_true',
+                        help='Interrupt the session, even after a successful update, without cleaning up temporary state. Use this if you want to inspect the changes. The session must be terminated with --continue or --abort.')
+
+    parser.add_argument('--tmp-dir', metavar='TMP_DIR', default=str(PROTO_DIR),
+                        help='Directory to use for temporary keeping old state (default: proto/).')
     return parser
 
 
@@ -517,12 +551,14 @@ def main() -> None:
 
     _setup_logging(args.debug)
 
+    proto_packages = [pkg.strip() for pkg in args.proto_packages.split(',') if pkg.strip()]
+    tmp_dir_path = Path(args.tmp_dir)
     if args.resume:
-        run_continue()
+        run_continue(proto_packages, tmp_dir_path)
         return
 
     if args.abort:
-        run_abort()
+        run_abort(tmp_dir_path)
         return
 
     # Normal run — both positional arguments are required
@@ -533,7 +569,9 @@ def main() -> None:
         parser.print_help()
         die('\nproto_folder is required for a normal run.')
 
-    run_main(args.repo_url, args.proto_folder, args.branch)
+    go_package_api_root = go_pkg_api_root(args.go_module)
+    
+    run_main(args.repo_url, args.proto_folder, args.branch, args.go_module, proto_packages, go_package_api_root, args.keep_state, tmp_dir_path)
 
 
 if __name__ == '__main__':

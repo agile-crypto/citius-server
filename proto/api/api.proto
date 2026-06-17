@@ -1,8 +1,7 @@
 syntax = "proto3";
 
 package caas.crypto.v1;
-
-option go_package = "github.ibm.com/citius/citius-server/gen/go;api";
+option go_package = "github.ibm.com/citius/citius-server/gen/go/api;api";
 
 // ============================================================================
 // Abstract Cryptographic API Specification
@@ -41,5 +40,9 @@ import "api/messages/policy.proto";
 // Service Definitions
 // ============================================================================
 import "api/services/crypto_service.proto";
+import "api/services/streaming_crypto_service.proto";
+import "api/services/key_management_service.proto";
+import "api/services/key_establishment_service.proto";
+import "api/services/crypto_policy_service.proto";
 import "api/services/provider_service.proto";
 import "api/services/discovery_service.proto";

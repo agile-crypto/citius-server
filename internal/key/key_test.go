@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	storepb "github.ibm.com/citius/citius-server/gen/go/api/store"
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"

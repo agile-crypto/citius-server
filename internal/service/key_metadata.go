@@ -1,7 +1,7 @@
 package service
 
 import (
-	types "github.ibm.com/citius/citius-server/gen/go/types"
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

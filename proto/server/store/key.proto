@@ -4,7 +4,7 @@ package caas.storage.v1;
 option go_package = "github.ibm.com/citius/citius-server/gen/go/server/store;store";
 
 import "google/protobuf/timestamp.proto";
-import "types/common.proto";
+import "api/types/common.proto";
 
 import "buf/validate/validate.proto";
 

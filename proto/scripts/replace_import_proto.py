@@ -359,7 +359,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument('-h', '--help', action='help',
                         help='Show this help message and exit.')
-
+    
     target = parser.add_mutually_exclusive_group(required=True)
     target.add_argument('-f', metavar='FILE', dest='file',
                         help='Operate on a single .proto file.')
@@ -371,10 +371,9 @@ def build_parser() -> argparse.ArgumentParser:
                       help='Treat old_import as a regular expression.')
     mode.add_argument(
         '--parametrized', action='store_true',
-        help=(
-            'Enable capture tokens in both import paths. '
-            '{name} matches one segment (no /). '
-            '* matches any substring including / (multi-segment, positional). '
+        help=('Enable capturing parameters and wildcards in both import paths.'
+            'Parameters are specified as {param_name} and match one segment in the path (no /).'
+            'Wildcards are specified as * and match any substring including "/" (multi-segment, positional). '
             'All but the last * are lazy; the last is greedy. '
             'Wildcard count must be equal in both patterns.'
         ),
