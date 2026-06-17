@@ -12,7 +12,10 @@ import (
 // and repository persistence crossing aggregate boundaries.
 type KeyOrchestrator interface {
 	CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*KeyMetadata, error)
-	ReadKey(ctx context.Context, keyName string) (*KeyMetadata, error)
+
+	// ReadKey returns the metadata for the named key at the given version.
+	// Pass version=0 to read the current/latest version.
+	ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error)
 	ListKeys(ctx context.Context) ([]*KeyMetadata, error)
 	DeleteKey(ctx context.Context, keyName string) error
 

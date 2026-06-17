@@ -25,7 +25,7 @@ func TestReadKey_happyPath(t *testing.T) {
 		t.Fatalf("CreateKey: %v", err)
 	}
 
-	got, err := orch.ReadKey(ctx, created.Name)
+	got, err := orch.ReadKey(ctx, created.Name, 0)
 	if err != nil {
 		t.Fatalf("ReadKey: %v", err)
 	}
@@ -39,7 +39,7 @@ func TestReadKey_happyPath(t *testing.T) {
 
 func TestReadKey_notFound(t *testing.T) {
 	orch := setupOrchestrator(t)
-	_, err := orch.ReadKey(context.Background(), "key_nonexistent")
+	_, err := orch.ReadKey(context.Background(), "key_nonexistent", 0)
 	if err == nil {
 		t.Fatal("expected error for missing key")
 	}
@@ -103,7 +103,7 @@ func TestDeleteKey_happyPath(t *testing.T) {
 	}
 
 	// Key should no longer be readable.
-	_, err = orch.ReadKey(ctx, created.Name)
+	_, err = orch.ReadKey(ctx, created.Name, 0)
 	if !errors.IsKeyNotFound(err) {
 		t.Errorf("expected CodeKeyNotFound after delete, got: %v", err)
 	}

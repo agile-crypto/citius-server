@@ -135,7 +135,8 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 //
 // Proto mapping:
 //
-//	messages.ReadKeyRequest.name => KeyOrchestrator.ReadKey(ctx, name)
+//	messages.ReadKeyRequest.name    => KeyOrchestrator.ReadKey(ctx, name, version)
+//	messages.ReadKeyRequest.version => version (0 = latest)
 func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (*messagespb.ReadKeyResponse, error) {
 	const readOp engerr.Op = handlerOp + ".ReadKey"
 
@@ -148,7 +149,7 @@ func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (
 		return nil, ToStatusError(err)
 	}
 
-	md, err := scope.Keys().ReadKey(ctx, req.GetName())
+	md, err := scope.Keys().ReadKey(ctx, req.GetName(), req.GetVersion())
 	if err != nil {
 		return nil, ToStatusError(engerr.Wrap(ctx, readOp, err))
 	}

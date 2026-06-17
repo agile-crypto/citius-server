@@ -236,13 +236,18 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	return r.toKeyMetadata(ctx, k, v)
 }
 
-func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string) (*KeyMetadata, error) {
+func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ReadKey"
 	k, err := r.repo.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	v, err := r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+	var v *key.Version
+	if version == 0 {
+		v, err = r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+	} else {
+		v, err = r.repo.GetVersion(ctx, k.GetPublicId(), version)
+	}
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}

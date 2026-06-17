@@ -104,7 +104,7 @@ func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreati
 	panic("mockKeyOrchestrator.CreateKey: not implemented")
 }
 
-func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string) (*service.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version uint32) (*service.KeyMetadata, error) {
 	if m.readFn != nil {
 		return m.readFn(ctx, name)
 	}
