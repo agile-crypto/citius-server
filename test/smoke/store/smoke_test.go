@@ -7,10 +7,7 @@ import (
 	"testing"
 
 	protovalidate "buf.build/go/protovalidate"
-<<<<<<< HEAD
 	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
-=======
->>>>>>> 711584f (Proto-layout restructuration (split server and api))
 	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	"google.golang.org/protobuf/proto"
 )

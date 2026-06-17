@@ -16,7 +16,7 @@ type Registry interface {
 	List(ctx context.Context) []Backend
 	Remove(ctx context.Context, name string) error
 	MatchForTemplate(ctx context.Context, templateID string) (Backend, error)
-	MatchForScope(ctx context.Context, scope core.ScopeSpec) (Backend, error)
+	MatchForScope(ctx context.Context, scope *core.ScopeSpecification) (Backend, error)
 }
 
 // registry is a thread-safe in-memory registry of provider backends.
@@ -132,7 +132,7 @@ func (r *registry) MatchForTemplate(ctx context.Context, templateID string) (Bac
 
 // MatchForScope for now delegates to GetDefault.
 // TODO: inspect provider capabilities and match on scope.
-func (r *registry) MatchForScope(ctx context.Context, scope core.ScopeSpec) (Backend, error) {
+func (r *registry) MatchForScope(ctx context.Context, scope *core.ScopeSpecification) (Backend, error) {
 	const op errors.Op = "provider.(Registry).MatchForScope"
 	p, err := r.GetDefault(ctx)
 	if err != nil {

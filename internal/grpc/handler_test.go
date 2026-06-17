@@ -5,10 +5,6 @@ import (
 	"testing"
 
 	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
-<<<<<<< HEAD
-=======
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
->>>>>>> 711584f (Proto-layout restructuration (split server and api))
 
 	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
 	"github.ibm.com/citius/citius-server/internal/core"
@@ -89,7 +85,7 @@ func (m *mockPolicyManager) ValidateOperation(_ context.Context, _ string, _ cor
 func (m *mockPolicyManager) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyCreationSpec) error {
 	panic("mockPolicyManager.ValidateKeyCreation: not implemented")
 }
-func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ core.ScopeSpec) ([]string, error) {
+func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ *core.ScopeSpecification) ([]string, error) {
 	panic("mockPolicyManager.AllowedTemplates: not implemented")
 }
 

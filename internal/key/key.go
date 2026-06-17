@@ -4,10 +4,7 @@ import (
 	"context"
 	"fmt"
 
-<<<<<<< HEAD
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-=======
->>>>>>> 711584f (Proto-layout restructuration (split server and api))
 	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
@@ -34,7 +31,7 @@ func NewKey(stored *storepb.Key) *Key {
 	return &Key{Key: stored}
 }
 
-func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpec, currentKeyVersion uint32, opt ...Option) (*Key, error) {
+func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpecification, currentKeyVersion uint32, opt ...Option) (*Key, error) {
 	const op = "key.newKey"
 	if id == "" {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "id is required")
@@ -50,7 +47,11 @@ func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpec,
 		// if no name is provided, default to id
 		opts.withName = id
 	}
-	sp, err := scopeSpec.Serialize(ctx)
+	sp, err := scopeSpec.ToProto(ctx)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	spBytes, err := proto.Marshal(sp)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -58,8 +59,8 @@ func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpec,
 		PublicId:           id,
 		Name:               opts.withName,
 		PolicyId:           policyID,
-		Primitive:          scopeSpec.Primitive.String(),
-		ScopeSpecification: sp,
+		Primitive:          scopeSpec.Scope.GetPrimitive().String(),
+		ScopeSpecification: spBytes,
 		CurrentVersion:     currentKeyVersion,
 		Labels:             opts.withLabels,
 		State:              opts.withState,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
@@ -51,10 +52,16 @@ func setupCryptoWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
 
 	seedCryptoPolicy(t, ctx, pol)
 
+	scopeSpec := &core.ScopeSpecification{
+		Scope: core.ScopeSignatureStandard,
+	}
+	scopeSpecBytes, err := scopeSpec.Serialize(ctx)
+	require.NoError(t, err, "failed to serialize scope specification")
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:       "sign-test-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   cryptoPolicyName,
+		Scope:      scopeSpecBytes,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

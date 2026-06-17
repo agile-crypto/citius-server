@@ -4,15 +4,10 @@ import (
 	"context"
 	"fmt"
 
-<<<<<<< HEAD
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
 	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
-=======
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
->>>>>>> 711584f (Proto-layout restructuration (split server and api))
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
@@ -83,26 +78,33 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	// 2. Resolve template + derive scope.
 	//    Two paths: explicit template_id OR scope-based selection.
 	var tmpl *template.Template
-	var scopeSpec core.ScopeSpec
+	if len(req.Scope) == 0 {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"scope specification must contain at least a scope")
+	}
+	scopeSpec := &core.ScopeSpecification{}
+	err := scopeSpec.Deserialize(ctx, req.Scope)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
 
 	if req.TemplateID != "" {
-		// Template-based path — direct lookup, no policy filter.
-		var err error
-		tmpl, err = r.templates.Get(ctx, req.TemplateID)
+		candidates := template.OnlyTemplates(req.TemplateID)
+		if len(candidates.IDs()) != 1 {
+			return nil, errors.New(ctx, op, errors.CodeInternal,
+				"expected exactly one template, got %d", len(candidates.IDs()))
+		}
+		tmpl, err = r.templates.Select(ctx, scopeSpec, candidates)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		// Derive scope from the template's primary ScopedCapability.
-		scopeSpec = tmpl.PrimaryScopeSpec()
+		if tmpl == nil {
+			return nil, errors.New(ctx, op, errors.CodeTemplateNotFound,
+				"no template matching the given scope specification found (ID=%s)", req.TemplateID)
+		}
 	} else {
 		// Scope-based path: parse the proto-encoded ScopeSpecification,
 		// query policy for allowed templates, then ask the registry to select.
-		var err error
-		scopeSpec, err = template.ParseScopeSpecification(req.Scope)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-
 		allowed, err := r.policy.AllowedTemplates(ctx, req.PolicyID, scopeSpec)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
@@ -141,6 +143,7 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 // API-facing KeyMetadata. v may be nil; version-scoped fields are
 // then left at their zero values.
 func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
+	const op = "service.(keyOrchestrator).buildKeyMetadata"
 	md := &KeyMetadata{
 		Name:           k.GetName(),
 		KeyID:          k.GetPublicId(),
@@ -152,9 +155,11 @@ func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *k
 
 	if data := k.GetScopeSpecification(); len(data) > 0 {
 		// ScopeSpecification is stored as JSON-encoded core.ScopeSpec.
-		if scopeSpec, err := core.ParseScopeSpec(ctx, data); err == nil {
-			md.ScopeSpec = template.ScopeSpecToProto(scopeSpec)
+		scopeSpec := &core.ScopeSpecification{}
+		if err := scopeSpec.Deserialize(ctx, data); err != nil {
+			return nil, errors.Wrap(ctx, op, err)
 		}
+		md.ScopeSpec = scopeSpec
 	}
 
 	if v != nil {
@@ -178,7 +183,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	op errors.Op,
 	req core.KeyCreationSpec,
 	tmpl *template.Template,
-	scopeSpec core.ScopeSpec,
+	scopeSpec *core.ScopeSpecification,
 ) (*KeyMetadata, error) {
 	// 1. Find a provider that supports this template.
 	prov, err := r.providers.MatchForTemplate(ctx, tmpl.TemplateID())
@@ -217,7 +222,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	k := key.NewKey(&storepb.Key{
 		PublicId:           keyID,
 		Name:               req.Name,
-		Primitive:          scopeSpec.Primitive.String(),
+		Primitive:          scopeSpec.Scope.GetPrimitive().String(),
 		ScopeSpecification: scopeBytes,
 		PolicyId:           req.PolicyID,
 		CurrentVersion:     1,

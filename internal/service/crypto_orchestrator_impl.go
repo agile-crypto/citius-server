@@ -341,20 +341,22 @@ func validateSignatureScopeParams(
 	var callerScope core.Scope
 	switch {
 	case sf.NoContext != nil:
-		callerScope = core.SignatureScopeStandard
+		callerScope = core.ScopeSignatureStandard
 	case sf.DomainContext != nil:
-		callerScope = core.SignatureScopeWithContext
+		callerScope = core.ScopeSignatureWithContext
+	default:
+		return errors.New(ctx, op, errors.CodeInvalidArgument, "signature scope field is required")
 	}
 
 	// 3. Deserialize the key's scope specification.
-	keyScope, err := core.ParseScopeSpec(ctx, k.GetScopeSpecification())
+	keyScopeSpec := &core.ScopeSpecification{}
+	err := keyScopeSpec.Deserialize(ctx, k.GetScopeSpecification())
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-
-	// 4. Delegate semantic validation to core.
-	if err := core.ValidateSignatureScope(ctx, keyScope, callerScope); err != nil {
-		return errors.Wrap(ctx, op, err)
+	if keyScopeSpec.Scope != callerScope {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			"caller scope %q does not match key scope %q", callerScope, keyScopeSpec.Scope)
 	}
 	return nil
 }

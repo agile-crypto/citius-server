@@ -107,6 +107,33 @@ func (r *VaultRegistry) List(ctx context.Context) []*Template {
 	return out
 }
 
+// Get all the templates with the given IDs, applying the filter function to each.
+// Returns a slice of matching templates, or an error if any filterFn call fails.
+// If a template ID is not found, it is skipped (not an error).
+func (r *VaultRegistry) selectTemplatesWithIDs(ctx context.Context, ids []string, filterFn func(t *Template) (bool, error)) ([]*Template, error) {
+	const op = "template.(VaultRegistry).getAllTemplatesWithIDs"
+	candidates := []*Template{}
+	for _, id := range ids {
+		entry, err := r.templates.Get(ctx, id)
+		if err != nil || entry == nil {
+			continue
+		}
+		stored := &api.TemplateInfo{}
+		if err = proto.Unmarshal(entry.Value, stored); err != nil {
+			continue
+		}
+		t := NewTemplate(stored)
+		ok, err := filterFn(t)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		if ok {
+			candidates = append(candidates, t)
+		}
+	}
+	return candidates, nil
+}
+
 // Select returns the best-matching template for the given request.
 // The selection algorithm:
 //  1. If candidates is restricted to one entry and scope is zero,
@@ -118,20 +145,20 @@ func (r *VaultRegistry) List(ctx context.Context) []*Template {
 //  4. Return first matching candidate, or CodeTemplateNotFound.
 //
 // Security filtering (fips_approved, quantum_safe) is part of scope matching:
-// the caller's ScopeSpec carries typed security filter fields, matched against
+// the caller's ScopeSpecification carries typed security filter fields, matched against
 // each template's ScopedCapabilities[].Scope.security (UniversalSecurityProperties).
 //
 // NOTE: Select accesses r.templates (logical.Storage) directly using readlock rather than
 // calling r.Get()/r.List(), because those methods also acquire r.mu.RLock()
 // and Go's sync.RWMutex is NOT reentrant.
 // TODO: Optimize with caching instead of full storage scan with serialization and deserialization
-func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, cs CandidateSet) (*Template, error) {
+func (r *VaultRegistry) Select(ctx context.Context, scopeSpec *core.ScopeSpecification, cs CandidateSet) (*Template, error) {
 	const op errors.Op = "template.(VaultRegistry).Select"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	// Fast path: explicit template ID lookup (single restricted ID, no scope/security filters)
-	if cs.IsRestricted() && len(cs.IDs()) == 1 && scopeSpec.IsZero() {
+	if cs.IsRestricted() && len(cs.IDs()) == 1 && scopeSpec == nil {
 		entry, err := r.templates.Get(ctx, cs.IDs()[0])
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
@@ -163,20 +190,16 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, cs
 	}
 
 	// Step 2: deserialize each candidate and apply scope + security filter.
-	var candidates []*Template
-	for _, id := range ids {
-		entry, err := r.templates.Get(ctx, id)
-		if err != nil || entry == nil {
-			continue
+	filterFn := func(t *Template) (bool, error) {
+		ok, err := MatchesScope(ctx, t, scopeSpec)
+		if err != nil {
+			return false, errors.Wrap(ctx, op, err)
 		}
-		stored := &api.TemplateInfo{}
-		if err := proto.Unmarshal(entry.Value, stored); err != nil {
-			continue
-		}
-		t := NewTemplate(stored)
-		if MatchesScope(t, scopeSpec) {
-			candidates = append(candidates, t)
-		}
+		return ok, nil
+	}
+	candidates, err := r.selectTemplatesWithIDs(ctx, ids, filterFn)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
 	}
 
 	if len(candidates) == 0 {
@@ -186,238 +209,4 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec core.ScopeSpec, cs
 
 	// Step 3: return first candidate (deterministic — storage/candidates iteration order)
 	return candidates[0].Clone(), nil
-}
-
-// ---------------------------------------------------------------------------
-// Proto -> Domain conversion (package-internal see doc.go)
-// ---------------------------------------------------------------------------
-
-// scopeSpecFromProto converts a proto ScopeSpecification to a core.ScopeSpec.
-// Extracts both the Primitive (from the oneof variant) and the Scope
-// (from the per-primitive scope enum value).
-// Also extracts UniversalSecurityProperties (fips_approved, quantum_safe)
-// from the per-primitive security field.
-// Returns zero-value ScopeSpec if spec is nil.
-func scopeSpecFromProto(spec *api.ScopeSpecification) core.ScopeSpec {
-	if spec == nil {
-		return core.ScopeSpec{}
-	}
-	switch s := spec.GetScopeSpec().(type) {
-	case *api.ScopeSpecification_Signature:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveSignature,
-			Scope:     signatureScopeToCore(s.Signature.GetScope()),
-		}
-		extractSecurity(&result, s.Signature.GetSecurity())
-		return result
-	case *api.ScopeSpecification_Aead:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveAead,
-			Scope:     aeadScopeToCore(s.Aead.GetScope()),
-		}
-		extractSecurity(&result, s.Aead.GetSecurity())
-		return result
-	case *api.ScopeSpecification_Mac:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveMac,
-			Scope:     macScopeToCore(s.Mac.GetScope()),
-		}
-		extractSecurity(&result, s.Mac.GetSecurity())
-		return result
-	case *api.ScopeSpecification_Kem:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveKem,
-			Scope:     kemScopeToCore(s.Kem.GetScope()),
-		}
-		extractSecurity(&result, s.Kem.GetSecurity())
-		return result
-	case *api.ScopeSpecification_KeyAgreement:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveKeyAgreement,
-			Scope:     keyAgreementScopeToCore(s.KeyAgreement.GetScope()),
-		}
-		extractSecurity(&result, s.KeyAgreement.GetSecurity())
-		return result
-	case *api.ScopeSpecification_Kdf:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveKdf,
-			Scope:     kdfScopeToCore(s.Kdf.GetScope()),
-		}
-		extractSecurity(&result, s.Kdf.GetSecurity())
-		return result
-	case *api.ScopeSpecification_Hash:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveHash,
-			Scope:     hashScopeToCore(s.Hash.GetScope()),
-		}
-		extractSecurity(&result, s.Hash.GetSecurity())
-		return result
-	case *api.ScopeSpecification_KeyWrapping:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveKeyWrapping,
-			Scope:     keyWrappingScopeToCore(s.KeyWrapping.GetScope()),
-		}
-		extractSecurity(&result, s.KeyWrapping.GetSecurity())
-		return result
-	case *api.ScopeSpecification_SymmetricCipher:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveSymmetricCipher,
-			Scope:     symmetricCipherScopeToCore(s.SymmetricCipher.GetScope()),
-		}
-		extractSecurity(&result, s.SymmetricCipher.GetSecurity())
-		return result
-	case *api.ScopeSpecification_GenericSecret:
-		result := core.ScopeSpec{
-			Primitive: core.PrimitiveGenericSecret,
-			Scope:     genericSecretScopeToCore(s.GenericSecret.GetScope()),
-		}
-		extractSecurity(&result, s.GenericSecret.GetSecurity())
-		return result
-	default:
-		return core.ScopeSpec{}
-	}
-}
-
-// extractSecurity populates ScopeSpec security fields from UniversalSecurityProperties.
-// Uses proto optional field semantics: nil → don't set, non-nil → set value.
-func extractSecurity(s *core.ScopeSpec, sec *api.UniversalSecurityProperties) {
-	if sec == nil {
-		return
-	}
-	if sec.FipsApproved != nil {
-		v := sec.GetFipsApproved()
-		s.FIPSApproved = &v
-	}
-	if sec.QuantumSafe != nil {
-		v := sec.GetQuantumSafe()
-		s.QuantumSafe = &v
-	}
-}
-
-// ---------------------------------------------------------------------------
-// Per-primitive scope enum → core.Scope converters
-// ---------------------------------------------------------------------------
-
-func signatureScopeToCore(s api.SignatureScope) core.Scope {
-	switch s {
-	case api.SignatureScope_SIGNATURE_SCOPE_STANDARD:
-		return core.SignatureScopeStandard
-	case api.SignatureScope_SIGNATURE_SCOPE_WITH_CONTEXT:
-		return core.SignatureScopeWithContext
-	case api.SignatureScope_SIGNATURE_SCOPE_PREHASHED:
-		return core.SignatureScopePrehashed
-	case api.SignatureScope_SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT:
-		return core.SignatureScopePrehashedWithContext
-	default:
-		return ""
-	}
-}
-
-func aeadScopeToCore(s api.AeadScope) core.Scope {
-	switch s {
-	case api.AeadScope_AEAD_SCOPE_STANDARD:
-		return core.AeadScopeStandard
-	case api.AeadScope_AEAD_SCOPE_DETERMINISTIC:
-		return core.AeadScopeDeterministic
-	case api.AeadScope_AEAD_SCOPE_STREAMING:
-		return core.AeadScopeStreaming
-	default:
-		return ""
-	}
-}
-
-func macScopeToCore(s api.MacScope) core.Scope {
-	switch s {
-	case api.MacScope_MAC_SCOPE_STANDARD:
-		return core.MacScopeStandard
-	case api.MacScope_MAC_SCOPE_STREAMING:
-		return core.MacScopeStreaming
-	default:
-		return ""
-	}
-}
-
-func kemScopeToCore(s api.KemScope) core.Scope {
-	switch s {
-	case api.KemScope_KEM_SCOPE_STANDARD:
-		return core.KemScopeStandard
-	case api.KemScope_KEM_SCOPE_HYBRID:
-		return core.KemScopeHybrid
-	default:
-		return ""
-	}
-}
-
-func keyAgreementScopeToCore(s api.KeyAgreementScope) core.Scope {
-	switch s {
-	case api.KeyAgreementScope_KEY_AGREEMENT_SCOPE_STANDARD:
-		return core.KeyAgreementScopeStandard
-	case api.KeyAgreementScope_KEY_AGREEMENT_SCOPE_HYBRID:
-		return core.KeyAgreementScopeHybrid
-	default:
-		return ""
-	}
-}
-
-func kdfScopeToCore(s api.KdfScope) core.Scope {
-	switch s {
-	case api.KdfScope_KDF_SCOPE_EXTRACT_EXPAND:
-		return core.KdfScopeExtractExpand
-	case api.KdfScope_KDF_SCOPE_PASSWORD:
-		return core.KdfScopePassword
-	case api.KdfScope_KDF_SCOPE_AGREEMENT:
-		return core.KdfScopeAgreement
-	case api.KdfScope_KDF_SCOPE_COUNTER:
-		return core.KdfScopeCounter
-	case api.KdfScope_KDF_SCOPE_TLS:
-		return core.KdfScopeTLS
-	case api.KdfScope_KDF_SCOPE_GOST:
-		return core.KdfScopeGOST
-	case api.KdfScope_KDF_SCOPE_VENDOR:
-		return core.KdfScopeVendor
-	default:
-		return ""
-	}
-}
-
-func hashScopeToCore(s api.HashScope) core.Scope {
-	switch s {
-	case api.HashScope_HASH_SCOPE_STANDARD:
-		return core.HashScopeStandard
-	case api.HashScope_HASH_SCOPE_XOF:
-		return core.HashScopeXOF
-	default:
-		return ""
-	}
-}
-
-func keyWrappingScopeToCore(s api.KeyWrappingScope) core.Scope {
-	switch s {
-	case api.KeyWrappingScope_KEY_WRAPPING_SCOPE_STANDARD:
-		return core.KeyWrappingScopeStandard
-	case api.KeyWrappingScope_KEY_WRAPPING_SCOPE_WITH_PADDING:
-		return core.KeyWrappingScopeWithPadding
-	default:
-		return ""
-	}
-}
-
-func symmetricCipherScopeToCore(s api.SymmetricCipherScope) core.Scope {
-	switch s {
-	case api.SymmetricCipherScope_SYMMETRIC_CIPHER_SCOPE_BLOCK:
-		return core.SymmetricCipherScopeBlock
-	case api.SymmetricCipherScope_SYMMETRIC_CIPHER_SCOPE_STREAM:
-		return core.SymmetricCipherScopeStream
-	default:
-		return ""
-	}
-}
-
-func genericSecretScopeToCore(s api.GenericSecretScope) core.Scope {
-	switch s {
-	case api.GenericSecretScope_GENERIC_SECRET_SCOPE_STANDARD:
-		return core.GenericSecretScopeStandard
-	default:
-		return ""
-	}
 }

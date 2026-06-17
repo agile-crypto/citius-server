@@ -22,7 +22,7 @@ type Evaluator interface {
 	// AllowedTemplates returns the template IDs permitted for the given scope by the named policy.
 	// Deny-by-default: absent section returns an empty non-nil slice (nothing allowed).
 	// Returns nil only when policyName is empty (bypass).
-	AllowedTemplates(ctx context.Context, policyName string, scopeSpec core.ScopeSpec) ([]string, error)
+	AllowedTemplates(ctx context.Context, policyName string, scopeSpec *core.ScopeSpecification) ([]string, error)
 }
 
 // Manager handles policy CRUD lifecycle.

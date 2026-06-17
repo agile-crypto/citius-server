@@ -40,12 +40,9 @@ type Registry interface {
 	// Core selection algorithm:
 	//   1. Determine candidate IDs from candidates (restricted => only those IDs,
 	//      unrestricted => every registered template is eligible).
-	//   2. Filter by scope + security match (Primitive, Scope, FIPSApproved, QuantumSafe).
+	//   2. Filter by scope + security match (Scope, SecuriyProperties, PrimitiveSpecificProperties, additional properties).
 	//   3. Return first matching active template, or CodeTemplateNotFound.
-	//
-	// Security filtering uses typed *bool fields in core.ScopeSpec
-	// (extracted from UniversalSecurityProperties in the proto ScopeSpecification).
-	Select(ctx context.Context, scopeSpec core.ScopeSpec,
+	Select(ctx context.Context, scopeSpec *core.ScopeSpecification,
 		candidates CandidateSet) (*Template, error)
 
 	// NOTE: LoadStandardCatalog is intentionally NOT part of this interface.

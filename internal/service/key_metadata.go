@@ -2,6 +2,7 @@ package service
 
 import (
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
+	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -21,7 +22,7 @@ type KeyMetadata struct {
 	TemplateID string
 
 	// The scope specification used to create this key.
-	ScopeSpec        *types.ScopeSpecification
+	ScopeSpec        *core.ScopeSpecification
 	Provider         string
 	CreatedTime      *timestamppb.Timestamp
 	UpdatedTime      *timestamppb.Timestamp

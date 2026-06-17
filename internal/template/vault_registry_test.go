@@ -226,7 +226,7 @@ func registryWithBothTemplates(t *testing.T) template.Registry {
 }
 
 // signatureScope matches any signature template regardless of scope variant.
-var signatureScope = core.ScopeSpec{Primitive: core.PrimitiveSignature}
+var signatureScope = &core.ScopeSpecification{Scope: core.ScopeSignatureStandard}
 
 func TestVaultRegistry_Select_byScope_noSecurityFilter(t *testing.T) {
 	r := registryWithBothTemplates(t)
@@ -245,9 +245,11 @@ func TestVaultRegistry_Select_byScope_noSecurityFilter(t *testing.T) {
 func TestVaultRegistry_Select_requireQuantumSafe(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
-	got, err := r.Select(ctx, core.ScopeSpec{
-		Primitive:   core.PrimitiveSignature,
-		QuantumSafe: boolPtr(true),
+	got, err := r.Select(ctx, &core.ScopeSpecification{
+		Scope: core.ScopeSignatureStandard,
+		SecurityProps: &core.SecurityProperties{
+			QuantumSafe: true,
+		},
 	}, template.AllTemplates())
 	if err != nil {
 		t.Fatalf("Select with quantum_safe: %v", err)
@@ -260,9 +262,11 @@ func TestVaultRegistry_Select_requireQuantumSafe(t *testing.T) {
 func TestVaultRegistry_Select_requireFIPSApproved(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
-	got, err := r.Select(ctx, core.ScopeSpec{
-		Primitive:    core.PrimitiveSignature,
-		FIPSApproved: boolPtr(true),
+	got, err := r.Select(ctx, &core.ScopeSpecification{
+		Scope: core.ScopeSignatureStandard,
+		SecurityProps: &core.SecurityProperties{
+			FipsApproved: true,
+		},
 	}, template.AllTemplates())
 	if err != nil {
 		t.Fatalf("Select with fips_approved: %v", err)
@@ -301,10 +305,12 @@ func TestVaultRegistry_Select_allowedTemplates_emptyCandidates(t *testing.T) {
 func TestVaultRegistry_Select_securityFilter_noMatch(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
-	_, err := r.Select(ctx, core.ScopeSpec{
-		Primitive:    core.PrimitiveSignature,
-		QuantumSafe:  boolPtr(true),
-		FIPSApproved: boolPtr(true),
+	_, err := r.Select(ctx, &core.ScopeSpecification{
+		Scope: core.ScopeSignatureStandard,
+		SecurityProps: &core.SecurityProperties{
+			QuantumSafe:  true,
+			FipsApproved: true,
+		},
 	}, template.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error — no template is both quantum_safe and fips_approved")
@@ -327,10 +333,10 @@ func TestVaultRegistry_Select_emptyRegistry(t *testing.T) {
 }
 
 func TestVaultRegistry_Select_explicitTemplateID_bypasses(t *testing.T) {
-	// When AllowedTemplates has exactly one entry and scope is zero, return it directly.
+	// When AllowedTemplates has exactly one entry and scope is nil, return it directly.
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
-	got, err := r.Select(ctx, core.ScopeSpec{}, template.OnlyTemplates("ecdsa-p256-sha256"))
+	got, err := r.Select(ctx, nil, template.OnlyTemplates("ecdsa-p256-sha256"))
 	if err != nil {
 		t.Fatalf("Select explicit: %v", err)
 	}
@@ -343,9 +349,8 @@ func TestVaultRegistry_Select_scopeVariantMismatch(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
 	// Templates have signature/standard; ask for prehashed — should find no match.
-	_, err := r.Select(ctx, core.ScopeSpec{
-		Primitive: core.PrimitiveSignature,
-		Scope:     core.SignatureScopePrehashed,
+	_, err := r.Select(ctx, &core.ScopeSpecification{
+		Scope: core.ScopeSignaturePrehashed,
 	}, template.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error for scope variant mismatch")
@@ -359,8 +364,8 @@ func TestVaultRegistry_Select_primitiveMismatch(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
 	// Templates are signature-scoped; ask for AEAD.
-	_, err := r.Select(ctx, core.ScopeSpec{
-		Primitive: core.PrimitiveAead,
+	_, err := r.Select(ctx, &core.ScopeSpecification{
+		Scope: core.ScopeAeadStandard,
 	}, template.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error for primitive mismatch")

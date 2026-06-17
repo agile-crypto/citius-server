@@ -1,53 +1,187 @@
 package template
 
 import (
+	"context"
+
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
+	"github.ibm.com/citius/citius-server/internal/errors"
 )
 
 // MatchesScope reports whether tmpl serves the given scope.
-// If want is a zero-value ScopeSpec (all fields zero/nil),
-// all templates match (no scope filter applied).
+// If want is nil, then all templates match (equivalent to no filter).
 // Inspects the template's ScopedCapabilities and checks if any ScopeSpecification
-// matches the requested core.ScopeSpec (Primitive + optional Scope variant +
-// optional security filters).
-func MatchesScope(tmpl *Template, want core.ScopeSpec) bool {
-	if want.IsZero() {
-		return true
+// matches the requested [core.ScopeSpecification] (Scope + SecurityProperties +
+// Primitive-specific properties + additional properties).
+// Matching rules:
+//
+//   - Scope: if want.Scope != Unknown, scopes must match exactly
+//
+//   - SecurityProperties: if want.SecurityProperties != nil, got field must be non-nil and satisfy boolean/integral matching rules
+//
+//   - Primitive-specific properties: if want.PrimitiveSpecificProps != nil, got must be non-nil, of the same type, and satisfy boolean matching rules
+//
+//   - Additional properties: every (key, value) pair in want.AdditionalProps must be present in got.AdditionalProps
+//
+//   - boolean matching rule: want true => got must be true; want false => ok
+//
+//   - integral matching rule: got value must be greater or equal to want value
+func MatchesScope(ctx context.Context, tmpl *Template, want *core.ScopeSpecification) (bool, error) {
+	const op = "template.MatchesScope"
+	if want == nil {
+		return true, nil
 	}
 	for _, sc := range tmpl.GetScopedCapabilities() {
-		got := scopeSpecFromProto(sc.GetScope())
-		if got.Primitive != want.Primitive {
+		if sc.Scope == nil {
+			return false, errors.New(ctx, op, errors.CodeInternal, "template %s has no scoped capabilities", tmpl.TemplateID())
+		}
+		templateSpec, err := core.ScopeSpecificationFromProto(ctx, sc.Scope)
+		if err != nil {
+			// TODO: may want to signal error without interrupting the process
+			return false, errors.Wrap(ctx, op, err, errors.WithMessage("failed to read template's scope specification"))
+		}
+		if want.Scope != core.ScopeUnknown && templateSpec.Scope != want.Scope {
 			continue
 		}
-		// If caller specified a scope variant, match it too.
-		// If caller only specified primitive (Scope == ""), any variant matches.
-		if want.Scope != "" && got.Scope != want.Scope {
+		if !securityPropertiesMatch(want.SecurityProps, templateSpec.SecurityProps) {
 			continue
 		}
-		// If caller specified security filters, the template's scope
-		// must satisfy them.
-		if !matchesSecurity(want, got) {
+		matches, err := primitivePropertiesMatch(ctx, want.PrimitiveSpecificProps, templateSpec.PrimitiveSpecificProps)
+		if err != nil {
+			// TODO: may want to signal error without interrupting the process
+			return false, errors.Wrap(ctx, op, err, errors.WithMessage("failed to compare primitive-specific properties for template %s", tmpl.TemplateID()))
+		}
+		if !matches {
 			continue
 		}
-		return true
+		if !additionalPropertiesMatch(want.AdditionalProps, templateSpec.AdditionalProps) {
+			continue
+		}
+		return true, nil
 	}
-	return false
+	return false, nil
 }
 
-// matchesSecurity checks whether template-side security properties (got)
+// securityPropertiesMatch checks whether template-side security properties (got)
 // satisfy the caller-side security filter (want).
 //
 // Nil-semantics per field:
 //   - want field nil  -> don't care -> always passes
 //   - want field non-nil -> got field must be non-nil and equal
-func matchesSecurity(want, got core.ScopeSpec) bool {
-	if want.FIPSApproved != nil {
-		if got.FIPSApproved == nil || *got.FIPSApproved != *want.FIPSApproved {
+func securityPropertiesMatch(want, got *core.SecurityProperties) bool {
+	if want == nil {
+		return true
+	}
+	if got == nil {
+		// caller specified security filters but template has no security properties -> no match
+		return false
+	}
+	if want.FipsApproved && !got.FipsApproved {
+		return false
+	}
+	if want.QuantumSafe && !got.QuantumSafe {
+		return false
+	}
+	if want.SecurityLevel != types.NistSecurityLevel_NIST_SECURITY_LEVEL_UNSPECIFIED && got.SecurityLevel < want.SecurityLevel {
+		return false
+	}
+	if got.SecurityStrength < want.SecurityStrength {
+		return false
+	}
+	if want.NistStatus != types.NistStatus_NIST_STATUS_UNSPECIFIED && got.NistStatus != want.NistStatus {
+		return false
+	}
+	return true
+}
+
+func matchesSignatureProperties(ctx context.Context, want *core.SignatureProperties, got core.PrimitiveSpecificProperties) (bool, error) {
+	const op = "template.matchesSignatureProperties"
+	g, ok := got.(*core.SignatureProperties)
+	if !ok {
+		return false, errors.New(ctx, op, errors.CodeInternal, "invalid PrimitiveSpecificProperties type: %T", got)
+	}
+	if want.Deterministic && !g.Deterministic {
+		return false, nil
+	}
+	if want.NonMalleable && !g.NonMalleable {
+		return false, nil
+	}
+	return true, nil
+}
+
+func matchesAeadProperties(ctx context.Context, want *core.AEADProperties, got core.PrimitiveSpecificProperties) (bool, error) {
+	const op = "template.matchesAeadProperties"
+	g, ok := got.(*core.AEADProperties)
+	if !ok {
+		return false, errors.New(ctx, op, errors.CodeInternal, "invalid PrimitiveSpecificProperties type: %T", got)
+	}
+	if want.NonceMisuseResistant && !g.NonceMisuseResistant {
+		return false, nil
+	}
+	return true, nil
+}
+
+func matchesKeyAgreementProperties(ctx context.Context, want *core.KeyAgreementProperties, got core.PrimitiveSpecificProperties) (bool, error) {
+	const op = "template.matchesKeyAgreementProperties"
+	g, ok := got.(*core.KeyAgreementProperties)
+	if !ok {
+		return false, errors.New(ctx, op, errors.CodeInternal, "invalid PrimitiveSpecificProperties type: %T", got)
+	}
+	if want.ForwardSecrecy && !g.ForwardSecrecy {
+		return false, nil
+	}
+	return true, nil
+}
+
+func matchesKDFProperties(ctx context.Context, want *core.KDFProperties, got core.PrimitiveSpecificProperties) (bool, error) {
+	const op = "template.matchesKDFProperties"
+	g, ok := got.(*core.KDFProperties)
+	if !ok {
+		return false, errors.New(ctx, op, errors.CodeInternal, "invalid PrimitiveSpecificProperties type: %T", got)
+	}
+	if want.MemoryHard && !g.MemoryHard {
+		return false, nil
+	}
+	return true, nil
+}
+
+// Check whether primitive-specific properties match.
+// Matching semantics (caller filter vs. template properties):
+//   - want == nil -> always matches (no requirements)
+//   - boolean properties: want true => got must be true; want false => ok
+//   - there is currently no non-boolean primitive-specific property
+func primitivePropertiesMatch(ctx context.Context, want, got core.PrimitiveSpecificProperties) (bool, error) {
+	const op = "template.primitivePropertiesMatch"
+	if want == nil {
+		return true, nil
+	}
+	if got == nil {
+		return false, nil
+	}
+	switch w := want.(type) {
+	case *core.SignatureProperties:
+		return matchesSignatureProperties(ctx, w, got)
+	case *core.AEADProperties:
+		return matchesAeadProperties(ctx, w, got)
+	case *core.KeyAgreementProperties:
+		return matchesKeyAgreementProperties(ctx, w, got)
+	case *core.KDFProperties:
+		return matchesKDFProperties(ctx, w, got)
+	default:
+		// unknown PrimitiveSpecificProperties type -> no match
+		return false, errors.New(ctx, op, errors.CodeInternal, "unsupported PrimitiveSpecificProperties type: %T", want)
+	}
+}
+
+// Matching semantics for additional (non-primitive-specific) properties: want is a filter that must be fully satisfied by got.
+// If a (key, value) pair is present in want.AdditionalProperties, the same pair must be present in got.AdditionalProperties.
+func additionalPropertiesMatch(want, got map[string]string) bool {
+	for k, v := range want {
+		gotVal, ok := got[k]
+		if !ok {
 			return false
 		}
-	}
-	if want.QuantumSafe != nil {
-		if got.QuantumSafe == nil || *got.QuantumSafe != *want.QuantumSafe {
+		if gotVal != v {
 			return false
 		}
 	}

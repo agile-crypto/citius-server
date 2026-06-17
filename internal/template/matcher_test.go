@@ -1,8 +1,10 @@
 package template_test
 
 import (
+	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	api "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/template"
@@ -16,7 +18,7 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 	tests := []struct {
 		name  string
 		tmpl  *template.Template
-		scope core.ScopeSpec
+		scope core.ScopeSpecification
 		want  bool
 	}{
 		{
@@ -32,9 +34,8 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 					},
 				}},
 			}),
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
-				Scope:     core.SignatureScopeStandard,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
 			},
 			want: true,
 		},
@@ -51,9 +52,8 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 					},
 				}},
 			}),
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
-				Scope:     core.SignatureScopePrehashed,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignaturePrehashed,
 			},
 			want: false,
 		},
@@ -70,9 +70,8 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 					},
 				}},
 			}),
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveAead,
-				Scope:     core.AeadScopeStandard,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeAeadStandard,
 			},
 			want: false,
 		},
@@ -89,26 +88,8 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 					},
 				}},
 			}),
-			scope: core.ScopeSpec{},
+			scope: core.ScopeSpecification{},
 			want:  true,
-		},
-		{
-			name: "primitive only - any scope variant matches",
-			tmpl: template.NewTemplate(&api.TemplateInfo{
-				ScopedCapabilities: []*api.ScopedCapabilities{{
-					Scope: &api.ScopeSpecification{
-						ScopeSpec: &api.ScopeSpecification_Signature{
-							Signature: &api.SignatureScopeSpec{
-								Scope: api.SignatureScope_SIGNATURE_SCOPE_PREHASHED,
-							},
-						},
-					},
-				}},
-			}),
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
-			},
-			want: true,
 		},
 		{
 			name: "template has multiple scopes - one matches",
@@ -134,9 +115,8 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 					},
 				},
 			}),
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
-				Scope:     core.SignatureScopePrehashed,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignaturePrehashed,
 			},
 			want: true,
 		},
@@ -145,9 +125,8 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 			tmpl: template.NewTemplate(&api.TemplateInfo{
 				ScopedCapabilities: []*api.ScopedCapabilities{},
 			}),
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
-				Scope:     core.SignatureScopeStandard,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignaturePrehashed,
 			},
 			want: false,
 		},
@@ -155,7 +134,9 @@ func TestMatchesScope_tabledriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := template.MatchesScope(tt.tmpl, tt.scope)
+			ctx := context.Background()
+			got, err := template.MatchesScope(ctx, tt.tmpl, &tt.scope)
+			require.NoError(t, err)
 			if got != tt.want {
 				t.Errorf("MatchesScope(%v) = %v, want %v", tt.scope, got, tt.want)
 			}
@@ -223,86 +204,100 @@ func TestMatchesScope_securityFilters_tabledriven(t *testing.T) {
 	tests := []struct {
 		name  string
 		tmpl  *template.Template
-		scope core.ScopeSpec
+		scope core.ScopeSpecification
 		want  bool
 	}{
 		{
 			name: "fips_approved=true matches ecdsa",
 			tmpl: ecdsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive:    core.PrimitiveSignature,
-				FIPSApproved: boolPtr(true),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					FipsApproved: true,
+				},
 			},
 			want: true,
 		},
 		{
 			name: "fips_approved=true does not match mldsa",
 			tmpl: mldsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive:    core.PrimitiveSignature,
-				FIPSApproved: boolPtr(true),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					FipsApproved: true,
+				},
 			},
 			want: false,
 		},
 		{
 			name: "quantum_safe=true matches mldsa",
 			tmpl: mldsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive:   core.PrimitiveSignature,
-				QuantumSafe: boolPtr(true),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					FipsApproved: true,
+				},
 			},
 			want: true,
 		},
 		{
 			name: "quantum_safe=true does not match ecdsa",
 			tmpl: ecdsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive:   core.PrimitiveSignature,
-				QuantumSafe: boolPtr(true),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					QuantumSafe: true,
+				},
 			},
 			want: false,
 		},
 		{
 			name: "both fips and quantum_safe required - no template satisfies both",
 			tmpl: ecdsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive:    core.PrimitiveSignature,
-				FIPSApproved: boolPtr(true),
-				QuantumSafe:  boolPtr(true),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					FipsApproved: true,
+					QuantumSafe:  true,
+				},
 			},
 			want: false,
 		},
 		{
-			name: "no security filter - primitive only - matches any",
+			name: "no security filter - scope only - matches any",
 			tmpl: ecdsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
 			},
 			want: true,
 		},
 		{
 			name: "bare template (nil security) fails fips filter",
 			tmpl: bareTmpl,
-			scope: core.ScopeSpec{
-				Primitive:    core.PrimitiveSignature,
-				FIPSApproved: boolPtr(true),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					FipsApproved: true,
+				},
 			},
 			want: false,
 		},
 		{
 			name: "bare template (nil security) passes without security filter",
 			tmpl: bareTmpl,
-			scope: core.ScopeSpec{
-				Primitive: core.PrimitiveSignature,
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
 			},
 			want: true,
 		},
 		{
 			name: "fips_approved=false explicitly matches mldsa",
 			tmpl: mldsaTmpl,
-			scope: core.ScopeSpec{
-				Primitive:    core.PrimitiveSignature,
-				FIPSApproved: boolPtr(false),
+			scope: core.ScopeSpecification{
+				Scope: core.ScopeSignatureStandard,
+				SecurityProps: &core.SecurityProperties{
+					FipsApproved: false,
+				},
 			},
 			want: true,
 		},
@@ -310,7 +305,9 @@ func TestMatchesScope_securityFilters_tabledriven(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := template.MatchesScope(tt.tmpl, tt.scope)
+			ctx := context.Background()
+			got, err := template.MatchesScope(ctx, tt.tmpl, &tt.scope)
+			require.NoError(t, err)
 			if got != tt.want {
 				t.Errorf("MatchesScope(%v) = %v, want %v", tt.scope, got, tt.want)
 			}

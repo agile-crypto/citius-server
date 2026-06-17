@@ -177,7 +177,7 @@ func (r *Enforcer) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyC
 // absent allowed_templates returns an empty non-nil slice (nothing allowed).
 // TODO: The scopeSpec parameter is accepted but ignored for now. Implement later.
 func (r *Enforcer) AllowedTemplates(ctx context.Context, policyName string,
-	_ core.ScopeSpec) ([]string, error) {
+	_ *core.ScopeSpecification) ([]string, error) {
 	const op errors.Op = "policy.(Enforcer).AllowedTemplates"
 
 	// Empty policy name => bypass (no policy assigned)

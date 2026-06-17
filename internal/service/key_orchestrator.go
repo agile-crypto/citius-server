@@ -28,4 +28,6 @@ type KeyOrchestrator interface {
 	// Policy changes take effect on the next crypto operation.
 	// Returns ErrNotFound if the key does not exist.
 	UpdateKeyPolicy(ctx context.Context, keyName string, policyName string) error
+
+	// TransformKey() error
 }

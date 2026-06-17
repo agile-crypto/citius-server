@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/go-jose/go-jose/v4/testutils/require"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/policy"
@@ -24,7 +25,7 @@ func TestAllowedTemplates_noPolicy_returnsNil(t *testing.T) {
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	// No policy name => bypass (no restrictions)
-	ids, err := enforcer.AllowedTemplates(ctx, "", core.ScopeSpec{})
+	ids, err := enforcer.AllowedTemplates(ctx, "", &core.ScopeSpecification{})
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -37,7 +38,7 @@ func TestAllowedTemplates_emptyRules_returnsEmptySlice(t *testing.T) {
 	// Empty rules_json - deny-by-default => no templates allowed
 	enforcer := setupWithRulesPolicy(t, "open-policy", nil)
 
-	ids, err := enforcer.AllowedTemplates(context.Background(), "open-policy", core.ScopeSpec{})
+	ids, err := enforcer.AllowedTemplates(context.Background(), "open-policy", &core.ScopeSpecification{})
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -56,9 +57,14 @@ func TestAllowedTemplates_withAllowList_returnsIDs(t *testing.T) {
 	}
 	enforcer := setupWithRulesPolicy(t, "restricted", rules)
 
-	ids, err := enforcer.AllowedTemplates(context.Background(), "restricted", core.ScopeSpec{
-		Primitive: core.PrimitiveSignature,
-	})
+	ctx := context.Background()
+	scopeSpec, err := core.NewScopeSpecification(
+		ctx, core.ScopeSignatureStandard, nil, nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("NewScopeSpecification: %v", err)
+	}
+	ids, err := enforcer.AllowedTemplates(context.Background(), "restricted", scopeSpec)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -77,7 +83,7 @@ func TestAllowedTemplates_policyNotFound_returnsError(t *testing.T) {
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
-	_, err := enforcer.AllowedTemplates(ctx, "nonexistent", core.ScopeSpec{})
+	_, err := enforcer.AllowedTemplates(ctx, "nonexistent", &core.ScopeSpecification{})
 	if err == nil {
 		t.Fatal("expected error when policy not found")
 	}
@@ -101,13 +107,14 @@ func TestAllowedTemplates_scopeSpecIgnored_M1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreatePolicy: %v", err)
 	}
-
+	scopeSpec, err := core.NewScopeSpecification(
+		ctx, core.ScopeSignatureStandard, nil, nil, nil,
+	)
+	require.NoError(t, err, "NewScopeSpecification: %v", err)
 	// With a specific scope
-	ids1, _ := enforcer.AllowedTemplates(ctx, "scope-test", core.ScopeSpec{
-		Primitive: core.PrimitiveSignature,
-	})
+	ids1, _ := enforcer.AllowedTemplates(ctx, "scope-test", scopeSpec)
 	// With empty scope
-	ids2, _ := enforcer.AllowedTemplates(ctx, "scope-test", core.ScopeSpec{})
+	ids2, _ := enforcer.AllowedTemplates(ctx, "scope-test", &core.ScopeSpecification{})
 	if len(ids1) != len(ids2) || ids1[0] != ids2[0] {
 		t.Errorf("M1: scopeSpec should not affect results; ids1=%v, ids2=%v", ids1, ids2)
 	}

@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/provider"
 )
 
@@ -166,7 +165,7 @@ func TestRegistry_MatchForScope_M1_returnsDefault(t *testing.T) {
 	r := provider.NewRegistry()
 	_ = r.Register(t.Context(), &capableProvider{name: "sw", algorithms: []string{"ecdsa-p256-sha256"}})
 
-	got, err := r.MatchForScope(t.Context(), core.ScopeSpec{})
+	got, err := r.MatchForScope(t.Context(), nil)
 	if err != nil {
 		t.Fatalf("MatchForScope: %v", err)
 	}
