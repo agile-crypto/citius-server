@@ -4,14 +4,14 @@ import (
 	"context"
 )
 
-// Reader is the read-only persistence contract for the Key aggregate.
+// ReadOnlyRepository is the read-only persistence contract for the Key aggregate.
 // It returns full domain objects (Key aggregate roots and Version entities)
 // so that callers enforce invariants by invoking aggregate methods rather
 // than inspecting flattened data.
 //
 // Any application service that only reads keys (e.g. CryptoOrchestrator)
-// should depend on Reader rather than the full Repository.
-type Reader interface {
+// should depend on ReadOnlyRepository rather than the full Repository.
+type ReadOnlyRepository interface {
 	// GetKeyByID retrieves a key by public ID (metadata only, no material).
 	GetKeyByID(ctx context.Context, id string) (*Key, error)
 
@@ -28,12 +28,12 @@ type Reader interface {
 	GetCurrentVersion(ctx context.Context, keyID string) (*Version, error)
 }
 
-// Writer is the mutating persistence contract for the Key aggregate.
+// WriteOnlyRepository is the mutating persistence contract for the Key aggregate.
 //
 // All write operations follow the aggregate-root pattern: the calling
-// application service loads the Key via Reader, enforces domain invariants
-// on the aggregate, and then persists the result through Writer.
-type Writer interface {
+// application service loads the Key via ReadOnlyRepository, enforces domain invariants
+// on the aggregate, and then persists the result through WriteOnlyRepository.
+type WriteOnlyRepository interface {
 	// CreateKey atomically persists a key along with its initial current version
 	// in storage. The version number of the initial version must match the
 	// current version of the key.
@@ -81,6 +81,6 @@ type Writer interface {
 // The repository exposes aggregate-level operations — there is no way to
 // create a Version without an associated Key (enforced by CreateKey).
 type Repository interface {
-	Reader
-	Writer
+	ReadOnlyRepository
+	WriteOnlyRepository
 }

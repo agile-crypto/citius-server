@@ -20,7 +20,7 @@ import (
 // for cryptographic operations.
 type cryptoOrchestrator struct {
 	store     storage.Storage
-	keys      key.Reader
+	keys      key.ReadOnlyRepository
 	policy    policy.Engine
 	providers provider.Registry
 	templates template.Registry
@@ -30,7 +30,7 @@ type cryptoOrchestrator struct {
 // All five dependencies are required; returns an error if any is nil.
 func NewCryptoOrchestrator(
 	s storage.Storage,
-	kr key.Reader,
+	kr key.ReadOnlyRepository,
 	pe policy.Engine,
 	pr provider.Registry,
 	tr template.Registry,
