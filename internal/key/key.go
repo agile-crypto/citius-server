@@ -172,10 +172,10 @@ var validTransitions = map[types.KeyLifecycleState][]types.KeyLifecycleState{
 	types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED: {}, // terminal — no transitions out
 }
 
-// TransitionTo attempts to move the key to a new lifecycle status.
+// UpdateState attempts to move the key to a new lifecycle status.
 // Returns an error if the transition is not valid per the NIST SP 800-57 state machine.
 // On success, updates the key's status in place.
-func (k *Key) TransitionTo(newStatus types.KeyLifecycleState) error {
+func (k *Key) UpdateState(newStatus types.KeyLifecycleState) error {
 	current := k.GetStatus()
 	allowed, ok := validTransitions[current]
 	if !ok {

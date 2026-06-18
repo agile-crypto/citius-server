@@ -157,7 +157,7 @@ func TestKey_TransitionTo_validTransitions(t *testing.T) {
 				PublicId: "key_01HXYZ", Name: "test", Primitive: "t",
 				Status: tt.from,
 			})
-			if err := k.TransitionTo(tt.to); err != nil {
+			if err := k.UpdateState(tt.to); err != nil {
 				t.Errorf("valid transition %s→%s returned error: %v", tt.from, tt.to, err)
 			}
 			if k.GetStatus() != tt.to {
@@ -184,7 +184,7 @@ func TestKey_TransitionTo_invalidTransitions(t *testing.T) {
 				PublicId: "key_01HXYZ", Name: "test", Primitive: "t",
 				Status: tt.from,
 			})
-			if err := k.TransitionTo(tt.to); err == nil {
+			if err := k.UpdateState(tt.to); err == nil {
 				t.Errorf("invalid transition %s→%s should return error", tt.from, tt.to)
 			}
 			// Status should NOT have changed
