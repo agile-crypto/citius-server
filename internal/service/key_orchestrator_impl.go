@@ -289,42 +289,6 @@ func (r *keyOrchestrator) DeleteKey(ctx context.Context, keyName string) error {
 	return nil
 }
 
-func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyName string, version uint32) (*key.Key, *key.Version, error) {
-	const op errors.Op = "service.(keyOrchestrator).GetKeyWithMaterial"
-
-	// 1. Fetch key metadata.
-	k, err := r.repo.GetKeyByName(ctx, keyName)
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-
-	// 2. Aggregate-level lifecycle checks.
-	//    This is the single gateway for key material access — all crypto
-	//    operations (Sign, Verify, etc.) get lifecycle protection through
-	//    this method.
-	if k.IsTerminal() {
-		return nil, nil, errors.New(ctx, op, errors.CodeFailedPrecondition,
-			"key is destroyed and cannot be used")
-	}
-	if cryptoErr := k.CanPerformCrypto(); cryptoErr != nil {
-		return nil, nil, errors.New(ctx, op, errors.CodeFailedPrecondition, cryptoErr.Error())
-	}
-
-	// 3. Fetch the requested version.
-	//    version == 0 means "current/latest"; otherwise fetch a specific version.
-	var v *key.Version
-	if version == 0 {
-		v, err = r.repo.GetCurrentVersion(ctx, k.GetPublicId())
-	} else {
-		v, err = r.repo.GetVersion(ctx, k.GetPublicId(), version)
-	}
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-
-	return k, v, nil
-}
-
 func (r *keyOrchestrator) RotateKey(ctx context.Context, _ string) (*KeyMetadata, error) {
 	return nil, errors.New(ctx, "service.(keyOrchestrator).RotateKey", errors.CodeNotImplemented,
 		"RotateKey not yet implemented")

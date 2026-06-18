@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/key"
 )
 
 // KeyOrchestrator orchestrates key lifecycle workflows.
@@ -18,12 +17,6 @@ type KeyOrchestrator interface {
 	ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error)
 	ListKeys(ctx context.Context) ([]*KeyMetadata, error)
 	DeleteKey(ctx context.Context, keyName string) error
-
-	// GetKeyWithMaterial fetches the key AND a specific version's material.
-	// Used internally by CryptoOrchestrator — not exposed over gRPC directly.
-	// Pass version=0 for latest version.
-	GetKeyWithMaterial(ctx context.Context, keyName string, version uint32) (*key.Key, *key.Version, error)
-
 	RotateKey(ctx context.Context, keyName string) (*KeyMetadata, error)
 	SuspendKey(ctx context.Context, keyName string) error
 	RestoreKey(ctx context.Context, keyName string) error
