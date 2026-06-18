@@ -34,17 +34,18 @@ type SignRequest struct {
 type SignResult struct {
 	Signature    []byte
 	KeyName      string                   // echo back for caller context
-	KeyVersionID uint32                   // version that was used
+	KeyVersion   uint32                   // version that was used
 	Algorithm    string                   // template ID (e.g., "ecdsa-p256-sha256")
 	ProviderName string                   // which provider performed the operation
 	Output       *messages.ProviderOutput // from provider (NoAlgorithmOutput + encoding)
 }
 
 type VerifyRequest struct {
-	KeyName   string
-	Payload   []byte // original data that was signed
-	Signature []byte
-
+	KeyName    string
+	KeyVersion uint32 // version that was used
+	Payload    []byte // original data that was signed
+	Signature  []byte
+	Output     *messages.ProviderOutput // from provider (NoAlgorithmOutput + encoding)
 	// Scope must match the scope used during signing.
 	SignatureScopeFields
 }
@@ -74,7 +75,7 @@ type EncryptRequest struct {
 
 type EncryptResult struct {
 	Ciphertext   []byte
-	KeyVersionID uint32                   // version that was used
+	KeyVersion   uint32                   // version that was used
 	Output       *messages.ProviderOutput // IV/nonce, tag, encoding — from provider
 	Algorithm    string
 	ProviderName string
@@ -82,6 +83,7 @@ type EncryptResult struct {
 
 type DecryptRequest struct {
 	KeyName    string
+	KeyVersion uint32 // version that was used
 	Ciphertext []byte
 	Output     *messages.ProviderOutput // stored ProviderOutput from EncryptResult (carries IV/nonce)
 
@@ -113,7 +115,7 @@ type WrapKeyRequest struct {
 type WrapKeyResult struct {
 	WrappedKeyBytes []byte
 	Algorithm       string
-	KeyVersionID    uint32 // version that was used
+	KeyVersion      uint32 // version that was used
 }
 
 // UnwrapKeyRequest carries the inputs for an UnwrapKey operation.
@@ -128,7 +130,7 @@ type UnwrapKeyRequest struct {
 // unwrapped material and persisting it via key.Repository.
 type UnwrapKeyResult struct {
 	UnwrappedKeyMaterial []byte                   // raw key bytes returned by the provider
-	KeyVersionID         uint32                   // version that was used
+	KeyVersion           uint32                   // version that was used
 	Algorithm            string                   // algorithm of the unwrapped key
 	Output               *messages.ProviderOutput // provider-generated output
 

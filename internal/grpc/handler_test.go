@@ -124,9 +124,6 @@ func (m *mockKeyOrchestrator) GetKeyWithMaterial(ctx context.Context, name strin
 	}
 	panic("mockKeyOrchestrator.GetKeyWithMaterial: not implemented")
 }
-func (m *mockKeyOrchestrator) GetKeyMaterial(_ context.Context, _ string, _ uint32) ([]byte, uint32, error) {
-	panic("mockKeyOrchestrator.GetKeyMaterial: not implemented")
-}
 func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*service.KeyMetadata, error) {
 	panic("mockKeyOrchestrator.RotateKey: not implemented")
 }

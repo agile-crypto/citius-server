@@ -83,6 +83,44 @@ func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
 		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
+		Payload:              payload,
+		Signature:            signResult.Signature,
+		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if !verifyResult.Valid {
+		t.Error("expected valid=true for correct ML-DSA signature")
+	}
+	if verifyResult.KeyName != keyName {
+		t.Errorf("KeyName: got %q want %q", verifyResult.KeyName, keyName)
+	}
+	if verifyResult.Algorithm == "" {
+		t.Error("Algorithm must be populated in VerifyResult")
+	}
+	if verifyResult.ProviderName == "" {
+		t.Error("ProviderName must be populated in VerifyResult")
+	}
+}
+
+func TestVerify_MLDSA_validSignature_noKeyVersion_returnsTrue(t *testing.T) {
+	ops, keyName := setupCryptoWithKeyForVerify(t)
+	ctx := context.Background()
+	payload := []byte("post-quantum verification")
+
+	signResult, err := ops.Sign(ctx, crypto.SignRequest{
+		KeyName:              keyName,
+		Payload:              payload,
+		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
+		KeyName:              keyName,
 		Payload:              payload,
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -119,6 +157,7 @@ func TestVerify_tamperedPayload_returnsFalse_notError(t *testing.T) {
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
 		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              []byte("tampered"), // different payload
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -152,6 +191,7 @@ func TestVerify_tamperedSignature_returnsFalse_notError(t *testing.T) {
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
 		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              payload,
 		Signature:            tampered,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -239,6 +279,7 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 	// Verify should fail with policy violation.
 	_, err = ops.Verify(ctx, crypto.VerifyRequest{
 		KeyName:              created.Name,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              []byte("data"),
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -283,6 +324,7 @@ func TestSignVerify_roundTrip_MLDSA65(t *testing.T) {
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
 		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              payload,
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},

@@ -157,7 +157,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	return crypto.SignResult{
 		Signature:    signResp.GetSignature(),
 		KeyName:      req.KeyName,
-		KeyVersionID: kv.GetVersion(),
+		KeyVersion:   kv.GetVersion(),
 		Algorithm:    templateID,
 		ProviderName: prov.Name(),
 		Output:       signResp.GetOutput(),
@@ -184,8 +184,8 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeFailedPrecondition, decErr.Error())
 	}
 
-	// 2a. Fetch the current version's material (includes public key bytes).
-	kv, err := o.keyReader.GetCurrentVersion(ctx, k.GetPublicId())
+	// 2a. Fetch the right version's material (includes public key bytes).
+	kv, err := o.keyReader.GetVersion(ctx, k.GetPublicId(), req.KeyVersion)
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -204,7 +204,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 5. Resolve template → *types.AlgorithmDetails for provider dispatch.
+	// 5. Resolve template => *types.AlgorithmDetails for provider dispatch.
 	tmpl, err := o.templates.Get(ctx, templateID)
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
@@ -228,6 +228,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 		Input:       req.Payload,
 		Signature:   req.Signature,
 		Algorithm:   tmpl.GetAlgorithm(),
+		Output:      req.Output,
 	}
 	switch {
 	case req.NoContext != nil:

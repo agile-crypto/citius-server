@@ -90,7 +90,7 @@ func TestSign_MLDSA_happyPath(t *testing.T) {
 	if result.ProviderName == "" {
 		t.Error("ProviderName must be populated in SignResult")
 	}
-	if result.KeyVersionID == 0 {
+	if result.KeyVersion == 0 {
 		t.Error("KeyVersionID must be populated in SignResult")
 	}
 }

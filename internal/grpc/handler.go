@@ -198,13 +198,12 @@ func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messa
 	}
 
 	// Wrap ProviderOutput into OperationMetadata.
-	// KeyVersion is 0 until version tracking is wired.
 	return &messagespb.SignResponse{
 		Signature: result.Signature,
 		Metadata: &messagespb.OperationMetadata{
-			KeyVersion:     result.KeyVersionID,
+			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
-			//TODO: Add API version
+			//TODO: Add user context and API version
 		},
 	}, nil
 }
@@ -232,10 +231,14 @@ func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*m
 		return nil, ToStatusError(err)
 	}
 
+	//TODO: Check API version in req.GetMetadata() and reject if unsupported.
+
 	verifyReq := crypto.VerifyRequest{
-		KeyName:   req.GetKeyName(),
-		Payload:   req.GetInput(),
-		Signature: req.GetSignature(),
+		KeyName:    req.GetKeyName(),
+		Payload:    req.GetInput(),
+		Signature:  req.GetSignature(),
+		KeyVersion: req.GetMetadata().GetKeyVersion(),
+		Output:     req.GetMetadata().GetProviderOutput(),
 	}
 	extractVerifyScopeParams(req.GetScopeParams(), &verifyReq)
 
@@ -248,7 +251,6 @@ func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*m
 		Valid: result.Valid,
 		Metadata: &messagespb.OperationMetadata{
 			ProviderOutput: result.Output,
-			//TODO: Add API version
 		},
 	}, nil
 }
