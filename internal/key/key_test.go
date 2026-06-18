@@ -135,26 +135,6 @@ func TestKey_CanRotate_suspended(t *testing.T) {
 	}
 }
 
-func TestKey_CanPerformCrypto_active(t *testing.T) {
-	k := key.NewKey(&storepb.Key{
-		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
-		Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
-	})
-	if err := k.CanPerformCrypto(); err != nil {
-		t.Errorf("CanPerformCrypto on ACTIVE key: unexpected error: %v", err)
-	}
-}
-
-func TestKey_CanPerformCrypto_destroyed(t *testing.T) {
-	k := key.NewKey(&storepb.Key{
-		PublicId: "key_01HXYZ", Name: "test", Primitive: "ecdsa-p256",
-		Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED,
-	})
-	if err := k.CanPerformCrypto(); err == nil {
-		t.Error("CanPerformCrypto on DESTROYED key should return error")
-	}
-}
-
 // ---- Lifecycle Test ---//
 func TestKey_TransitionTo_validTransitions(t *testing.T) {
 	tests := []struct {

@@ -111,19 +111,6 @@ func (k *Key) CanRotate() error {
 	return nil
 }
 
-// CanPerformCrypto returns an error if the key cannot be used for cryptographic
-// operations in its current lifecycle state. Only ACTIVE keys can encrypt/sign.
-//
-// TODO: Deprecate this: prefer CanPerformOriginatingCrypto for originating operations
-// (Sign, Encrypt, Wrap) or CanPerformReceivingCrypto for receiving operations
-// (Verify, Decrypt, Unwrap), which apply the correct per-operation lifecycle rule.
-func (k *Key) CanPerformCrypto() error {
-	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
-		return fmt.Errorf("key is in status %s: cryptographic operations require ACTIVE status", k.GetStatus())
-	}
-	return nil
-}
-
 // CanPerformOriginatingCrypto reports whether the key may be used to originate
 // new cryptographic protection (Sign, Encrypt, Wrap). Only ACTIVE keys may
 // originate new protection.
