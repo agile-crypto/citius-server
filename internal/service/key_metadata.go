@@ -2,6 +2,7 @@ package service
 
 import (
 	types "github.ibm.com/citius/citius-server/gen/go/types"
+	"github.ibm.com/citius/citius-server/internal/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -18,6 +19,7 @@ type KeyMetadata struct {
 	KeyID      string
 	Primitive  string // e.g. "signature", "encryption" — derived from ScopeSpec
 	TemplateID string
+
 	// The scope specification used to create this key.
 	ScopeSpec        *types.ScopeSpecification
 	Provider         string
@@ -27,7 +29,8 @@ type KeyMetadata struct {
 	Labels           map[string]string
 	ProviderMetadata map[string]string
 
-	TemplateInfo *types.TemplateInfo
+	//TODO: Currently not populated deliberately
+	TemplateInfo *template.Template
 
 	// Whether the key material can be extracted from its provider.
 	// False for non-extractable HSM keys.

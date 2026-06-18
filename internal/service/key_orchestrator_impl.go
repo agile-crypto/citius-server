@@ -156,9 +156,10 @@ func (r *keyOrchestrator) toKeyMetadata(ctx context.Context, k *key.Key, v *key.
 		md.Version = v.GetVersion()
 		md.TemplateID = v.GetTemplateId()
 		md.Provider = v.GetProviderId()
-		if tmpl, err := r.templates.Get(ctx, v.GetTemplateId()); err == nil {
-			md.TemplateInfo = tmpl.Proto()
-		}
+		//TODO: skip for now. TemplateInfo should be fetched by the application using the template id
+		// if tmpl, err := r.templates.Get(ctx, v.GetTemplateId()); err == nil {
+		// 	md.TemplateInfo = tmpl
+		// }
 	}
 
 	return md, nil
