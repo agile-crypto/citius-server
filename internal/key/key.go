@@ -113,11 +113,40 @@ func (k *Key) CanRotate() error {
 
 // CanPerformCrypto returns an error if the key cannot be used for cryptographic
 // operations in its current lifecycle state. Only ACTIVE keys can encrypt/sign.
+//
+// TODO: Deprecate this: prefer CanPerformOriginatingCrypto for originating operations
+// (Sign, Encrypt, Wrap) or CanPerformReceivingCrypto for receiving operations
+// (Verify, Decrypt, Unwrap), which apply the correct per-operation lifecycle rule.
 func (k *Key) CanPerformCrypto() error {
 	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
 		return fmt.Errorf("key is in status %s: cryptographic operations require ACTIVE status", k.GetStatus())
 	}
 	return nil
+}
+
+// CanPerformOriginatingCrypto reports whether the key may be used to originate
+// new cryptographic protection (Sign, Encrypt, Wrap). Only ACTIVE keys may
+// originate new protection.
+func (k *Key) CanPerformOriginatingCrypto() error {
+	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
+		return fmt.Errorf("key is in status %s: originating operations (Sign, Encrypt, Wrap) require ACTIVE status", k.GetStatus())
+	}
+	return nil
+}
+
+// CanPerformReceivingCrypto reports whether the key may be used to receive
+// previously protected data (Verify, Decrypt, Unwrap). ACTIVE, SUSPENDED, and
+// DEACTIVATED ("legacy") keys may still process existing ciphertext/signatures;
+// terminal or COMPROMISED keys may not.
+func (k *Key) CanPerformReceivingCrypto() error {
+	switch k.GetStatus() {
+	case types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
+		types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
+		types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED:
+		return nil
+	default:
+		return fmt.Errorf("key is in status %s: receiving operations (Verify, Decrypt, Unwrap) require ACTIVE, SUSPENDED, or DEACTIVATED status", k.GetStatus())
+	}
 }
 
 // TODO: CanExport deferred — requires `bool extractable` field to be added to

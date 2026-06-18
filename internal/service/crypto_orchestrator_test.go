@@ -63,7 +63,7 @@ func setupCryptoOrchestratorFull(t *testing.T) (service.CryptoOrchestrator, serv
 		t.Fatalf("NewKeyOrchestrator: %v", err)
 	}
 
-	ops, err := service.NewCryptoOrchestrator(storage, keyOrch, pol, provReg, reg)
+	ops, err := service.NewCryptoOrchestrator(storage, repo, pol, provReg, reg)
 	if err != nil {
 		t.Fatalf("NewCryptoOrchestrator: %v", err)
 	}
@@ -100,15 +100,14 @@ func TestNewCryptoOrchestrator_nilStorage_returnsError(t *testing.T) {
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
 	eval := policy.NewSimpleRulesEvaluator()
 	pol, _ := policy.NewEnforcer(policyRepo, eval)
-	keyOrch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 
-	_, err := service.NewCryptoOrchestrator(nil, keyOrch, pol, provReg, reg)
+	_, err := service.NewCryptoOrchestrator(nil, repo, pol, provReg, reg)
 	if err == nil {
 		t.Fatal("expected error for nil storage")
 	}
 }
 
-func TestNewCryptoOrchestrator_nilKeyOrchestrator_returnsError(t *testing.T) {
+func TestNewCryptoOrchestrator_nilKeyReader_returnsError(t *testing.T) {
 	ctx := context.Background()
 	storage := &logical.InmemStorage{}
 
@@ -120,7 +119,7 @@ func TestNewCryptoOrchestrator_nilKeyOrchestrator_returnsError(t *testing.T) {
 
 	_, err := service.NewCryptoOrchestrator(storage, nil, pol, provReg, reg)
 	if err == nil {
-		t.Fatal("expected error for nil key orchestrator")
+		t.Fatal("expected error for nil key reader")
 	}
 }
 
@@ -131,12 +130,8 @@ func TestNewCryptoOrchestrator_nilPolicyEngine_returnsError(t *testing.T) {
 	repo, _ := key.NewVaultRepository(ctx, storage)
 	reg, _ := template.NewVaultRegistry(ctx, storage)
 	provReg := provider.NewRegistry()
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, _ := policy.NewEnforcer(policyRepo, eval)
-	keyOrch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 
-	_, err := service.NewCryptoOrchestrator(storage, keyOrch, nil, provReg, reg)
+	_, err := service.NewCryptoOrchestrator(storage, repo, nil, provReg, reg)
 	if err == nil {
 		t.Fatal("expected error for nil policy engine")
 	}
@@ -148,13 +143,11 @@ func TestNewCryptoOrchestrator_nilProviderRegistry_returnsError(t *testing.T) {
 
 	repo, _ := key.NewVaultRepository(ctx, storage)
 	reg, _ := template.NewVaultRegistry(ctx, storage)
-	provReg := provider.NewRegistry()
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
 	eval := policy.NewSimpleRulesEvaluator()
 	pol, _ := policy.NewEnforcer(policyRepo, eval)
-	keyOrch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 
-	_, err := service.NewCryptoOrchestrator(storage, keyOrch, pol, nil, reg)
+	_, err := service.NewCryptoOrchestrator(storage, repo, pol, nil, reg)
 	if err == nil {
 		t.Fatal("expected error for nil provider registry")
 	}
@@ -165,14 +158,12 @@ func TestNewCryptoOrchestrator_nilTemplateRegistry_returnsError(t *testing.T) {
 	storage := &logical.InmemStorage{}
 
 	repo, _ := key.NewVaultRepository(ctx, storage)
-	reg, _ := template.NewVaultRegistry(ctx, storage)
 	provReg := provider.NewRegistry()
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
 	eval := policy.NewSimpleRulesEvaluator()
 	pol, _ := policy.NewEnforcer(policyRepo, eval)
-	keyOrch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 
-	_, err := service.NewCryptoOrchestrator(storage, keyOrch, pol, provReg, nil)
+	_, err := service.NewCryptoOrchestrator(storage, repo, pol, provReg, nil)
 	if err == nil {
 		t.Fatal("expected error for nil template registry")
 	}

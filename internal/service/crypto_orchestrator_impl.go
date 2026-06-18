@@ -20,7 +20,7 @@ import (
 // for cryptographic operations.
 type cryptoOrchestrator struct {
 	store     storage.Storage
-	keys      KeyOrchestrator
+	keys      key.Reader
 	policy    policy.Engine
 	providers provider.Registry
 	templates template.Registry
@@ -30,7 +30,7 @@ type cryptoOrchestrator struct {
 // All five dependencies are required; returns an error if any is nil.
 func NewCryptoOrchestrator(
 	s storage.Storage,
-	km KeyOrchestrator,
+	kr key.Reader,
 	pe policy.Engine,
 	pr provider.Registry,
 	tr template.Registry,
@@ -42,9 +42,9 @@ func NewCryptoOrchestrator(
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"storage must not be nil")
 	}
-	if km == nil {
+	if kr == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-			"key orchestrator must not be nil")
+			"key reader must not be nil")
 	}
 	if pe == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
@@ -61,7 +61,7 @@ func NewCryptoOrchestrator(
 
 	return &cryptoOrchestrator{
 		store:     s,
-		keys:      km,
+		keys:      kr,
 		policy:    pe,
 		providers: pr,
 		templates: tr,
@@ -85,15 +85,23 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 			"Payload must not be empty")
 	}
 
-	// 2. Fetch key + material.
-	//    lifecycle checks (IsTerminal, CanPerformCrypto) are
-	//    enforced inside GetKeyWithMaterial — Sign does not duplicate them.
-	k, kv, err := o.keys.GetKeyWithMaterial(ctx, req.KeyName, 0) // 0 = latest
+	// 2. Load the key aggregate and apply the protecting-operation lifecycle rule.
+	//    Sign creates new protected data, so only ACTIVE keys are permitted.
+	k, err := o.keys.GetKeyByName(ctx, req.KeyName)
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+	if encErr := k.CanPerformOriginatingCrypto(); encErr != nil {
+		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeFailedPrecondition, encErr.Error())
+	}
+
+	// 3a. Fetch the current version's material.
+	kv, err := o.keys.GetCurrentVersion(ctx, k.GetPublicId())
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 3. Validate operation against the key's attached policy.
+	// 4. Validate operation against the key's attached policy.
 	policyID := k.GetPolicyId()
 	templateID := kv.GetTemplateId()
 	err = o.policy.ValidateOperation(ctx, policyID, core.OperationSign, templateID, "")
@@ -101,24 +109,24 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 4. Fetch the provider that created this key version.
+	// 5. Fetch the provider that created this key version.
 	prov, err := o.providers.Get(ctx, kv.GetProviderId())
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 5. Resolve template → *types.AlgorithmDetails for provider dispatch.
+	// 6. Resolve template → *types.AlgorithmDetails for provider dispatch.
 	tmpl, err := o.templates.Get(ctx, templateID)
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 5a. Validate that the caller's scope_params match the key's declared scope.
+	// 6a. Validate that the caller's scope_params match the key's declared scope.
 	if err = validateSignatureScopeParams(ctx, op, k, req.SignatureScopeFields); err != nil {
 		return crypto.SignResult{}, err
 	}
 
-	// 5b. Unmarshal stored GenerateKeyResponse to extract private key material.
+	// 6b. Unmarshal stored GenerateKeyResponse to extract private key material.
 	var genResp providerpb.GenerateKeyResponse
 	if err = proto.Unmarshal(kv.GetKeyMaterial(), &genResp); err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
@@ -165,10 +173,19 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 			"KeyPublicID must not be empty")
 	}
 
-	// 2. Fetch key + material (includes public key bytes for verification).
-	//    Lifecycle checks (IsTerminal, CanPerformCrypto) are enforced inside
-	//    GetKeyWithMaterial — Verify does not duplicate them.
-	k, kv, err := o.keys.GetKeyWithMaterial(ctx, req.KeyName, 0) // 0 = latest
+	// 2. Load the key aggregate and apply the processing-operation lifecycle rule.
+	//    Verify processes existing signatures, so ACTIVE, SUSPENDED, and
+	//    DEACTIVATED ("legacy") keys are permitted.
+	k, err := o.keys.GetKeyByName(ctx, req.KeyName)
+	if err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+	if decErr := k.CanPerformReceivingCrypto(); decErr != nil {
+		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeFailedPrecondition, decErr.Error())
+	}
+
+	// 2a. Fetch the current version's material (includes public key bytes).
+	kv, err := o.keys.GetCurrentVersion(ctx, k.GetPublicId())
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}

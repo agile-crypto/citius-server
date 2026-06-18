@@ -230,3 +230,97 @@ func TestKey_IsTerminal(t *testing.T) {
 		t.Error("ACTIVE key should not be terminal")
 	}
 }
+
+// CanPerformOriginatingCrypto
+
+func TestKey_CanPerformOriginatingCrypto_active_succeeds(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE})
+	if err := k.CanPerformOriginatingCrypto(); err != nil {
+		t.Errorf("CanPerformOriginatingCrypto on ACTIVE key: unexpected error: %v", err)
+	}
+}
+
+func TestKey_CanPerformOriginatingCrypto_suspended_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED})
+	if err := k.CanPerformOriginatingCrypto(); err == nil {
+		t.Error("CanPerformOriginatingCrypto on SUSPENDED key: expected error, got nil")
+	}
+}
+
+func TestKey_CanPerformOriginatingCrypto_deactivated_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED})
+	if err := k.CanPerformOriginatingCrypto(); err == nil {
+		t.Error("CanPerformOriginatingCrypto on DEACTIVATED key: expected error, got nil")
+	}
+}
+
+func TestKey_CanPerformOriginatingCrypto_destroyed_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED})
+	if err := k.CanPerformOriginatingCrypto(); err == nil {
+		t.Error("CanPerformOriginatingCrypto on DESTROYED key: expected error, got nil")
+	}
+}
+
+func TestKey_CanPerformOriginatingCrypto_compromised_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED})
+	if err := k.CanPerformOriginatingCrypto(); err == nil {
+		t.Error("CanPerformOriginatingCrypto on COMPROMISED key: expected error, got nil")
+	}
+}
+
+// CanPerformReceivingCrypto
+
+func TestKey_CanPerformReceivingCrypto_active_succeeds(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE})
+	if err := k.CanPerformReceivingCrypto(); err != nil {
+		t.Errorf("CanPerformReceivingCrypto on ACTIVE key: unexpected error: %v", err)
+	}
+}
+
+func TestKey_CanPerformReceivingCrypto_suspended_succeeds(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED})
+	if err := k.CanPerformReceivingCrypto(); err != nil {
+		t.Errorf("CanPerformReceivingCrypto on SUSPENDED key: unexpected error: %v", err)
+	}
+}
+
+func TestKey_CanPerformReceivingCrypto_deactivated_succeeds(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED})
+	if err := k.CanPerformReceivingCrypto(); err != nil {
+		t.Errorf("CanPerformReceivingCrypto on DEACTIVATED (legacy) key: unexpected error: %v", err)
+	}
+}
+
+func TestKey_CanPerformReceivingCrypto_destroyed_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED})
+	if err := k.CanPerformReceivingCrypto(); err == nil {
+		t.Error("CanPerformReceivingCrypto on DESTROYED key: expected error, got nil")
+	}
+}
+
+func TestKey_CanPerformReceivingCrypto_destroyedCompromised_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED})
+	if err := k.CanPerformReceivingCrypto(); err == nil {
+		t.Error("CanPerformReceivingCrypto on DESTROYED_COMPROMISED key: expected error, got nil")
+	}
+}
+
+func TestKey_CanPerformReceivingCrypto_compromised_fails(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_COMPROMISED})
+	if err := k.CanPerformReceivingCrypto(); err == nil {
+		t.Error("CanPerformReceivingCrypto on COMPROMISED key: expected error, got nil")
+	}
+}
+
+// TestKey_OriginatingVsReceiving_asymmetry verifies the core invariant:
+// deactivated keys permit receiving operations (Verify/Decrypt/Unwrap) but not
+// originating operations (Sign/Encrypt/Wrap).
+func TestKey_OriginatingVsReceiving_asymmetry(t *testing.T) {
+	k := key.NewKey(&storepb.Key{Status: types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED})
+	if err := k.CanPerformOriginatingCrypto(); err == nil {
+		t.Error("CanPerformOriginatingCrypto should fail on DEACTIVATED key")
+	}
+	if err := k.CanPerformReceivingCrypto(); err != nil {
+		t.Errorf("CanPerformReceivingCrypto should succeed on DEACTIVATED key: %v", err)
+	}
+}

@@ -31,6 +31,8 @@ const keyNameToIDStoragePrefix string = "key_name_to_id/"
 const versionSep string = ":"
 
 var _ Repository = (*VaultRepository)(nil)
+var _ Reader = (*VaultRepository)(nil)
+var _ Writer = (*VaultRepository)(nil)
 
 // Key repositories can share the same lock, provided as option. This allows to create per-request
 // repositories that share the same lock, so that they can be used concurrently.
