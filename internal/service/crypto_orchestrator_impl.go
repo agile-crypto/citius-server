@@ -20,7 +20,7 @@ import (
 // for cryptographic operations.
 type cryptoOrchestrator struct {
 	store     storage.Storage
-	keys      key.Reader
+	keyReader key.Reader
 	policy    policy.Engine
 	providers provider.Registry
 	templates template.Registry
@@ -61,7 +61,7 @@ func NewCryptoOrchestrator(
 
 	return &cryptoOrchestrator{
 		store:     s,
-		keys:      kr,
+		keyReader: kr,
 		policy:    pe,
 		providers: pr,
 		templates: tr,
@@ -87,7 +87,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 
 	// 2. Load the key aggregate and apply the protecting-operation lifecycle rule.
 	//    Sign creates new protected data, so only ACTIVE keys are permitted.
-	k, err := o.keys.GetKeyByName(ctx, req.KeyName)
+	k, err := o.keyReader.GetKeyByName(ctx, req.KeyName)
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -96,7 +96,7 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	}
 
 	// 3a. Fetch the current version's material.
-	kv, err := o.keys.GetCurrentVersion(ctx, k.GetPublicId())
+	kv, err := o.keyReader.GetCurrentVersion(ctx, k.GetPublicId())
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -176,7 +176,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	// 2. Load the key aggregate and apply the processing-operation lifecycle rule.
 	//    Verify processes existing signatures, so ACTIVE, SUSPENDED, and
 	//    DEACTIVATED ("legacy") keys are permitted.
-	k, err := o.keys.GetKeyByName(ctx, req.KeyName)
+	k, err := o.keyReader.GetKeyByName(ctx, req.KeyName)
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -185,7 +185,7 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	}
 
 	// 2a. Fetch the current version's material (includes public key bytes).
-	kv, err := o.keys.GetCurrentVersion(ctx, k.GetPublicId())
+	kv, err := o.keyReader.GetCurrentVersion(ctx, k.GetPublicId())
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
