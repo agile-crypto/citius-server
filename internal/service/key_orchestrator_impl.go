@@ -132,10 +132,10 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	return r.generateAndPersistKey(ctx, op, req, tmpl, scopeSpec)
 }
 
-// toKeyMetadata projects a key.Key and its current key.Version into the
+// buildKeyMetadata projects a key.Key and its current key.Version into the
 // API-facing KeyMetadata. v may be nil; version-scoped fields are
 // then left at their zero values.
-func (r *keyOrchestrator) toKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
+func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
 	md := &KeyMetadata{
 		Name:           k.GetName(),
 		KeyID:          k.GetPublicId(),
@@ -234,7 +234,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	return r.toKeyMetadata(ctx, k, v)
+	return r.buildKeyMetadata(ctx, k, v)
 }
 
 func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error) {
@@ -252,7 +252,7 @@ func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string, version u
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return r.toKeyMetadata(ctx, k, v)
+	return r.buildKeyMetadata(ctx, k, v)
 }
 
 func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*KeyMetadata, error) {
@@ -267,7 +267,7 @@ func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*KeyMetadata, error) 
 		if verr != nil {
 			return nil, errors.Wrap(ctx, op, verr)
 		}
-		md, merr := r.toKeyMetadata(ctx, k, v)
+		md, merr := r.buildKeyMetadata(ctx, k, v)
 		if merr != nil {
 			return nil, errors.Wrap(ctx, op, merr)
 		}
