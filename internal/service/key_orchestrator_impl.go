@@ -141,7 +141,7 @@ func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *k
 		KeyID:          k.GetPublicId(),
 		Primitive:      k.GetPrimitive(),
 		Policy:         k.GetPolicyId(),
-		LifecycleState: k.GetStatus(),
+		LifecycleState: k.GetState(),
 		Labels:         k.GetLabels(),
 	}
 
@@ -216,7 +216,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		ScopeSpecification: scopeBytes,
 		PolicyId:           req.PolicyID,
 		CurrentVersion:     1,
-		Status:             types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
+		State:              types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 		Labels:             req.Labels,
 	})
 
@@ -227,7 +227,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		ProviderId:  prov.Name(),
 		TemplateId:  tmpl.TemplateID(),
 		KeyMaterial: genRespBytes,
-		Status:      types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
+		State:       types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	})
 
 	if err := r.repo.CreateKey(ctx, k, v); err != nil {

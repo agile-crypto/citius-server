@@ -59,7 +59,7 @@ func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpec,
 		ScopeSpecification: sp,
 		CurrentVersion:     currentKeyVersion,
 		Labels:             opts.withLabels,
-		Status:             opts.withStatus,
+		State:              opts.withState,
 	}
 	return &Key{Key: k}, nil
 }
@@ -105,8 +105,8 @@ func (k *Key) VetForWrite(ctx context.Context, op core.WriteOp) error {
 // CanRotate returns an error if the key cannot be rotated in its current state.
 // A key can only be rotated when it is ACTIVE.
 func (k *Key) CanRotate() error {
-	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
-		return fmt.Errorf("cannot rotate key in status %s: only ACTIVE keys can be rotated", k.GetStatus())
+	if k.GetState() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
+		return fmt.Errorf("cannot rotate key in status %s: only ACTIVE keys can be rotated", k.GetState())
 	}
 	return nil
 }
@@ -115,8 +115,8 @@ func (k *Key) CanRotate() error {
 // new cryptographic protection (Sign, Encrypt, Wrap). Only ACTIVE keys may
 // originate new protection.
 func (k *Key) CanPerformOriginatingCrypto() error {
-	if k.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
-		return fmt.Errorf("key is in status %s: originating operations (Sign, Encrypt, Wrap) require ACTIVE status", k.GetStatus())
+	if k.GetState() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE {
+		return fmt.Errorf("key is in status %s: originating operations (Sign, Encrypt, Wrap) require ACTIVE status", k.GetState())
 	}
 	return nil
 }
@@ -126,13 +126,13 @@ func (k *Key) CanPerformOriginatingCrypto() error {
 // DEACTIVATED ("legacy") keys may still process existing ciphertext/signatures;
 // terminal or COMPROMISED keys may not.
 func (k *Key) CanPerformReceivingCrypto() error {
-	switch k.GetStatus() {
+	switch k.GetState() {
 	case types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 		types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
 		types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DEACTIVATED:
 		return nil
 	default:
-		return fmt.Errorf("key is in status %s: receiving operations (Verify, Decrypt, Unwrap) require ACTIVE, SUSPENDED, or DEACTIVATED status", k.GetStatus())
+		return fmt.Errorf("key is in status %s: receiving operations (Verify, Decrypt, Unwrap) require ACTIVE, SUSPENDED, or DEACTIVATED status", k.GetState())
 	}
 }
 
@@ -143,7 +143,7 @@ func (k *Key) CanPerformReceivingCrypto() error {
 // Terminal keys (DESTROYED, DESTROYED_COMPROMISED) are already gone.
 func (k *Key) CanDelete() error {
 	if k.IsTerminal() {
-		return fmt.Errorf("key is already in terminal state %s", k.GetStatus())
+		return fmt.Errorf("key is already in terminal state %s", k.GetState())
 	}
 	return nil
 }
@@ -176,14 +176,14 @@ var validTransitions = map[types.KeyLifecycleState][]types.KeyLifecycleState{
 // Returns an error if the transition is not valid per the NIST SP 800-57 state machine.
 // On success, updates the key's status in place.
 func (k *Key) UpdateState(newStatus types.KeyLifecycleState) error {
-	current := k.GetStatus()
+	current := k.GetState()
 	allowed, ok := validTransitions[current]
 	if !ok {
 		return fmt.Errorf("unknown current status %s", current)
 	}
 	for _, s := range allowed {
 		if s == newStatus {
-			k.Status = newStatus
+			k.State = newStatus
 			return nil
 		}
 	}
@@ -192,7 +192,7 @@ func (k *Key) UpdateState(newStatus types.KeyLifecycleState) error {
 
 // IsTerminal returns true if the key is in a terminal state (DESTROYED or DESTROYED_COMPROMISED).
 func (k *Key) IsTerminal() bool {
-	s := k.GetStatus()
+	s := k.GetState()
 	return s == types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED || s == types.KeyLifecycleState_KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED
 }
 

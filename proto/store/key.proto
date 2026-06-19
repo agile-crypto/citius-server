@@ -54,7 +54,7 @@ message KeyVersion {
   string provider_id = 12 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
   // Lifecycle state of the key version
   // @gotags: gorm:"not_null"
-  caas.crypto.v1.KeyLifecycleState status = 13;
+  caas.crypto.v1.KeyLifecycleState state = 13;
 }
 
 // Key represents a cryptographic key stored in the database
@@ -80,5 +80,5 @@ message Key {
   uint32 current_version = 9 [(buf.validate.field).uint32.gte = 1];
   // Labels associated with the key
   map<string, string> labels = 10;
-  caas.crypto.v1.KeyLifecycleState status = 11;
+  caas.crypto.v1.KeyLifecycleState state = 11;
 }

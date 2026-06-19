@@ -27,7 +27,7 @@ func TestKey_roundtrip(t *testing.T) {
 		PublicId:           "key_01HXYZ",
 		Name:               "my-signing-key",
 		ScopeSpecification: []byte("scope-spec"),
-		Status:             typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
+		State:              typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	}
 	b, err := proto.Marshal(orig)
 	if err != nil {
@@ -43,8 +43,8 @@ func TestKey_roundtrip(t *testing.T) {
 	if got.Name != orig.Name {
 		t.Errorf("name: got %q want %q", got.Name, orig.Name)
 	}
-	if got.Status != orig.Status {
-		t.Errorf("status: got %v want %v", got.Status, orig.Status)
+	if got.State != orig.State {
+		t.Errorf("state: got %v want %v", got.State, orig.State)
 	}
 }
 
@@ -168,7 +168,7 @@ func TestKey_noMaterialFields(t *testing.T) {
 	_ = k.Name
 	_ = k.ScopeSpecification
 	_ = k.PolicyId
-	_ = k.Status
+	_ = k.State
 	_ = k.CurrentVersion
 	// Specifically verify there are no plaintext_material or ciphertext_material fields
 	// by ensuring the struct only has the expected fields above (documented intent).

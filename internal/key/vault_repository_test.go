@@ -151,7 +151,7 @@ func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
 			v0, err := r.GetCurrentVersion(ctx, tc.keyID)
 			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyID, err)
 			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
-			assert.Equal(tc.wantStatus, v0.GetStatus(), "version should have expected status")
+			assert.Equal(tc.wantStatus, v0.GetState(), "version should have expected status")
 		})
 	}
 
@@ -333,7 +333,7 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 		PublicId:       "key_01HXYZ",
 		Name:           "signing-key",
 		Primitive:      "signature",
-		Status:         types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
+		State:          types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
 		CurrentVersion: 1,
 	})
 	if err := r.UpdateKey(ctx, updated); err != nil {
@@ -344,8 +344,8 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetKey after update: %v", err)
 	}
-	if got.GetStatus() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED {
-		t.Errorf("status: got %v want SUSPENDED", got.GetStatus())
+	if got.GetState() != types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED {
+		t.Errorf("status: got %v want SUSPENDED", got.GetState())
 	}
 }
 
@@ -500,7 +500,7 @@ func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T)
 		PublicId:       "key_01",
 		Name:           "signing-key",
 		Primitive:      "signature",
-		Status:         types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
+		State:          types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
 		CurrentVersion: 1,
 	})
 	require.NoError(t, r.UpdateKey(ctx, updated))
@@ -508,7 +508,7 @@ func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T)
 	got, err := r.GetKeyByName(ctx, "signing-key")
 	require.NoError(t, err)
 	assert.Equal(t, "key_01", got.PublicId)
-	assert.Equal(t, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, got.GetStatus())
+	assert.Equal(t, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, got.GetState())
 }
 
 func Test_VaultRepository_GetKeyByName_afterDeletion_notFound(t *testing.T) {
@@ -559,7 +559,7 @@ func Test_VaultRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
 		PublicId:       "key_01",
 		Name:           "new-name",
 		Primitive:      "signature",
-		Status:         types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
+		State:          types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 		CurrentVersion: 1,
 	})
 	err := r.UpdateKey(ctx, renamed)
