@@ -150,17 +150,17 @@ func TestCreateKey_templateBased_happyPath(t *testing.T) {
 		t.Fatal("CreateKey returned nil key")
 		return // unreachable; satisfies static-analysis nil-flow
 	}
-	if created.GetPublicId() == "" {
+	if created.KeyID == "" {
 		t.Error("PublicId must not be empty")
 	}
-	if created.GetName() != "my-mldsa-key" {
-		t.Errorf("Name: got %q want %q", created.GetName(), "my-mldsa-key")
+	if created.Name != "my-mldsa-key" {
+		t.Errorf("Name: got %q want %q", created.Name, "my-mldsa-key")
 	}
-	if created.GetCurrentVersion() != 1 {
-		t.Errorf("CurrentVersion: got %d want 1", created.GetCurrentVersion())
+	if created.Version != 1 {
+		t.Errorf("CurrentVersion: got %d want 1", created.Version)
 	}
-	if created.GetPrimitive() == "" {
-		t.Error("Primitive must not be empty")
+	if created.ScopeSpec == nil {
+		t.Error("ScopeSpec must not be empty")
 	}
 }
 
@@ -215,7 +215,7 @@ func TestCreateKey_storesPersistentKey(t *testing.T) {
 
 	// ReadKey is still a stub (CodeNotImplemented), but we verify the key
 	// was created successfully with a valid ID.
-	if created.GetPublicId() == "" {
+	if created.KeyID == "" {
 		t.Error("expected non-empty PublicId")
 	}
 }
@@ -234,7 +234,7 @@ func TestCreateKey_withLabels(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
-	got := created.GetLabels()
+	got := created.Labels
 	if len(got) != 2 {
 		t.Errorf("Labels: got %d entries want 2", len(got))
 	}
@@ -338,11 +338,11 @@ func TestCreateKey_scopeBased_permissivePolicy_selectsByScope(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateKey (scope-based, permissive policy): %v", err)
 	}
-	if created.GetPrimitive() == "" {
+	if created.Primitive == "" {
 		t.Error("Primitive should be set from scope")
 	}
-	if created.GetPrimitive() != "signature" {
-		t.Errorf("Primitive: got %q want %q", created.GetPrimitive(), "signature")
+	if created.Primitive != "signature" {
+		t.Errorf("Primitive: got %q want %q", created.Primitive, "signature")
 	}
 }
 
@@ -368,7 +368,7 @@ func TestCreateKey_scopeBased_policyAllowsTemplate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
-	if created.GetPublicId() == "" {
+	if created.KeyID == "" {
 		t.Error("expected valid key")
 	}
 }
@@ -456,8 +456,8 @@ func TestCreateKey_scopeBased_quantumSafeFilter(t *testing.T) {
 		t.Fatalf("CreateKey (quantum_safe scope): %v", err)
 	}
 	// The only quantum-safe signature template in the catalog is ml-dsa-65.
-	if created.GetPrimitive() != "signature" {
-		t.Errorf("Primitive: got %q want %q", created.GetPrimitive(), "signature")
+	if created.Primitive != "signature" {
+		t.Errorf("Primitive: got %q want %q", created.Primitive, "signature")
 	}
 }
 

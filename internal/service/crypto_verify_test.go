@@ -60,7 +60,7 @@ func setupCryptoWithKeyForVerify(t *testing.T) (service.CryptoOrchestrator, stri
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
 	}
-	return ops, created.GetPublicId()
+	return ops, created.Name
 }
 
 // ============================================================================
@@ -68,12 +68,12 @@ func setupCryptoWithKeyForVerify(t *testing.T) (service.CryptoOrchestrator, stri
 // ============================================================================
 
 func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
-	ops, keyID := setupCryptoWithKeyForVerify(t)
+	ops, keyName := setupCryptoWithKeyForVerify(t)
 	ctx := context.Background()
 	payload := []byte("post-quantum verification")
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              payload,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -82,7 +82,8 @@ func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
 	}
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              payload,
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -93,8 +94,45 @@ func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
 	if !verifyResult.Valid {
 		t.Error("expected valid=true for correct ML-DSA signature")
 	}
-	if verifyResult.KeyPublicID != keyID {
-		t.Errorf("KeyPublicID: got %q want %q", verifyResult.KeyPublicID, keyID)
+	if verifyResult.KeyName != keyName {
+		t.Errorf("KeyName: got %q want %q", verifyResult.KeyName, keyName)
+	}
+	if verifyResult.Algorithm == "" {
+		t.Error("Algorithm must be populated in VerifyResult")
+	}
+	if verifyResult.ProviderName == "" {
+		t.Error("ProviderName must be populated in VerifyResult")
+	}
+}
+
+func TestVerify_MLDSA_validSignature_noKeyVersion_returnsTrue(t *testing.T) {
+	ops, keyName := setupCryptoWithKeyForVerify(t)
+	ctx := context.Background()
+	payload := []byte("post-quantum verification")
+
+	signResult, err := ops.Sign(ctx, crypto.SignRequest{
+		KeyName:              keyName,
+		Payload:              payload,
+		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
+		KeyName:              keyName,
+		Payload:              payload,
+		Signature:            signResult.Signature,
+		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Verify: %v", err)
+	}
+	if !verifyResult.Valid {
+		t.Error("expected valid=true for correct ML-DSA signature")
+	}
+	if verifyResult.KeyName != keyName {
+		t.Errorf("KeyName: got %q want %q", verifyResult.KeyName, keyName)
 	}
 	if verifyResult.Algorithm == "" {
 		t.Error("Algorithm must be populated in VerifyResult")
@@ -105,11 +143,11 @@ func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
 }
 
 func TestVerify_tamperedPayload_returnsFalse_notError(t *testing.T) {
-	ops, keyID := setupCryptoWithKeyForVerify(t)
+	ops, keyName := setupCryptoWithKeyForVerify(t)
 	ctx := context.Background()
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              []byte("original"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -118,7 +156,8 @@ func TestVerify_tamperedPayload_returnsFalse_notError(t *testing.T) {
 	}
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              []byte("tampered"), // different payload
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -132,12 +171,12 @@ func TestVerify_tamperedPayload_returnsFalse_notError(t *testing.T) {
 }
 
 func TestVerify_tamperedSignature_returnsFalse_notError(t *testing.T) {
-	ops, keyID := setupCryptoWithKeyForVerify(t)
+	ops, keyName := setupCryptoWithKeyForVerify(t)
 	ctx := context.Background()
 	payload := []byte("data")
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              payload,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -151,7 +190,8 @@ func TestVerify_tamperedSignature_returnsFalse_notError(t *testing.T) {
 	tampered[len(tampered)/2] ^= 0xFF
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              payload,
 		Signature:            tampered,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -167,9 +207,9 @@ func TestVerify_tamperedSignature_returnsFalse_notError(t *testing.T) {
 func TestVerify_keyNotFound_returnsError(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
 	_, err := ops.Verify(context.Background(), crypto.VerifyRequest{
-		KeyPublicID: "key_nonexistent",
-		Payload:     []byte("data"),
-		Signature:   []byte("sig"),
+		KeyName:   "key_nonexistent",
+		Payload:   []byte("data"),
+		Signature: []byte("sig"),
 	})
 	if err == nil {
 		t.Fatal("expected error for unknown key")
@@ -182,9 +222,9 @@ func TestVerify_keyNotFound_returnsError(t *testing.T) {
 func TestVerify_emptyKeyPublicID_returnsError(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
 	_, err := ops.Verify(context.Background(), crypto.VerifyRequest{
-		KeyPublicID: "",
-		Payload:     []byte("data"),
-		Signature:   []byte("sig"),
+		KeyName:   "",
+		Payload:   []byte("data"),
+		Signature: []byte("sig"),
 	})
 	if err == nil {
 		t.Fatal("expected error for empty KeyPublicID")
@@ -228,7 +268,7 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Sign first (allowed).
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          created.GetPublicId(),
+		KeyName:              created.Name,
 		Payload:              []byte("data"),
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -238,7 +278,8 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Verify should fail with policy violation.
 	_, err = ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          created.GetPublicId(),
+		KeyName:              created.Name,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              []byte("data"),
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -252,11 +293,11 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 }
 
 func TestVerify_noScopeParams_returnsError(t *testing.T) {
-	ops, keyID := setupCryptoWithKeyForVerify(t)
+	ops, keyName := setupCryptoWithKeyForVerify(t)
 	_, err := ops.Verify(context.Background(), crypto.VerifyRequest{
-		KeyPublicID: keyID,
-		Payload:     []byte("data"),
-		Signature:   []byte("sig"),
+		KeyName:   keyName,
+		Payload:   []byte("data"),
+		Signature: []byte("sig"),
 		// no scope_params set
 	})
 	if err == nil {
@@ -268,12 +309,12 @@ func TestVerify_noScopeParams_returnsError(t *testing.T) {
 }
 
 func TestSignVerify_roundTrip_MLDSA65(t *testing.T) {
-	ops, keyID := setupCryptoWithKeyForVerify(t)
+	ops, keyName := setupCryptoWithKeyForVerify(t)
 	ctx := context.Background()
 	payload := []byte("canonical round-trip test: ML-DSA-65")
 
 	signResult, err := ops.Sign(ctx, crypto.SignRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              payload,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -282,7 +323,8 @@ func TestSignVerify_roundTrip_MLDSA65(t *testing.T) {
 	}
 
 	verifyResult, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
+		KeyVersion:           signResult.KeyVersion,
 		Payload:              payload,
 		Signature:            signResult.Signature,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
@@ -293,8 +335,8 @@ func TestSignVerify_roundTrip_MLDSA65(t *testing.T) {
 	if !verifyResult.Valid {
 		t.Error("round-trip failed: valid=false")
 	}
-	if verifyResult.KeyPublicID != keyID {
-		t.Errorf("KeyPublicID: got %q want %q", verifyResult.KeyPublicID, keyID)
+	if verifyResult.KeyName != keyName {
+		t.Errorf("KeyName: got %q want %q", verifyResult.KeyName, keyName)
 	}
 	if verifyResult.Algorithm == "" {
 		t.Error("Algorithm must be populated")
@@ -307,9 +349,9 @@ func TestSignVerify_roundTrip_MLDSA65(t *testing.T) {
 func TestVerify_scopeMismatch_returnsError(t *testing.T) {
 	// Key created via template ml-dsa-65 has primary scope "standard".
 	// DomainContext maps to "with_context" — scope mismatch.
-	ops, keyID := setupCryptoWithKeyForVerify(t)
+	ops, keyName := setupCryptoWithKeyForVerify(t)
 	_, err := ops.Verify(context.Background(), crypto.VerifyRequest{
-		KeyPublicID:          keyID,
+		KeyName:              keyName,
 		Payload:              []byte("data"),
 		Signature:            []byte("sig"),
 		SignatureScopeFields: crypto.SignatureScopeFields{DomainContext: &types.SignatureDomainContext{}},

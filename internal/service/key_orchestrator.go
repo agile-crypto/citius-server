@@ -4,32 +4,28 @@ import (
 	"context"
 
 	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/key"
 )
 
 // KeyOrchestrator orchestrates key lifecycle workflows.
 // Implementations coordinate template selection, provider dispatch, policy validation,
 // and repository persistence crossing aggregate boundaries.
 type KeyOrchestrator interface {
-	CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*key.Key, error)
-	ReadKey(ctx context.Context, name string) (*key.Key, error)
-	ListKeys(ctx context.Context) ([]*key.Key, error)
-	DeleteKey(ctx context.Context, name string) error
+	CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*KeyMetadata, error)
 
-	// GetKeyWithMaterial fetches the key AND a specific version's material.
-	// Used internally by CryptoOrchestrator — not exposed over gRPC directly.
-	// Pass version=0 for latest version.
-	GetKeyWithMaterial(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
+	// ReadKey returns the metadata for the named key at the given version.
+	// Pass version=0 to read the current/latest version.
+	ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error)
+	ListKeys(ctx context.Context) ([]*KeyMetadata, error)
+	DeleteKey(ctx context.Context, keyName string) error
+	RotateKey(ctx context.Context, keyName string) (*KeyMetadata, error)
+	SuspendKey(ctx context.Context, keyName string) error
+	RestoreKey(ctx context.Context, keyName string) error
+	DestroyKey(ctx context.Context, keyName string) error
 
-	RotateKey(ctx context.Context, name string) (*key.Key, error)
-	SuspendKey(ctx context.Context, name string) error
-	RestoreKey(ctx context.Context, name string) error
-	DestroyKey(ctx context.Context, name string) error
-
-	ImportKey(ctx context.Context, spec core.ImportKeySpec) (*key.Key, error)
+	ImportKey(ctx context.Context, spec core.ImportKeySpec) (*KeyMetadata, error)
 
 	// UpdateKeyPolicy changes the policy governing an existing key.
 	// Policy changes take effect on the next crypto operation.
 	// Returns ErrNotFound if the key does not exist.
-	UpdateKeyPolicy(ctx context.Context, name string, policyName string) error
+	UpdateKeyPolicy(ctx context.Context, keyName string, policyName string) error
 }

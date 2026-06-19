@@ -54,7 +54,7 @@ func newVersion(ctx context.Context, publicID, keyID, templateID, providerID str
 		TemplateId:    templateID,
 		KeyMaterial:   keyMaterial,
 		WrappingKeyId: opts.withWrappingKeyID,
-		Status:        opts.withStatus,
+		State:         opts.withState,
 	}
 	return NewVersion(kv), nil
 

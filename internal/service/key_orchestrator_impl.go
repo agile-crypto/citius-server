@@ -6,6 +6,8 @@ import (
 
 	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
 	storepb "github.ibm.com/citius/citius-server/gen/go/store"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
+
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/key"
@@ -60,7 +62,7 @@ func NewKeyOrchestrator(
 	}, nil
 }
 
-func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpec) (*key.Key, error) {
+func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpec) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).CreateKey"
 
 	// 1. Validate request
@@ -130,6 +132,39 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	return r.generateAndPersistKey(ctx, op, req, tmpl, scopeSpec)
 }
 
+// buildKeyMetadata projects a key.Key and its current key.Version into the
+// API-facing KeyMetadata. v may be nil; version-scoped fields are
+// then left at their zero values.
+func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
+	md := &KeyMetadata{
+		Name:           k.GetName(),
+		KeyID:          k.GetPublicId(),
+		Primitive:      k.GetPrimitive(),
+		Policy:         k.GetPolicyId(),
+		LifecycleState: k.GetState(),
+		Labels:         k.GetLabels(),
+	}
+
+	if data := k.GetScopeSpecification(); len(data) > 0 {
+		// ScopeSpecification is stored as JSON-encoded core.ScopeSpec.
+		if scopeSpec, err := core.ParseScopeSpec(ctx, data); err == nil {
+			md.ScopeSpec = template.ScopeSpecToProto(scopeSpec)
+		}
+	}
+
+	if v != nil {
+		md.Version = v.GetVersion()
+		md.TemplateID = v.GetTemplateId()
+		md.Provider = v.GetProviderId()
+		//TODO: skip for now. TemplateInfo should be fetched by the application using the template id
+		// if tmpl, err := r.templates.Get(ctx, v.GetTemplateId()); err == nil {
+		// 	md.TemplateInfo = tmpl
+		// }
+	}
+
+	return md, nil
+}
+
 // generateAndPersistKey handles provider key generation, proto marshaling, and
 // repository persistence.  Extracted from CreateKey to keep cyclomatic
 // complexity within linter limits.
@@ -139,7 +174,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	req core.KeyCreationSpec,
 	tmpl *template.Template,
 	scopeSpec core.ScopeSpec,
-) (*key.Key, error) {
+) (*KeyMetadata, error) {
 	// 1. Find a provider that supports this template.
 	prov, err := r.providers.MatchForTemplate(ctx, tmpl.TemplateID())
 	if err != nil {
@@ -181,7 +216,7 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		ScopeSpecification: scopeBytes,
 		PolicyId:           req.PolicyID,
 		CurrentVersion:     1,
-		Status:             storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		State:              types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 		Labels:             req.Labels,
 	})
 
@@ -192,80 +227,70 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		ProviderId:  prov.Name(),
 		TemplateId:  tmpl.TemplateID(),
 		KeyMaterial: genRespBytes,
-		Status:      storepb.KeyStatus_KEY_STATUS_ACTIVE,
+		State:       types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	})
 
 	if err := r.repo.CreateKey(ctx, k, v); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	return k, nil
+	return r.buildKeyMetadata(ctx, k, v)
 }
 
-func (r *keyOrchestrator) ReadKey(ctx context.Context, publicID string) (*key.Key, error) {
+func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ReadKey"
-	k, err := r.repo.GetKeyByID(ctx, publicID)
+	k, err := r.repo.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return k, nil
+	var v *key.Version
+	if version == 0 {
+		v, err = r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+	} else {
+		v, err = r.repo.GetVersion(ctx, k.GetPublicId(), version)
+	}
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return r.buildKeyMetadata(ctx, k, v)
 }
 
-func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*key.Key, error) {
+func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ListKeys"
-	// Repository.ListKeys returns []*key.Key directly — no N+1 fetch needed.
 	keys, err := r.repo.ListKeys(ctx)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return keys, nil
+	out := make([]*KeyMetadata, 0, len(keys))
+	for _, k := range keys {
+		v, verr := r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+		if verr != nil {
+			return nil, errors.Wrap(ctx, op, verr)
+		}
+		md, merr := r.buildKeyMetadata(ctx, k, v)
+		if merr != nil {
+			return nil, errors.Wrap(ctx, op, merr)
+		}
+		out = append(out, md)
+	}
+	return out, nil
 }
 
-func (r *keyOrchestrator) DeleteKey(ctx context.Context, publicID string) error {
+func (r *keyOrchestrator) DeleteKey(ctx context.Context, keyName string) error {
 	const op errors.Op = "service.(keyOrchestrator).DeleteKey"
-	if err := r.repo.DeleteKey(ctx, publicID); err != nil {
+	// 1. Fetch key metadata.
+	k, err := r.repo.GetKeyByName(ctx, keyName)
+	if err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+
+	if err := r.repo.DeleteKey(ctx, k.GetPublicId()); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
 }
 
-func (r *keyOrchestrator) GetKeyWithMaterial(ctx context.Context, keyID string, version uint32) (*key.Key, *key.Version, error) {
-	const op errors.Op = "service.(keyOrchestrator).GetKeyWithMaterial"
-
-	// 1. Fetch key metadata.
-	k, err := r.repo.GetKeyByID(ctx, keyID)
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-
-	// 2. Aggregate-level lifecycle checks.
-	//    This is the single gateway for key material access — all crypto
-	//    operations (Sign, Verify, etc.) get lifecycle protection through
-	//    this method.
-	if k.IsTerminal() {
-		return nil, nil, errors.New(ctx, op, errors.CodeFailedPrecondition,
-			"key is destroyed and cannot be used")
-	}
-	if cryptoErr := k.CanPerformCrypto(); cryptoErr != nil {
-		return nil, nil, errors.New(ctx, op, errors.CodeFailedPrecondition, cryptoErr.Error())
-	}
-
-	// 3. Fetch the requested version.
-	//    version == 0 means "current/latest"; otherwise fetch a specific version.
-	var v *key.Version
-	if version == 0 {
-		v, err = r.repo.GetCurrentVersion(ctx, keyID)
-	} else {
-		v, err = r.repo.GetVersion(ctx, keyID, version)
-	}
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-
-	return k, v, nil
-}
-
-func (r *keyOrchestrator) RotateKey(ctx context.Context, _ string) (*key.Key, error) {
+func (r *keyOrchestrator) RotateKey(ctx context.Context, _ string) (*KeyMetadata, error) {
 	return nil, errors.New(ctx, "service.(keyOrchestrator).RotateKey", errors.CodeNotImplemented,
 		"RotateKey not yet implemented")
 }
@@ -285,7 +310,7 @@ func (r *keyOrchestrator) DestroyKey(ctx context.Context, _ string) error {
 		"DestroyKey not yet implemented")
 }
 
-func (r *keyOrchestrator) ImportKey(ctx context.Context, _ core.ImportKeySpec) (*key.Key, error) {
+func (r *keyOrchestrator) ImportKey(ctx context.Context, _ core.ImportKeySpec) (*KeyMetadata, error) {
 	return nil, errors.New(ctx, "service.(keyOrchestrator).ImportKey", errors.CodeNotImplemented,
 		"ImportKey not yet implemented")
 }

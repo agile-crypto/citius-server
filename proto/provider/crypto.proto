@@ -80,6 +80,9 @@ message VerifyRequest {
 
   // Typed algorithm specification — must match the algorithm used during signing.
   caas.crypto.v1.AlgorithmDetails algorithm = 7;
+
+  // Provider-generated output — algorithm parameters and encoding, retuned during signing.  The core extracts this from the stored OperationMetadata and passes it through for verification.
+  caas.crypto.v1.ProviderOutput output = 8;
 }
 
 // VerifyResponse reports whether the signature is valid.

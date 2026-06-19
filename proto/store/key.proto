@@ -5,20 +5,10 @@ package caas.storage.v1;
 option go_package = "github.ibm.com/citius/citius-server/gen/go/store;store";
 
 import "google/protobuf/timestamp.proto";
+import "types/common.proto";
+
 import "buf/validate/validate.proto";
 
-// KeyStatus represents the lifecycle state of a key.
-// Reference - NIST SP 800-57
-enum KeyStatus {
-  KEY_STATUS_UNSPECIFIED           = 0;
-  KEY_STATUS_ACTIVE                = 1;
-  KEY_STATUS_SUSPENDED             = 2;
-  KEY_STATUS_DESTROYED             = 3;
-  KEY_STATUS_PRE_ACTIVE            = 4;  // generated, not yet authorized
-  KEY_STATUS_DEACTIVATED           = 5;  // no longer for protection, still for processing
-  KEY_STATUS_COMPROMISED           = 6;  // integrity/confidentiality in question
-  KEY_STATUS_DESTROYED_COMPROMISED = 7;  // was compromised, then destroyed
-}
 
 enum KeyVersionStatus {
   KEY_VERSION_STATUS_UNSPECIFIED = 0;
@@ -64,7 +54,7 @@ message KeyVersion {
   string provider_id = 12 [(buf.validate.field).string = {prefix: "prv_", min_len: 5}];
   // Lifecycle state of the key version
   // @gotags: gorm:"not_null"
-  KeyStatus status = 13;
+  caas.crypto.v1.KeyLifecycleState state = 13;
 }
 
 // Key represents a cryptographic key stored in the database
@@ -90,5 +80,5 @@ message Key {
   uint32 current_version = 9 [(buf.validate.field).uint32.gte = 1];
   // Labels associated with the key
   map<string, string> labels = 10;
-  KeyStatus status = 11;
+  caas.crypto.v1.KeyLifecycleState state = 11;
 }

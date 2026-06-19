@@ -114,6 +114,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 		KeyName:   keyName,
 		Input:     payload,
 		Signature: signResp.GetSignature(),
+		Metadata:  signResp.GetMetadata(),
 		ScopeParams: &messagespb.VerifyRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},
@@ -134,6 +135,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 		KeyName:   keyName,
 		Input:     tampered,
 		Signature: signResp.GetSignature(),
+		Metadata:  signResp.GetMetadata(),
 		ScopeParams: &messagespb.VerifyRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},

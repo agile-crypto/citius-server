@@ -126,7 +126,7 @@ func fetchToken(t *testing.T, endpointEnv string) string {
 // Unauthenticated.
 func TestUnauthenticated_NoTokenIsRejected(t *testing.T) {
 	conn := dial(t)
-	cli := servicespb.NewCryptoServiceClient(conn)
+	cli := servicespb.NewKeyManagementServiceClient(conn)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -141,7 +141,7 @@ func TestUnauthenticated_NoTokenIsRejected(t *testing.T) {
 // permissions is rejected with PermissionDenied (not Unauthenticated).
 func TestNoPermissionIsForbidden(t *testing.T) {
 	conn := dial(t)
-	cli := servicespb.NewCryptoServiceClient(conn)
+	cli := servicespb.NewKeyManagementServiceClient(conn)
 	tok := fetchToken(t, "SVC_NOPERM_TOKEN_FILE")
 
 	ctx, cancel := context.WithTimeout(withToken(context.Background(), tok), 5*time.Second)
@@ -158,7 +158,7 @@ func TestNoPermissionIsForbidden(t *testing.T) {
 // CreateKey even if its key-name allow-list would permit the resource.
 func TestReadOnlyCannotCreate(t *testing.T) {
 	conn := dial(t)
-	cli := servicespb.NewCryptoServiceClient(conn)
+	cli := servicespb.NewKeyManagementServiceClient(conn)
 	tok := fetchToken(t, "SVC_READONLY_TOKEN_FILE")
 
 	ctx, cancel := context.WithTimeout(withToken(context.Background(), tok), 5*time.Second)
@@ -179,7 +179,7 @@ func TestReadOnlyCannotCreate(t *testing.T) {
 // granted.
 func TestTesterCannotEscapeNamespace(t *testing.T) {
 	conn := dial(t)
-	cli := servicespb.NewCryptoServiceClient(conn)
+	cli := servicespb.NewKeyManagementServiceClient(conn)
 	tok := fetchToken(t, "SVC_TESTER_TOKEN_FILE")
 
 	ctx, cancel := context.WithTimeout(withToken(context.Background(), tok), 5*time.Second)
@@ -195,7 +195,8 @@ func TestTesterCannotEscapeNamespace(t *testing.T) {
 // authorization layers in the success direction.
 func TestAdminCanCreateAndRead(t *testing.T) {
 	conn := dial(t)
-	cli := servicespb.NewCryptoServiceClient(conn)
+	kmCli := servicespb.NewKeyManagementServiceClient(conn)
+	polCli := servicespb.NewCryptoPolicyServiceClient(conn)
 	tok := fetchToken(t, "SVC_ADMIN_TOKEN_FILE")
 
 	ctx, cancel := context.WithTimeout(withToken(context.Background(), tok), 10*time.Second)
@@ -210,14 +211,14 @@ func TestAdminCanCreateAndRead(t *testing.T) {
 			"key_operations": ["create_key", "read_key", "sign", "verify"]
 		}
 	}`
-	if _, err := cli.CreateCryptoPolicy(ctx, &messagespb.CreateCryptoPolicyRequest{
+	if _, err := polCli.CreateCryptoPolicy(ctx, &messagespb.CreateCryptoPolicyRequest{
 		Name:           "default",
 		PolicyDocument: policyDoc,
 	}); err != nil && status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("CreateCryptoPolicy as admin: %v", err)
 	}
 
-	createResp, err := cli.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	createResp, err := kmCli.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   keyName,
 		Policy: "default",
 		KeySpecification: &messagespb.CreateKeyRequest_TemplateId{
@@ -231,7 +232,7 @@ func TestAdminCanCreateAndRead(t *testing.T) {
 	// KeyMetadata.Name); subsequent reads must use that identifier, not
 	// the user-supplied display name.
 	storedName := createResp.GetKeyMetadata().GetName()
-	if _, err := cli.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: storedName}); err != nil {
+	if _, err := kmCli.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: storedName}); err != nil {
 		t.Fatalf("ReadKey as admin: %v", err)
 	}
 }

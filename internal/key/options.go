@@ -3,7 +3,7 @@ package key
 import (
 	"sync"
 
-	"github.ibm.com/citius/citius-server/gen/go/store"
+	types "github.ibm.com/citius/citius-server/gen/go/types"
 )
 
 // getOpts - iterate the inbound Options and return a struct
@@ -24,7 +24,7 @@ type Option func(*options)
 type options struct {
 	withLock                 *sync.RWMutex
 	withTemplateID           string
-	withStatus               store.KeyStatus
+	withState                types.KeyLifecycleState
 	withLabels               map[string]string
 	withName                 string
 	withWrappingKeyID        string
@@ -41,7 +41,7 @@ type options struct {
 func getDefaultOptions() options {
 	return options{
 		withLock:                 &sync.RWMutex{},
-		withStatus:               store.KeyStatus_KEY_STATUS_UNSPECIFIED,
+		withState:                types.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED,
 		withLabels:               make(map[string]string),
 		withDigestAlgorithm:      "HMAC-SHA256",
 		withCurrentVersion:       0,
@@ -70,9 +70,9 @@ func WithTemplateID(templateID string) Option {
 }
 
 // WithStatus provides an optional status.
-func WithStatus(status store.KeyStatus) Option {
+func WithStatus(status types.KeyLifecycleState) Option {
 	return func(o *options) {
-		o.withStatus = status
+		o.withState = status
 	}
 }
 

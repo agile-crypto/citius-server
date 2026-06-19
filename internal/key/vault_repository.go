@@ -31,6 +31,8 @@ const keyNameToIDStoragePrefix string = "key_name_to_id/"
 const versionSep string = ":"
 
 var _ Repository = (*VaultRepository)(nil)
+var _ ReadOnlyRepository = (*VaultRepository)(nil)
+var _ WriteOnlyRepository = (*VaultRepository)(nil)
 
 // Key repositories can share the same lock, provided as option. This allows to create per-request
 // repositories that share the same lock, so that they can be used concurrently.
@@ -534,9 +536,17 @@ func (r *VaultRepository) GetVersion(ctx context.Context, keyID string, versionN
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	v, err := r.getVersionInternal(ctx, keyID, versionNumber)
+	var v *Version
+	var err error
+
+	if versionNumber == 0 {
+		v, err = r.getCurrentVersionInternal(ctx, keyID)
+	} else {
+		v, err = r.getVersionInternal(ctx, keyID, versionNumber)
+	}
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
+
 	return v, nil
 }

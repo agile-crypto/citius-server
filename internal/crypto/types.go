@@ -20,8 +20,8 @@ type SignatureScopeFields struct {
 // SignRequest carries the inputs for a Sign operation at the orchestrator level.
 // The orchestrator resolves key material and passes scope_params through to the provider.
 type SignRequest struct {
-	KeyPublicID string // identifies which key to use (proto: key_name)
-	Payload     []byte // data to sign (proto: input)
+	KeyName string // identifies which key to use (proto: key_name)
+	Payload []byte // data to sign (proto: input)
 
 	// Scope-based context for domain separation — exactly one must be non-nil.
 	// Maps to the scope_params oneof in caas.crypto.v1.SignRequest.
@@ -33,18 +33,19 @@ type SignRequest struct {
 // Output carries NoAlgorithmOutput + encoding (signing has no system-generated params).
 type SignResult struct {
 	Signature    []byte
-	KeyPublicID  string                   // echo back for caller context
-	KeyVersionID uint32                   // version that was used
+	KeyName      string                   // echo back for caller context
+	KeyVersion   uint32                   // version that was used
 	Algorithm    string                   // template ID (e.g., "ecdsa-p256-sha256")
 	ProviderName string                   // which provider performed the operation
 	Output       *messages.ProviderOutput // from provider (NoAlgorithmOutput + encoding)
 }
 
 type VerifyRequest struct {
-	KeyPublicID string
-	Payload     []byte // original data that was signed
-	Signature   []byte
-
+	KeyName    string
+	KeyVersion uint32 // version that was used
+	Payload    []byte // original data that was signed
+	Signature  []byte
+	Output     *messages.ProviderOutput // from provider (NoAlgorithmOutput + encoding)
 	// Scope must match the scope used during signing.
 	SignatureScopeFields
 }
@@ -53,14 +54,14 @@ type VerifyRequest struct {
 // Invalid signature is NOT an error — it returns Valid=false.
 type VerifyResult struct {
 	Valid        bool
-	KeyPublicID  string
+	KeyName      string
 	Algorithm    string
 	ProviderName string
 	Output       *messages.ProviderOutput // from provider
 }
 
 type EncryptRequest struct {
-	KeyID     string
+	KeyName   string
 	Plaintext []byte
 
 	// Scope-based operation parameters — exactly one must be non-nil.
@@ -74,14 +75,15 @@ type EncryptRequest struct {
 
 type EncryptResult struct {
 	Ciphertext   []byte
-	KeyVersionID uint32                   // version that was used
+	KeyVersion   uint32                   // version that was used
 	Output       *messages.ProviderOutput // IV/nonce, tag, encoding — from provider
 	Algorithm    string
 	ProviderName string
 }
 
 type DecryptRequest struct {
-	KeyID      string
+	KeyName    string
+	KeyVersion uint32 // version that was used
 	Ciphertext []byte
 	Output     *messages.ProviderOutput // stored ProviderOutput from EncryptResult (carries IV/nonce)
 
@@ -113,7 +115,7 @@ type WrapKeyRequest struct {
 type WrapKeyResult struct {
 	WrappedKeyBytes []byte
 	Algorithm       string
-	KeyVersionID    uint32 // version that was used
+	KeyVersion      uint32 // version that was used
 }
 
 // UnwrapKeyRequest carries the inputs for an UnwrapKey operation.
@@ -128,7 +130,7 @@ type UnwrapKeyRequest struct {
 // unwrapped material and persisting it via key.Repository.
 type UnwrapKeyResult struct {
 	UnwrappedKeyMaterial []byte                   // raw key bytes returned by the provider
-	KeyVersionID         uint32                   // version that was used
+	KeyVersion           uint32                   // version that was used
 	Algorithm            string                   // algorithm of the unwrapped key
 	Output               *messages.ProviderOutput // provider-generated output
 

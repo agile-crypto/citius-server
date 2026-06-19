@@ -28,9 +28,11 @@ type ServiceGateway interface {
 	ForStorage(ctx context.Context, store storage.Storage) (ScopeGateway, error)
 }
 
-// Compile-time assertion: Handler implements the generated CryptoServiceServer interface.
-// This catches any method-signature drift between handler.go and the proto definition.
+// Compile-time assertions: Handler implements all three generated server interfaces.
+// This catches any method-signature drift between handler.go and the proto definitions.
 var _ servicespb.CryptoServiceServer = (*Handler)(nil)
+var _ servicespb.KeyManagementServiceServer = (*Handler)(nil)
+var _ servicespb.CryptoPolicyServiceServer = (*Handler)(nil)
 
 const handlerOp = engerr.Op("grpc.(Handler)")
 
@@ -40,6 +42,8 @@ type Handler struct {
 	svc   ServiceGateway
 	store func() storage.Storage // factory for per-request Storage; nil is allowed in tests
 	servicespb.UnimplementedCryptoServiceServer
+	servicespb.UnimplementedKeyManagementServiceServer
+	servicespb.UnimplementedCryptoPolicyServiceServer
 }
 
 // New creates a Handler.
@@ -109,7 +113,7 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 		}
 	}
 
-	k, err := scope.Keys().CreateKey(ctx, spec)
+	md, err := scope.Keys().CreateKey(ctx, spec)
 	if err != nil {
 		return nil, ToStatusError(engerr.Wrap(ctx, createOp, err))
 	}
@@ -117,9 +121,12 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 	return &messagespb.CreateKeyResponse{
 		Success: true,
 		KeyMetadata: &messagespb.KeyMetadata{
-			Name:    k.GetPublicId(),
-			Version: k.GetCurrentVersion(),
-			Policy:  k.GetPolicyId(),
+			Name:       md.Name,
+			Version:    md.Version,
+			Policy:     md.Policy,
+			KeyId:      md.KeyID,
+			TemplateId: md.TemplateID,
+			Provider:   md.Provider,
 		},
 	}, nil
 }
@@ -128,7 +135,8 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 //
 // Proto mapping:
 //
-//	messages.ReadKeyRequest.name => KeyOrchestrator.ReadKey(ctx, name)
+//	messages.ReadKeyRequest.name    => KeyOrchestrator.ReadKey(ctx, name, version)
+//	messages.ReadKeyRequest.version => version (0 = latest)
 func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (*messagespb.ReadKeyResponse, error) {
 	const readOp engerr.Op = handlerOp + ".ReadKey"
 
@@ -141,16 +149,19 @@ func (h *Handler) ReadKey(ctx context.Context, req *messagespb.ReadKeyRequest) (
 		return nil, ToStatusError(err)
 	}
 
-	k, err := scope.Keys().ReadKey(ctx, req.GetName())
+	md, err := scope.Keys().ReadKey(ctx, req.GetName(), req.GetVersion())
 	if err != nil {
 		return nil, ToStatusError(engerr.Wrap(ctx, readOp, err))
 	}
 
 	return &messagespb.ReadKeyResponse{
 		KeyMetadata: &messagespb.KeyMetadata{
-			Name:    k.GetPublicId(),
-			Version: k.GetCurrentVersion(),
-			Policy:  k.GetPolicyId(),
+			Name:       md.Name,
+			Version:    md.Version,
+			Policy:     md.Policy,
+			KeyId:      md.KeyID,
+			TemplateId: md.TemplateID,
+			Provider:   md.Provider,
 		},
 	}, nil
 }
@@ -176,8 +187,8 @@ func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messa
 	}
 
 	signReq := crypto.SignRequest{
-		KeyPublicID: req.GetKeyName(),
-		Payload:     req.GetInput(),
+		KeyName: req.GetKeyName(),
+		Payload: req.GetInput(),
 	}
 	extractSigningScopeParams(req.GetScopeParams(), &signReq)
 
@@ -187,12 +198,12 @@ func (h *Handler) Sign(ctx context.Context, req *messagespb.SignRequest) (*messa
 	}
 
 	// Wrap ProviderOutput into OperationMetadata.
-	// KeyVersion is 0 until version tracking is wired.
 	return &messagespb.SignResponse{
 		Signature: result.Signature,
 		Metadata: &messagespb.OperationMetadata{
-			KeyVersion:     0, // TODO: populate from result.KeyVersionID once version tracking is wired
+			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
+			//TODO: Add user context and API version
 		},
 	}, nil
 }
@@ -220,10 +231,14 @@ func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*m
 		return nil, ToStatusError(err)
 	}
 
+	//TODO: Check API version in req.GetMetadata() and reject if unsupported.
+
 	verifyReq := crypto.VerifyRequest{
-		KeyPublicID: req.GetKeyName(),
-		Payload:     req.GetInput(),
-		Signature:   req.GetSignature(),
+		KeyName:    req.GetKeyName(),
+		Payload:    req.GetInput(),
+		Signature:  req.GetSignature(),
+		KeyVersion: req.GetMetadata().GetKeyVersion(),
+		Output:     req.GetMetadata().GetProviderOutput(),
 	}
 	extractVerifyScopeParams(req.GetScopeParams(), &verifyReq)
 

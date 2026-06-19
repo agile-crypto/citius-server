@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
 	typespb "github.ibm.com/citius/citius-server/gen/go/types"
 
 	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
@@ -93,18 +92,19 @@ func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ core
 // mockKeyOrchestrator stubs KeyOrchestrator for tests.
 // Only createFn and readFn are wired; all other methods panic.
 type mockKeyOrchestrator struct {
-	createFn func(ctx context.Context, spec core.KeyCreationSpec) (*key.Key, error)
-	readFn   func(ctx context.Context, name string) (*key.Key, error)
+	createFn             func(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error)
+	readFn               func(ctx context.Context, name string) (*service.KeyMetadata, error)
+	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
 }
 
-func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*key.Key, error) {
+func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
 	if m.createFn != nil {
 		return m.createFn(ctx, spec)
 	}
 	panic("mockKeyOrchestrator.CreateKey: not implemented")
 }
 
-func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string) (*key.Key, error) {
+func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version uint32) (*service.KeyMetadata, error) {
 	if m.readFn != nil {
 		return m.readFn(ctx, name)
 	}
@@ -112,16 +112,19 @@ func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string) (*key.Ke
 }
 
 // Stub the rest of the interface.
-func (m *mockKeyOrchestrator) ListKeys(_ context.Context) ([]*key.Key, error) {
+func (m *mockKeyOrchestrator) ListKeys(_ context.Context) ([]*service.KeyMetadata, error) {
 	panic("mockKeyOrchestrator.ListKeys: not implemented")
 }
 func (m *mockKeyOrchestrator) DeleteKey(_ context.Context, _ string) error {
 	panic("mockKeyOrchestrator.DeleteKey: not implemented")
 }
-func (m *mockKeyOrchestrator) GetKeyWithMaterial(_ context.Context, _ string, _ uint32) (*key.Key, *key.Version, error) {
+func (m *mockKeyOrchestrator) GetKeyWithMaterial(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error) {
+	if m.getKeyWithMaterialFn != nil {
+		return m.getKeyWithMaterialFn(ctx, name, version)
+	}
 	panic("mockKeyOrchestrator.GetKeyWithMaterial: not implemented")
 }
-func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*key.Key, error) {
+func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*service.KeyMetadata, error) {
 	panic("mockKeyOrchestrator.RotateKey: not implemented")
 }
 func (m *mockKeyOrchestrator) SuspendKey(_ context.Context, _ string) error {
@@ -133,7 +136,7 @@ func (m *mockKeyOrchestrator) RestoreKey(_ context.Context, _ string) error {
 func (m *mockKeyOrchestrator) DestroyKey(_ context.Context, _ string) error {
 	panic("mockKeyOrchestrator.DestroyKey: not implemented")
 }
-func (m *mockKeyOrchestrator) ImportKey(_ context.Context, _ core.ImportKeySpec) (*key.Key, error) {
+func (m *mockKeyOrchestrator) ImportKey(_ context.Context, _ core.ImportKeySpec) (*service.KeyMetadata, error) {
 	panic("mockKeyOrchestrator.ImportKey: not implemented")
 }
 func (m *mockKeyOrchestrator) UpdateKeyPolicy(_ context.Context, _ string, _ string) error {
@@ -210,17 +213,20 @@ func wireHandlerWithPolicy(keys service.KeyOrchestrator, cr service.CryptoOrches
 func TestHandler_CreateKey_Success(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*key.Key, error) {
+		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
 			if spec.Name == "" {
 				t.Error("expected non-empty name in CreateKey spec")
 			}
 			if spec.TemplateID != "ecdsa-p256-sha256-der" {
 				t.Errorf("expected template ecdsa-p256-sha256-der, got %s", spec.TemplateID)
 			}
-			return key.NewKey(&storepb.Key{
-				PublicId: spec.Name,
-				Name:     spec.Name,
-			}), nil
+			return &service.KeyMetadata{
+				Name:       spec.Name,
+				KeyID:      spec.Name,
+				Version:    1,
+				TemplateID: "ecdsa-p256-sha256-der",
+				Provider:   "software",
+			}, nil
 		},
 	}
 	h := wireHandler(km, nil)
@@ -245,7 +251,7 @@ func TestHandler_CreateKey_Success(t *testing.T) {
 func TestHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		createFn: func(ctx context.Context, _ core.KeyCreationSpec) (*key.Key, error) {
+		createFn: func(ctx context.Context, _ core.KeyCreationSpec) (*service.KeyMetadata, error) {
 			return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "name required")
 		},
 	}
@@ -264,7 +270,7 @@ func TestHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) 
 func TestHandler_ReadKey_NotFound_ReturnsNotFound(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		readFn: func(ctx context.Context, name string) (*key.Key, error) {
+		readFn: func(ctx context.Context, name string) (*service.KeyMetadata, error) {
 			return nil, engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
 		},
 	}
@@ -295,7 +301,7 @@ func TestHandler_Sign_Success(t *testing.T) {
 			}
 			return crypto.SignResult{
 				Signature:    []byte("fake-sig"),
-				KeyPublicID:  req.KeyPublicID,
+				KeyName:      req.KeyName,
 				Algorithm:    "ecdsa-p256-sha256-der",
 				ProviderName: "software",
 				Output:       providerOutput,

@@ -194,11 +194,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	keyOrch, err := service.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
-	if err != nil {
-		return nil, err
-	}
-	return service.NewCryptoOrchestrator(s, keyOrch, pol, providerReg, templateReg)
+	return service.NewCryptoOrchestrator(s, repo, pol, providerReg, templateReg)
 }
 
 func buildPolicyEngine(
