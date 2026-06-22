@@ -235,7 +235,7 @@ func TestMatchesScope_securityFilters_tabledriven(t *testing.T) {
 			scope: core.ScopeSpecification{
 				Scope: core.ScopeSignatureStandard,
 				SecurityProps: &core.SecurityProperties{
-					FipsApproved: true,
+					QuantumSafe: true,
 				},
 			},
 			want: true,
