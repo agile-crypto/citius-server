@@ -211,7 +211,7 @@ func (r *VaultRepository) getKey(ctx context.Context, id string) (*Key, error) {
 			return nil, errors.Wrap(ctx, op, err)
 		}
 	}
-	return NewKey(storedKey), nil
+	return &Key{Key: storedKey}, nil
 }
 
 func (r *VaultRepository) getKeyVersion(ctx context.Context, keyID string, version uint32) (*Version, error) {
@@ -225,7 +225,7 @@ func (r *VaultRepository) getKeyVersion(ctx context.Context, keyID string, versi
 		}
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return NewVersion(storedVersion), nil
+	return &Version{KeyVersion: storedVersion}, nil
 }
 
 // Set create and update time.

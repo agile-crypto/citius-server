@@ -69,10 +69,10 @@ func WithTemplateID(templateID string) Option {
 	}
 }
 
-// WithStatus provides an optional status.
-func WithStatus(status types.KeyLifecycleState) Option {
+// WithState provides an optional status.
+func WithState(state types.KeyLifecycleState) Option {
 	return func(o *options) {
-		o.withState = status
+		o.withState = state
 	}
 }
 

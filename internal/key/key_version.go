@@ -17,20 +17,16 @@ type Version struct {
 	*storepb.KeyVersion
 }
 
-// NewVersion wraps a KeyVersion.
-// TODO: Remove
-func NewVersion(stored *storepb.KeyVersion) *Version {
-	if stored == nil {
-		stored = &storepb.KeyVersion{}
-	}
-	return &Version{KeyVersion: stored}
-}
-
 func defaultKeyVersionID(keyID string, version uint32) string {
 	return fmt.Sprintf("%s%s%d", keyID, versionSep, version)
 }
 
-func newVersion(ctx context.Context, publicID, keyID, templateID, providerID string, version uint32, keyMaterial []byte, opt ...Option) (*Version, error) {
+// NewVersion creates a new [Version] with the given parameters.
+//
+// Available options:
+//   - WithState: sets the State field (defaults to [types.KeyVersionLifecycleState_PRE_ACTIVE] if not provided)
+//   - WithWrappingKeyID: sets the WrappingKeyId field (defaults to empty string if not provided)
+func NewVersion(ctx context.Context, publicID, keyID, templateID, providerID string, version uint32, keyMaterial []byte, opt ...Option) (*Version, error) {
 	const op = "key.newKeyVersion"
 	opts := getOpts(opt...)
 	if len(keyMaterial) == 0 {
@@ -56,7 +52,7 @@ func newVersion(ctx context.Context, publicID, keyID, templateID, providerID str
 		WrappingKeyId: opts.withWrappingKeyID,
 		State:         opts.withState,
 	}
-	return NewVersion(kv), nil
+	return &Version{KeyVersion: kv}, nil
 
 }
 

@@ -21,17 +21,13 @@ type Key struct {
 	*storepb.Key
 }
 
-// NewKey wraps a StoredKey in the Key domain type.
-// If stored is nil, NewKey returns a zero-value Key (public_id and name will be empty,
-// so VetForWrite will fail).
-func NewKey(stored *storepb.Key) *Key {
-	if stored == nil {
-		stored = &storepb.Key{}
-	}
-	return &Key{Key: stored}
-}
-
-func newKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpecification, currentKeyVersion uint32, opt ...Option) (*Key, error) {
+// NewKey creates a new [Key] with the given parameters.
+//
+// Available options:
+//   - WithName: sets the Name field (defaults to the key ID if not provided)
+//   - WithLabels: sets the Labels field (defaults to an empty map if not provided)
+//   - WithState : sets the State field (defaults to [types.KeyLifecycleState_PRE_ACTIVE] if not provided)
+func NewKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpecification, currentKeyVersion uint32, opt ...Option) (*Key, error) {
 	const op = "key.newKey"
 	if id == "" {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "id is required")
