@@ -27,18 +27,16 @@ import (
 // testPolicyName is the name of the permissive policy seeded by setupOrchestrator.
 const testPolicyName = "test-allow-all"
 
-func defaultScopeSpecBytes(t *testing.T) []byte {
-	return scopeSpecBytesWithScope(t, core.ScopeSignatureStandard)
+func defaultScopeSpec(t *testing.T) *core.ScopeSpecification {
+	return scopeSpecWithScope(t, core.ScopeSignatureStandard)
 }
 
-func scopeSpecBytesWithScope(t *testing.T, scope core.Scope) []byte {
+func scopeSpecWithScope(t *testing.T, scope core.Scope) *core.ScopeSpecification {
 	t.Helper()
 	scopeSpec := &core.ScopeSpecification{
 		Scope: scope,
 	}
-	scopeSpecBytes, err := scopeSpec.Serialize(context.Background())
-	require.NoError(t, err, "serialize default scope spec")
-	return scopeSpecBytes
+	return scopeSpec
 }
 
 // seedPermissivePolicy creates a policy that allows the ml-dsa-65 template and
@@ -157,7 +155,7 @@ func TestCreateKey_templateBased_happyPath(t *testing.T) {
 		Name:       "my-mldsa-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   testPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -186,7 +184,7 @@ func TestCreateKey_templateNotFound_returnsError(t *testing.T) {
 		Name:       "key",
 		TemplateID: "nonexistent-template",
 		PolicyID:   testPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 	})
 	if err == nil {
 		t.Fatal("expected error for unknown template")
@@ -198,7 +196,7 @@ func TestCreateKey_missingName_returnsError(t *testing.T) {
 	_, err := orch.CreateKey(context.Background(), core.KeyCreationSpec{
 		TemplateID: "ml-dsa-65",
 		PolicyID:   testPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 		// Name is empty
 	})
 	if err == nil {
@@ -211,7 +209,7 @@ func TestCreateKey_missingPolicyID_returnsError(t *testing.T) {
 	_, err := orch.CreateKey(context.Background(), core.KeyCreationSpec{
 		Name:       "no-policy",
 		TemplateID: "ml-dsa-65",
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 		// PolicyID is empty
 	})
 	if err == nil {
@@ -227,7 +225,7 @@ func TestCreateKey_storesPersistentKey(t *testing.T) {
 		Name:       "persistent-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   testPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -249,7 +247,7 @@ func TestCreateKey_withLabels(t *testing.T) {
 		Name:       "labelled-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   testPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 		Labels:     labels,
 	})
 	if err != nil {
@@ -284,7 +282,7 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 		Name:       "no-provider",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   testPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 	})
 	if err == nil {
 		t.Fatal("expected error when no provider supports the template")
@@ -376,7 +374,7 @@ func TestCreateKey_scopeBased_permissivePolicy_selectsByScope(t *testing.T) {
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "scope-based-key",
-		Scope:    defaultScopeSpecBytes(t),
+		Scope:    defaultScopeSpec(t),
 		PolicyID: policyName,
 	})
 	if err != nil {
@@ -404,7 +402,7 @@ func TestCreateKey_scopeBased_policyAllowsTemplate(t *testing.T) {
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "policy-allowed",
-		Scope:    defaultScopeSpecBytes(t),
+		Scope:    defaultScopeSpec(t),
 		PolicyID: policyName,
 	})
 	if err != nil {
@@ -430,7 +428,7 @@ func TestCreateKey_scopeBased_policyDenies_noMatchingTemplate(t *testing.T) {
 
 	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "should-fail",
-		Scope:    defaultScopeSpecBytes(t),
+		Scope:    defaultScopeSpec(t),
 		PolicyID: policyName,
 	})
 	if err == nil {
@@ -447,7 +445,7 @@ func TestCreateKey_scopeBased_policyDenyByDefault(t *testing.T) {
 
 	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "should-fail",
-		Scope:    defaultScopeSpecBytes(t),
+		Scope:    defaultScopeSpec(t),
 		PolicyID: policyName,
 	})
 	if err == nil {
@@ -483,12 +481,10 @@ func TestCreateKey_scopeBased_quantumSafeFilter(t *testing.T) {
 
 	scopeSpec, err := core.ScopeSpecificationFromProto(ctx, spec)
 	require.NoError(t, err, "convert scope spec from proto")
-	scopeBytes, err := scopeSpec.Serialize(ctx)
-	require.NoError(t, err, "serialize scope spec")
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "quantum-safe-key",
-		Scope:    scopeBytes,
+		Scope:    scopeSpec,
 		PolicyID: policyName,
 	})
 	if err != nil {
@@ -506,7 +502,7 @@ func TestCreateKey_scopeBased_policyNotFound(t *testing.T) {
 
 	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "should-fail",
-		Scope:    defaultScopeSpecBytes(t),
+		Scope:    defaultScopeSpec(t),
 		PolicyID: "nonexistent-policy",
 	})
 	if err == nil {
@@ -537,12 +533,10 @@ func TestCreateKey_scopeBased_primitiveMismatch(t *testing.T) {
 	}
 	scopeSpec, err := core.ScopeSpecificationFromProto(ctx, spec)
 	require.NoError(t, err, "convert scope spec from proto")
-	scopeBytes, err := scopeSpec.Serialize(ctx)
-	require.NoError(t, err, "serialize scope spec")
 
 	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:     "kem-key",
-		Scope:    scopeBytes,
+		Scope:    scopeSpec,
 		PolicyID: policyName,
 	})
 	if err == nil {

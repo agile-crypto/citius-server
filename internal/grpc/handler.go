@@ -11,7 +11,6 @@ import (
 	"github.ibm.com/citius/citius-server/internal/policy"
 	"github.ibm.com/citius/citius-server/internal/service"
 	"github.ibm.com/citius/citius-server/internal/storage"
-	"google.golang.org/protobuf/proto"
 )
 
 // ScopeGateway is the per-request subset of *app.RequestScope used by the Handler.
@@ -104,11 +103,11 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 		spec.TemplateID = *req.TemplateId
 	}
 	if req.ScopeSpec != nil {
-		raw, merr := proto.Marshal(req.ScopeSpec)
-		if merr != nil {
-			return nil, ToStatusError(engerr.Wrap(ctx, createOp, merr, engerr.WithMessage("invalid scope_spec encoding")))
+		scopeSpec, err := core.ScopeSpecificationFromProto(ctx, req.ScopeSpec)
+		if err != nil {
+			return nil, ToStatusError(engerr.Wrap(ctx, createOp, err, engerr.WithMessage("invalid scope_spec")))
 		}
-		spec.Scope = raw
+		spec.Scope = scopeSpec
 	}
 
 	md, err := scope.Keys().CreateKey(ctx, spec)

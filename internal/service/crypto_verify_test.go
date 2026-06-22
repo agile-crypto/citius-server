@@ -56,7 +56,7 @@ func setupCryptoWithKeyForVerify(t *testing.T) (service.CryptoOrchestrator, stri
 		Name:       "verify-test-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   verifyPolicyName,
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -262,7 +262,7 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 		Name:       "no-verify-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   "no-verify-policy",
-		Scope:      defaultScopeSpecBytes(t),
+		Scope:      defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

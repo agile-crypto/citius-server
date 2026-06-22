@@ -19,7 +19,7 @@ func TestReadKey_happyPath(t *testing.T) {
 	orch := setupOrchestrator(t)
 	ctx := context.Background()
 
-	scopeSpecBytes := defaultScopeSpecBytes(t)
+	scopeSpecBytes := defaultScopeSpec(t)
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name: "read-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes,
 	})
@@ -58,7 +58,7 @@ func TestListKeys_returnsAll(t *testing.T) {
 	orch := setupOrchestrator(t)
 	ctx := context.Background()
 
-	scopeSpecBytes := defaultScopeSpecBytes(t)
+	scopeSpecBytes := defaultScopeSpec(t)
 	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k1", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes})
 	require.NoError(t, err, "CreateKey k1")
 	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k2", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes})
@@ -96,7 +96,7 @@ func TestDeleteKey_happyPath(t *testing.T) {
 	ctx := context.Background()
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "to-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpecBytes(t),
+		Name: "to-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -119,11 +119,11 @@ func TestDeleteKey_removedFromList(t *testing.T) {
 	ctx := context.Background()
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "list-then-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpecBytes(t),
+		Name: "list-then-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpec(t),
 	})
 	require.NoError(t, err, "CreateKey")
 	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpecBytes(t),
+		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpec(t),
 	})
 	require.NoError(t, err, "CreateKey")
 

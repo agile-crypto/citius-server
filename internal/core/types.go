@@ -42,7 +42,7 @@ const (
 type KeyCreationSpec struct {
 	Name               string
 	TemplateID         string // set when key_specification=template_id
-	Scope              []byte // serialised ScopeSpecification, set when key_specification=scope
+	Scope              *ScopeSpecification
 	PolicyID           string
 	ProviderInstanceID string // optional: if empty, use default provider
 	Labels             map[string]string
@@ -66,12 +66,12 @@ type VetForWriter interface {
 type ImportKeySpec struct {
 	Name                string
 	PolicyName          string
-	KeyMaterial         []byte            // raw or wrapped key bytes
-	Format              string            // plain string (e.g., "raw", "pkcs8"); TODO: typed KeyFormat enum
-	UnwrappingKeyName   string            // required if Format is "wrapped"
-	ProviderID          string            // optional: target provider
-	TemplateID          string            // set when key_specification=template_id
-	Scope               []byte            // serialised ScopeSpecification, set when key_specification=scope
-	PreferredProperties map[string]string // soft preference hints for scope-based selection
+	KeyMaterial         []byte              // raw or wrapped key bytes
+	Format              string              // plain string (e.g., "raw", "pkcs8"); TODO: typed KeyFormat enum
+	UnwrappingKeyName   string              // required if Format is "wrapped"
+	ProviderID          string              // optional: target provider
+	TemplateID          string              // set when key_specification=template_id
+	Scope               *ScopeSpecification // set when key_specification=scope
+	PreferredProperties map[string]string   // soft preference hints for scope-based selection
 	Labels              map[string]string
 }

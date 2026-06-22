@@ -74,18 +74,18 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"policy ID must not be empty")
 	}
+	if req.Scope == nil {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"scope specification must not be nil and contain at least a scope")
+	}
 
 	// 2. Resolve template + derive scope.
 	//    Two paths: explicit template_id OR scope-based selection.
 	var tmpl *template.Template
-	if len(req.Scope) == 0 {
+
+	if req.Scope.Scope == core.ScopeUnknown {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-			"scope specification must contain at least a scope")
-	}
-	scopeSpec := &core.ScopeSpecification{}
-	err := scopeSpec.Deserialize(ctx, req.Scope)
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
+			"scope is unknown or missing; scope is required for key creation")
 	}
 
 	if req.TemplateID != "" {
@@ -94,18 +94,19 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 			return nil, errors.New(ctx, op, errors.CodeInternal,
 				"expected exactly one template, got %d", len(candidates.IDs()))
 		}
-		tmpl, err = r.templates.Select(ctx, scopeSpec, candidates)
+		tmpl0, err := r.templates.Select(ctx, req.Scope, candidates)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		if tmpl == nil {
+		if tmpl0 == nil {
 			return nil, errors.New(ctx, op, errors.CodeTemplateNotFound,
 				"no template matching the given scope specification found (ID=%s)", req.TemplateID)
 		}
+		tmpl = tmpl0
 	} else {
 		// Scope-based path: parse the proto-encoded ScopeSpecification,
 		// query policy for allowed templates, then ask the registry to select.
-		allowed, err := r.policy.AllowedTemplates(ctx, req.PolicyID, scopeSpec)
+		allowed, err := r.policy.AllowedTemplates(ctx, req.PolicyID, req.Scope)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -118,10 +119,11 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 			candidates = template.OnlyTemplates(allowed...)
 		}
 
-		tmpl, err = r.templates.Select(ctx, scopeSpec, candidates)
+		tmpl0, err := r.templates.Select(ctx, req.Scope, candidates)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
+		tmpl = tmpl0
 	}
 
 	// 2a. Policy: validate that create_key with this template is permitted.
@@ -136,7 +138,7 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	}
 
 	// 3. Generate key material and persist key + initial version.
-	return r.generateAndPersistKey(ctx, op, req, tmpl, scopeSpec)
+	return r.generateAndPersistKey(ctx, op, req, tmpl, req.Scope)
 }
 
 // buildKeyMetadata projects a key.Key and its current key.Version into the
