@@ -17,7 +17,6 @@ import (
 	"github.ibm.com/citius/citius-server/internal/provider/software"
 	"github.ibm.com/citius/citius-server/internal/service"
 	"github.ibm.com/citius/citius-server/internal/template"
-	"google.golang.org/protobuf/proto"
 )
 
 // ============================================================================
@@ -316,24 +315,6 @@ func TestCreateKey_withoutScope_returnsError(t *testing.T) {
 // ============================================================================
 // Scope-Based Helpers
 // ============================================================================
-
-// marshalSignatureScope builds proto-encoded ScopeSpecification bytes for the
-// given SignatureScope. Used by scope-based CreateKey tests.
-func marshalSignatureScope(t *testing.T, scope api.SignatureScope) []byte {
-	t.Helper()
-	spec := &api.ScopeSpecification{
-		ScopeSpec: &api.ScopeSpecification_Signature{
-			Signature: &api.SignatureScopeSpec{
-				Scope: scope,
-			},
-		},
-	}
-	b, err := proto.Marshal(spec)
-	if err != nil {
-		t.Fatalf("marshal ScopeSpecification: %v", err)
-	}
-	return b
-}
 
 // seedScopePolicy creates a named policy with the given rules and returns the
 // policy name. Convenience for scope-based tests that need custom policies.

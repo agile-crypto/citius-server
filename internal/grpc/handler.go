@@ -103,9 +103,9 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 		spec.TemplateID = *req.TemplateId
 	}
 	if req.ScopeSpec != nil {
-		scopeSpec, err := core.ScopeSpecificationFromProto(ctx, req.ScopeSpec)
-		if err != nil {
-			return nil, ToStatusError(engerr.Wrap(ctx, createOp, err, engerr.WithMessage("invalid scope_spec")))
+		scopeSpec, err0 := core.ScopeSpecificationFromProto(ctx, req.ScopeSpec)
+		if err0 != nil {
+			return nil, ToStatusError(engerr.Wrap(ctx, createOp, err0, engerr.WithMessage("invalid scope_spec")))
 		}
 		spec.Scope = scopeSpec
 	}
