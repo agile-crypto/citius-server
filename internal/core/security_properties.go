@@ -27,11 +27,17 @@ func SecurityPropertiesFromProto(s *types.UniversalSecurityProperties) *Security
 	if s == nil {
 		return nil
 	}
+	derefBool := func(b *bool) bool {
+		if b == nil {
+			return false
+		}
+		return *b
+	}
 	return &SecurityProperties{
 		SecurityStrength: s.SecurityStrengthBits,
 		SecurityLevel:    s.NistSecurityLevel,
-		QuantumSafe:      *s.QuantumSafe,
+		QuantumSafe:      derefBool(s.QuantumSafe),
 		NistStatus:       s.NistStatus,
-		FipsApproved:     *s.FipsApproved,
+		FipsApproved:     derefBool(s.FipsApproved),
 	}
 }
