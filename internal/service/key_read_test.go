@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 )
@@ -18,8 +19,9 @@ func TestReadKey_happyPath(t *testing.T) {
 	orch := setupOrchestrator(t)
 	ctx := context.Background()
 
+	scopeSpecBytes := defaultScopeSpecBytes(t)
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "read-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName,
+		Name: "read-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -56,8 +58,11 @@ func TestListKeys_returnsAll(t *testing.T) {
 	orch := setupOrchestrator(t)
 	ctx := context.Background()
 
-	_, _ = orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k1", TemplateID: "ml-dsa-65", PolicyID: testPolicyName})
-	_, _ = orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k2", TemplateID: "ml-dsa-65", PolicyID: testPolicyName})
+	scopeSpecBytes := defaultScopeSpecBytes(t)
+	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k1", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes})
+	require.NoError(t, err, "CreateKey k1")
+	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k2", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes})
+	require.NoError(t, err, "CreateKey k2")
 
 	keys, err := orch.ListKeys(ctx)
 	if err != nil {
@@ -91,7 +96,7 @@ func TestDeleteKey_happyPath(t *testing.T) {
 	ctx := context.Background()
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "to-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName,
+		Name: "to-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpecBytes(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -113,22 +118,21 @@ func TestDeleteKey_removedFromList(t *testing.T) {
 	orch := setupOrchestrator(t)
 	ctx := context.Background()
 
-	created, _ := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "list-then-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName,
+	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
+		Name: "list-then-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpecBytes(t),
 	})
-	_, _ = orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName,
+	require.NoError(t, err, "CreateKey")
+	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{
+		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpecBytes(t),
 	})
+	require.NoError(t, err, "CreateKey")
 
-	_ = orch.DeleteKey(ctx, created.Name)
+	err = orch.DeleteKey(ctx, created.Name)
+	require.NoError(t, err)
 
 	keys, err := orch.ListKeys(ctx)
-	if err != nil {
-		t.Fatalf("ListKeys: %v", err)
-	}
-	if len(keys) != 1 {
-		t.Errorf("ListKeys after delete: got %d want 1", len(keys))
-	}
+	require.NoError(t, err, "ListKeys")
+	require.Len(t, keys, 1, "ListKeys after delete: got %d want 1", len(keys))
 }
 
 func TestDeleteKey_notFound(t *testing.T) {

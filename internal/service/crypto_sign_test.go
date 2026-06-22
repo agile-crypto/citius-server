@@ -168,6 +168,7 @@ func TestSign_policyDeniesSign_returnsError(t *testing.T) {
 		Name:       "no-sign-key",
 		TemplateID: "ml-dsa-65",
 		PolicyID:   "no-sign-policy",
+		Scope:      defaultScopeSpecBytes(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
