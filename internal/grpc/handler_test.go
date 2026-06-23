@@ -143,6 +143,10 @@ func (m *mockKeyOrchestrator) UpdateKeyPolicy(_ context.Context, _ string, _ str
 	panic("mockKeyOrchestrator.UpdateKeyPolicy: not implemented")
 }
 
+func (m *mockKeyOrchestrator) TransformKey(_ context.Context, _ service.TransformKeySpec) (*service.KeyMetadata, error) {
+	panic("mockKeyOrchestrator.TransformKey: not implemented")
+}
+
 // mockCryptoOps stubs CryptoOrchestrator for tests.
 // Only signFn and verifyFn are wired; all other methods panic.
 type mockCryptoOps struct {
