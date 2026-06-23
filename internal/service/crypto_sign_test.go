@@ -1,4 +1,4 @@
-package service_test
+package service
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/policy"
-	"github.ibm.com/citius/citius-server/internal/service"
 )
 
 // cryptoPolicyName is the name of the policy that allows create_key + sign.
@@ -44,7 +43,7 @@ func seedCryptoPolicy(t *testing.T, ctx context.Context, pol policy.Engine) {
 // setupCryptoWithKey creates a wired CryptoOrchestrator, seeds a policy that
 // allows create_key + sign for ml-dsa-65, creates a key, and returns the
 // CryptoOrchestrator and the key's public ID.
-func setupCryptoWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
+func setupCryptoWithKey(t *testing.T) (CryptoOrchestrator, string) {
 	t.Helper()
 	ctx := context.Background()
 	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)

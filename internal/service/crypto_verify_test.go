@@ -1,4 +1,4 @@
-package service_test
+package service
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/policy"
-	"github.ibm.com/citius/citius-server/internal/service"
 )
 
 // verifyPolicyName is the name of the policy that allows create_key + sign + verify.
@@ -45,7 +44,7 @@ func seedVerifyPolicy(t *testing.T, ctx context.Context, pol policy.Engine) {
 // setupCryptoWithKeyForVerify creates a wired CryptoOrchestrator, seeds a
 // policy that allows create_key + sign + verify for ml-dsa-65, creates a key,
 // and returns the CryptoOrchestrator and the key's public ID.
-func setupCryptoWithKeyForVerify(t *testing.T) (service.CryptoOrchestrator, string) {
+func setupCryptoWithKeyForVerify(t *testing.T) (CryptoOrchestrator, string) {
 	t.Helper()
 	ctx := context.Background()
 	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
