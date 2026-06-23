@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
 	"github.ibm.com/citius/citius-server/internal/core"
+	"github.ibm.com/citius/citius-server/internal/errors"
 )
 
 // KeyOrchestrator orchestrates key lifecycle workflows.
@@ -29,5 +31,35 @@ type KeyOrchestrator interface {
 	// Returns ErrNotFound if the key does not exist.
 	UpdateKeyPolicy(ctx context.Context, keyName string, policyName string) error
 
-	// TransformKey() error
+	TransformKey(ctx context.Context, spec TransformKeySpec) (*KeyMetadata, error)
+}
+
+type TransformKeySpec struct {
+	KeyName            string
+	ScopeSpecification *core.ScopeSpecification
+	TemplateID         string
+	RetainBytes        bool
+}
+
+func (s *TransformKeySpec) FromProto(ctx context.Context, protoReq *messagespb.TransformKeyRequest) error {
+	const op = "service.(TransformKeySpec).FromProto"
+	if protoReq == nil {
+		return errors.New(ctx, op, errors.CodeInvalidArgument, "transform key request proto is nil")
+	}
+	res := &TransformKeySpec{
+		KeyName:     protoReq.Name,
+		RetainBytes: protoReq.RetainKeyBytes,
+	}
+	if protoReq.TemplateId != nil {
+		res.TemplateID = *protoReq.TemplateId
+	}
+	if protoReq.ScopeSpec != nil {
+		scopeSpec, err := core.ScopeSpecificationFromProto(ctx, protoReq.ScopeSpec)
+		if err != nil {
+			return errors.Wrap(ctx, op, err)
+		}
+		res.ScopeSpecification = scopeSpec
+	}
+	*s = *res
+	return nil
 }
