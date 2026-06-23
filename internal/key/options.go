@@ -42,7 +42,7 @@ func getDefaultOptions() options {
 	return options{
 		withLock:                 &sync.RWMutex{},
 		withState:                types.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED,
-		withLabels:               make(map[string]string),
+		withLabels:               nil,
 		withDigestAlgorithm:      "HMAC-SHA256",
 		withCurrentVersion:       0,
 		withVetForWrite:          true, // default: vet for write
