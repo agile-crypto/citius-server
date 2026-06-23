@@ -162,6 +162,9 @@ func extractProtoScopeSpec(ctx context.Context, s *types.ScopeSpecification) (*p
 
 func ScopeSpecificationFromProto(ctx context.Context, s *types.ScopeSpecification) (*ScopeSpecification, error) {
 	const op = "core.ScopeSpecificationFromProto"
+	if s == nil {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "scope specification proto is nil")
+	}
 	protoScopeSpec, err := extractProtoScopeSpec(ctx, s)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
