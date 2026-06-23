@@ -6,7 +6,6 @@ import (
 
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
@@ -20,7 +19,7 @@ import (
 // keyOrchestrator implements the KeyOrchestrator interface.
 // It requires key.Repository, template.Registry, provider.Registry, and policy.Engine to function.
 type keyOrchestrator struct {
-	repo      key.Repository
+	keys      key.Repository
 	templates template.Registry
 	providers provider.Registry
 	policy    policy.Engine
@@ -29,39 +28,81 @@ type keyOrchestrator struct {
 // NewKeyOrchestrator creates a new KeyOrchestrator.
 // All four dependencies are required; returns an error if any is nil.
 func NewKeyOrchestrator(
-	repo key.Repository,
-	tr template.Registry,
-	pr provider.Registry,
-	pe policy.Engine,
+	keys key.Repository,
+	templates template.Registry,
+	providers provider.Registry,
+	policyEngine policy.Engine,
 ) (KeyOrchestrator, error) {
 	const op errors.Op = "service.NewKeyOrchestrator"
 	ctx := context.Background()
 
-	if repo == nil {
+	if keys == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"repository must not be nil")
 	}
-	if tr == nil {
+	if templates == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"template registry must not be nil")
 	}
-	if pr == nil {
+	if providers == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"provider registry must not be nil")
 	}
-	if pe == nil {
+	if policyEngine == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"policy engine must not be nil")
 	}
 
 	return &keyOrchestrator{
-		repo:      repo,
-		templates: tr,
-		providers: pr,
-		policy:    pe,
+		keys:      keys,
+		templates: templates,
+		providers: providers,
+		policy:    policyEngine,
 	}, nil
 }
 
+// If templateID is non-empty, pickTemplate returns the template with that ID if it matches the scope spec.
+// If templateID is empty, pickTemplate returns the single best template matching the scope spec and allowed by policy.
+func (r *keyOrchestrator) pickTemplate(ctx context.Context, policyID string, templateID string, scopeSpec *core.ScopeSpecification) (*template.Template, error) {
+	const op = "service.(keyOrchestrator).pickTemplate"
+	if templateID != "" {
+		candidates := template.OnlyTemplates(templateID)
+		if len(candidates.IDs()) != 1 {
+			return nil, errors.New(ctx, op, errors.CodeInternal,
+				"expected exactly one template, got %d", len(candidates.IDs()))
+		}
+		tmpl, err := r.templates.Select(ctx, scopeSpec, candidates)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		if tmpl == nil {
+			return nil, errors.New(ctx, op, errors.CodeTemplateNotFound,
+				"no template matching the given scope specification found (ID=%s)", templateID)
+		}
+		return tmpl, nil
+	} else {
+		// Scope-based path: parse the proto-encoded ScopeSpecification,
+		// query policy for allowed templates, then ask the registry to select.
+		allowed, err := r.policy.AllowedTemplates(ctx, policyID, scopeSpec)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+
+		var candidates template.CandidateSet
+		if allowed == nil {
+			// nil means bypass (no policy in the system) - all templates eligible.
+			candidates = template.AllTemplates()
+		} else {
+			candidates = template.OnlyTemplates(allowed...)
+		}
+
+		tmpl, err := r.templates.Select(ctx, scopeSpec, candidates)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return tmpl, nil
+	}
+}
 func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpec) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).CreateKey"
 
@@ -87,43 +128,9 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"scope is unknown or missing; scope is required for key creation")
 	}
-
-	if req.TemplateID != "" {
-		candidates := template.OnlyTemplates(req.TemplateID)
-		if len(candidates.IDs()) != 1 {
-			return nil, errors.New(ctx, op, errors.CodeInternal,
-				"expected exactly one template, got %d", len(candidates.IDs()))
-		}
-		tmpl0, err := r.templates.Select(ctx, req.Scope, candidates)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		if tmpl0 == nil {
-			return nil, errors.New(ctx, op, errors.CodeTemplateNotFound,
-				"no template matching the given scope specification found (ID=%s)", req.TemplateID)
-		}
-		tmpl = tmpl0
-	} else {
-		// Scope-based path: parse the proto-encoded ScopeSpecification,
-		// query policy for allowed templates, then ask the registry to select.
-		allowed, err := r.policy.AllowedTemplates(ctx, req.PolicyID, req.Scope)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-
-		var candidates template.CandidateSet
-		if allowed == nil {
-			// nil means bypass (no policy in the system) - all templates eligible.
-			candidates = template.AllTemplates()
-		} else {
-			candidates = template.OnlyTemplates(allowed...)
-		}
-
-		tmpl0, err := r.templates.Select(ctx, req.Scope, candidates)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		tmpl = tmpl0
+	tmpl, err := r.pickTemplate(ctx, req.PolicyID, req.TemplateID, req.Scope)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
 	}
 
 	// 2a. Policy: validate that create_key with this template is permitted.
@@ -144,8 +151,8 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 // buildKeyMetadata projects a key.Key and its current key.Version into the
 // API-facing KeyMetadata. v may be nil; version-scoped fields are
 // then left at their zero values.
-func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
-	const op = "service.(keyOrchestrator).buildKeyMetadata"
+func buildKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMetadata, error) {
+	const op = "service.buildKeyMetadata"
 	md := &KeyMetadata{
 		Name:           k.GetName(),
 		KeyID:          k.GetPublicId(),
@@ -177,6 +184,10 @@ func (r *keyOrchestrator) buildKeyMetadata(ctx context.Context, k *key.Key, v *k
 	return md, nil
 }
 
+func computeVersionID(keyID string, version uint32) string {
+	return fmt.Sprintf("%s:%d", keyID, version)
+}
+
 // generateAndPersistKey handles provider key generation, proto marshaling, and
 // repository persistence.  Extracted from CreateKey to keep cyclomatic
 // complexity within linter limits.
@@ -206,12 +217,9 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	// TODO: add saga compensation to prevent orphaned key
 	// material if storage fails after provider key generation succeeds.
 	keyID := core.NewID(core.KeyPrefix)
-	versionID := fmt.Sprintf("%s:%d", keyID, 1)
+	initialVersion := uint32(1)
 
-	scopeBytes, err := scopeSpec.Serialize(ctx)
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
-	}
+	versionID := computeVersionID(keyID, initialVersion)
 
 	// Marshal the full GenerateKeyResponse so that both KeyMaterial (private)
 	// and PublicKeyBytes are persisted.  The crypto orchestrator unmarshals to
@@ -221,65 +229,59 @@ func (r *keyOrchestrator) generateAndPersistKey(
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	k := key.NewKey(&storepb.Key{
-		PublicId:           keyID,
-		Name:               req.Name,
-		Primitive:          scopeSpec.Scope.GetPrimitive().String(),
-		ScopeSpecification: scopeBytes,
-		PolicyId:           req.PolicyID,
-		CurrentVersion:     1,
-		State:              types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
-		Labels:             req.Labels,
-	})
-
-	v := key.NewVersion(&storepb.KeyVersion{
-		PublicId:    versionID,
-		KeyId:       keyID,
-		Version:     1,
-		ProviderId:  prov.Name(),
-		TemplateId:  tmpl.TemplateID(),
-		KeyMaterial: genRespBytes,
-		State:       types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
-	})
-
-	if err := r.repo.CreateKey(ctx, k, v); err != nil {
+	k, err := key.NewKey(ctx, keyID, req.PolicyID, scopeSpec, initialVersion,
+		key.WithName(req.Name),
+		key.WithLabels(req.Labels),
+		key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE),
+	)
+	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	return r.buildKeyMetadata(ctx, k, v)
+	v, err := key.NewVersion(ctx, versionID, keyID, tmpl.TemplateID(), prov.Name(), initialVersion, genRespBytes,
+		key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	if err := r.keys.CreateKey(ctx, k, v); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	return buildKeyMetadata(ctx, k, v)
 }
 
 func (r *keyOrchestrator) ReadKey(ctx context.Context, keyName string, version uint32) (*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ReadKey"
-	k, err := r.repo.GetKeyByName(ctx, keyName)
+	k, err := r.keys.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	var v *key.Version
 	if version == 0 {
-		v, err = r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+		v, err = r.keys.GetCurrentVersion(ctx, k.GetPublicId())
 	} else {
-		v, err = r.repo.GetVersion(ctx, k.GetPublicId(), version)
+		v, err = r.keys.GetVersion(ctx, k.GetPublicId(), version)
 	}
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return r.buildKeyMetadata(ctx, k, v)
+	return buildKeyMetadata(ctx, k, v)
 }
 
 func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*KeyMetadata, error) {
 	const op errors.Op = "service.(keyOrchestrator).ListKeys"
-	keys, err := r.repo.ListKeys(ctx)
+	keys, err := r.keys.ListKeys(ctx)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	out := make([]*KeyMetadata, 0, len(keys))
 	for _, k := range keys {
-		v, verr := r.repo.GetCurrentVersion(ctx, k.GetPublicId())
+		v, verr := r.keys.GetCurrentVersion(ctx, k.GetPublicId())
 		if verr != nil {
 			return nil, errors.Wrap(ctx, op, verr)
 		}
-		md, merr := r.buildKeyMetadata(ctx, k, v)
+		md, merr := buildKeyMetadata(ctx, k, v)
 		if merr != nil {
 			return nil, errors.Wrap(ctx, op, merr)
 		}
@@ -291,12 +293,12 @@ func (r *keyOrchestrator) ListKeys(ctx context.Context) ([]*KeyMetadata, error) 
 func (r *keyOrchestrator) DeleteKey(ctx context.Context, keyName string) error {
 	const op errors.Op = "service.(keyOrchestrator).DeleteKey"
 	// 1. Fetch key metadata.
-	k, err := r.repo.GetKeyByName(ctx, keyName)
+	k, err := r.keys.GetKeyByName(ctx, keyName)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 
-	if err := r.repo.DeleteKey(ctx, k.GetPublicId()); err != nil {
+	if err := r.keys.DeleteKey(ctx, k.GetPublicId()); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
@@ -330,6 +332,88 @@ func (r *keyOrchestrator) ImportKey(ctx context.Context, _ core.ImportKeySpec) (
 func (r *keyOrchestrator) UpdateKeyPolicy(ctx context.Context, _ string, _ string) error {
 	return errors.New(ctx, "service.(keyOrchestrator).UpdateKeyPolicy", errors.CodeNotImplemented,
 		"UpdateKeyPolicy not yet implemented")
+}
+
+func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpec) (*KeyMetadata, error) {
+	const op = "service.(keyOrchestrator).TransformKey"
+	// Retrieve the keyO's current scope specification and use that for template selection.
+	keyO, err := r.keys.GetKeyByName(ctx, spec.KeyName)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	if spec.ScopeSpecification != nil {
+		// For now, the DB layout cannot update the scope specification across versions.
+		// Scope specification is unchanged after the initial key creation
+		// TODO: Enable scope specification update across versions
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented, "transformation with scope specification is not supported")
+	}
+	scopeSpec := &core.ScopeSpecification{}
+	err = scopeSpec.Deserialize(ctx, keyO.ScopeSpecification)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	// Pick template
+	template, err := r.pickTemplate(ctx, keyO.PolicyId, spec.TemplateID, scopeSpec)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	// TODO: Handle retain bytes option (requires ability to get get the key size for a template)
+	if spec.RetainBytes {
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented, "transformation with retain bytes is not supported")
+	}
+	// Validation (same as for key creation)
+	// Policy: validate that create_key with this template is permitted.
+	if err = r.policy.ValidateOperation(ctx, keyO.PolicyId,
+		core.OperationCreateKey, template.TemplateID(), ""); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	// Policy: validate key configuration constraints (extractable, rotation, etc.)
+	// Note: the existing policy validation for key creation expects a KeyCreationSpec.
+	// TODO: Should it be validated also for transform spec?
+	// if err := r.policy.ValidateKeyCreation(ctx, key.PolicyId, scopeSpec); err != nil {
+	// 	return nil, errors.Wrap(ctx, op, err)
+	// }
+	lastVersion, err := r.keys.GetVersion(ctx, keyO.PublicId, keyO.CurrentVersion)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	provider, err := r.providers.Get(ctx, lastVersion.ProviderId)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	// TODO: check that the provider supports the new template --> returns specific error if it does not
+	// instead of failing later
+
+	// Generate new key material
+	resp, err := provider.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
+		Algorithm: template.GetAlgorithm(),
+	})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	// Create new key version with the new material, same key ID, and incremented version number.
+	newVersionNumber := lastVersion.GetVersion() + 1
+	newVersionID := computeVersionID(keyO.GetPublicId(), newVersionNumber)
+	newVersion, err := key.NewVersion(ctx, newVersionID, keyO.GetPublicId(), template.TemplateID(), provider.Name(), newVersionNumber,
+		resp.KeyMaterial, key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	err = r.keys.AddVersion(ctx, newVersion)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	// Update the state of previous version
+	// TODO: check how/when this hsould be done and the expected transition
+	// TODO: provide method in repository to update state
+
+	metadata, err := buildKeyMetadata(ctx, keyO, newVersion)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return metadata, nil
 }
 
 // Compile-time assertion: keyOrchestrator implements KeyOrchestrator.
