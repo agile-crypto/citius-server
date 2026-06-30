@@ -6,8 +6,8 @@
 # generation targets. Currently, `cd proto && buf generate` uses
 # proto/buf.gen.yaml which outputs to gen/go/.
 #
-# Storage protos: proto/storage/ → gen/go/server/store/
-# Provider protos: proto/provider/ → gen/go/server/provider/
+# Storage protos: proto/server/store/ → gen/go/server/store/
+# Provider protos: proto/server/provider/ → gen/go/server/provider/
 
 version: v1
 plugins:
