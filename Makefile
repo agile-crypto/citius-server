@@ -23,7 +23,7 @@
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
 .PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env test-integration-auth-e2e
-.PHONY: update-api-proto
+.PHONY: proto-update-api
 
 # Default goal: print help when `make` is run with no arguments.
 .DEFAULT_GOAL := help
