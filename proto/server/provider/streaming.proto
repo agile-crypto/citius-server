@@ -1,0 +1,70 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+option go_package = "github.ibm.com/citius/citius-server/gen/go/server/provider;provider";
+
+import "buf/validate/validate.proto";
+import "api/types/operation_params.proto";
+import "api/messages/metadata.proto";
+
+// ============================================================================
+// Streaming (multi-part) operation messages
+// ============================================================================
+// These messages follow the PKCS #11 Init/Update/Final pattern.
+
+// StreamingSignInitRequest initializes a multi-part sign session.
+message StreamingSignInitRequest {
+  bytes  key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  string session_id   = 2 [(buf.validate.field).string.min_len = 1];
+
+  // Scope-based context (same as SignRequest).
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_context     = 3;
+    caas.crypto.v1.SignatureDomainContext   domain_context = 4;
+    caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
+  }
+}
+
+// StreamingSignChunk is one chunk of data in a multi-part sign operation.
+message StreamingSignChunk {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  bytes  data_chunk = 2 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// StreamingSignResult is returned when the multi-part sign is finalized.
+message StreamingSignResult {
+  bytes  signature  = 1 [(buf.validate.field).bytes.min_len = 1];
+  string session_id = 2 [(buf.validate.field).string.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 3;
+}
+
+// StreamingVerifyInitRequest initializes a multi-part verify session.
+message StreamingVerifyInitRequest {
+  bytes  key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  string session_id   = 2 [(buf.validate.field).string.min_len = 1];
+
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_context     = 3;
+    caas.crypto.v1.SignatureDomainContext   domain_context = 4;
+    caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
+  }
+}
+
+// StreamingVerifyChunk is one chunk in a multi-part verify operation.
+message StreamingVerifyChunk {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  bytes  data_chunk = 2 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// StreamingVerifyFinalRequest finalizes multi-part verification.
+message StreamingVerifyFinalRequest {
+  string session_id = 1 [(buf.validate.field).string.min_len = 1];
+  bytes  signature  = 2 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// StreamingVerifyResult is returned when the multi-part verify is finalized.
+message StreamingVerifyResult {
+  bool   valid      = 1;
+  string session_id = 2;
+  caas.crypto.v1.ProviderOutput output = 3;
+}

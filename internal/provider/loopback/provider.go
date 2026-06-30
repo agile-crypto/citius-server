@@ -13,7 +13,7 @@ import (
 	"bytes"
 	"context"
 
-	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
+	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
 	"github.ibm.com/citius/citius-server/internal/provider"
 )
 

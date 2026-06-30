@@ -7,8 +7,8 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
-	types "github.ibm.com/citius/citius-server/gen/go/types"
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"

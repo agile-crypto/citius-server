@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
-	storepb "github.ibm.com/citius/citius-server/gen/go/store"
-	types "github.ibm.com/citius/citius-server/gen/go/types"
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
+	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
+	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"

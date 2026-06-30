@@ -1,0 +1,429 @@
+syntax = "proto3";
+
+package caas.crypto.v1;
+option go_package = "github.ibm.com/citius/citius-server/gen/go/api/messages;api";
+
+// ============================================================================
+// Serialization Metadata
+// ============================================================================
+
+// OperationMetadata captures key version and algorithm-specific serialization information
+// This enables proper deserialization and key lifecycle tracking across all operations
+//
+// ARCHITECTURE NOTE: Protobuf API vs Cryptographic Artifacts
+// ===========================================================
+// This specification defines the RPC API using Protobuf, but cryptographic artifacts
+// (keys, signatures, encrypted data) may use different encodings for interoperability:
+//
+// - Protobuf: Used for RPC messages
+// - Cryptographic Artifacts: May use ASN.1/DER, JWS, CBOR, or raw formats for:
+//   * Compatibility with existing PKI infrastructure (X.509 certs)
+//   * Interoperability across different implementations
+//   * Long-term storage or cross-system exchange
+//
+// The algorithm_parameters map documents which encoding is used for each artifact.
+//
+// SECURITY NOTE: Metadata Does NOT Require Signing
+// ================================================
+// The metadata fields are NOT cryptographic inputs and do NOT require authentication:
+//
+// 1. Algorithm Parameters (IV, nonce, encoding info):
+//    - These are embedded in and authenticated by the AEAD authentication tag
+//    - Changing any parameter invalidates the authentication tag
+//    - AEAD modes guarantee: if any parameter changes, decryption fails or tag verification fails
+//
+// 2. Key Version:
+//    - If wrong version specified, decryption produces wrong plaintext
+//    - For verification: wrong key version produces garbage or signature fails
+//    - Using a different key_version is cryptographically equivalent to using a different key
+//
+// 3. Template ID:
+//    - Intentionally excluded from OperationMetadata (unsigned → tamperable)
+//    - If wrong template assumed: plaintext garbage or verification fails
+//    - Clients retrieve template via ReadKey → key_metadata.template_id
+//
+// Threat Model:
+//    - Attacker can tamper with metadata
+//    - Result: Wrong IV + wrong ciphertext (simultaneous tampering)
+//    - AEAD authentication still fails (tag was computed with original IV)
+//    - OR: Wrong IV + same ciphertext = garbage plaintext or tag fails
+//    - OR: For signing: wrong key_version doesn't affect signature validity
+//
+// Conclusion: The cryptographic authentication (AEAD tag, signature) is sufficient.
+// Signing metadata would be redundant and provide zero additional security guarantees.
+//
+// For audit trail integrity (if needed for compliance): Sign the audit log entry
+// that contains both the cryptographic result and this metadata, not the metadata alone.
+//
+// CRYPTOGRAPHIC ARTIFACT ENCODING GUIDANCE
+// ==========================================
+//
+// The algorithm_parameters map documents encoding and format information for artifacts.
+// Different implementations may use different encodings; the spec accommodates both.
+//
+// ENCRYPTION ARTIFACTS:
+// =====================
+// For AEAD operations (AES-GCM, ChaCha20-Poly1305, etc.):
+//   Format: IV || Ciphertext || AuthenticationTag (concatenated)
+//   algorithm_parameters: {
+//     "iv": <generated_iv_bytes>,     // MUST be included for decryption
+//     "tag_length_bytes": "16",       // Tag length (usually 16 for 128-bit)
+//     "encoding": "raw"               // No wrapper encoding
+//   }
+//
+// For RSA-OAEP encryption:
+//   Format: Raw OAEP ciphertext or ASN.1-wrapped
+//   algorithm_parameters: {
+//     "encoding": "raw",              // Or "der" if ASN.1-wrapped
+//     "hash_algorithm": "sha256"      // Hash used in OAEP padding
+//   }
+//
+// For custom symmetric ciphers with IV/nonce:
+//   algorithm_parameters: {
+//     "iv": <nonce>,
+//     "mode": "cbc",
+//     "padding": "pkcs7",
+//     "encoding": "raw"
+//   }
+//
+// SIGNATURE ARTIFACTS:
+// ====================
+// For ECDSA/EdDSA signatures:
+//   Format: Raw (r || s) or ASN.1/DER encoded
+//   algorithm_parameters: {
+//     "encoding": "raw",    // (r || s concatenated) OR
+//     "encoding": "der",    // ASN.1 DER: SEQUENCE { r INTEGER, s INTEGER }
+//     "hash_algorithm": "sha256"
+//   }
+//
+// For RSA-PSS signatures:
+//   Format: Raw or ASN.1-wrapped
+//   algorithm_parameters: {
+//     "encoding": "raw",    // Raw signature OR
+//     "encoding": "der",    // ASN.1 DER
+//     "hash_algorithm": "sha256",
+//     "salt_length_bytes": "32"
+//   }
+//
+// For post-quantum signatures (ML-DSA, SLH-DSA):
+//   Format: Raw or vendor-specific encoding
+//   algorithm_parameters: {
+//     "encoding": "raw",    // Native format (most efficient)
+//     "signature_length_bytes": "2420",  // For ML-DSA-65
+//     "public_key_length_bytes": "1952"
+//   }
+//
+// For hybrid signatures (ML-DSA+ECDSA):
+//   Format: Component signatures concatenated or structured
+//   algorithm_parameters: {
+//     "encoding": "concatenated",  // ml_dsa_sig || ecdsa_sig
+//     "component_1": "ml-dsa-65",
+//     "component_1_length": "2420",
+//     "component_2": "ecdsa-p256-sha256",
+//     "component_2_encoding": "der"
+//   }
+//
+// KEY DERIVATION ARTIFACTS:
+// ==========================
+// DeriveKeyResponse includes derived key metadata (not the key material itself):
+//   algorithm_parameters: {
+//     "salt": <derived_salt>,         // If applicable
+//     "iterations": "600000",         // PBKDF2 iterations
+//     "memory_mb": "256",             // Argon2 memory
+//     "hash_algorithm": "sha256"
+//   }
+//
+// KEY WRAPPING ARTIFACTS:
+// =======================
+// For RFC 3394 AES-KW:
+//   Format: Raw wrapped key
+//   algorithm_parameters: {
+//     "wrapping_key_template": "aes-256-kw",
+//     "original_key_length": "32",
+//     "encoding": "raw"
+//   }
+//
+// For RSA-OAEP key wrapping:
+//   algorithm_parameters: {
+//     "wrapping_key_template": "rsa-oaep-4096-sha256",
+//     "encoding": "raw"
+//   }
+//
+// INTEROPERABILITY PATTERNS:
+// ===========================
+//
+// Pattern 1: Standard Format (ASN.1/DER for X.509 compatibility)
+//   Use when integrating with existing PKI infrastructure.
+//   Services SHOULD support DER encoding for public operations.
+//   algorithm_parameters: { "encoding": "der" }
+//
+// Pattern 2: Raw Format (Most efficient, vendor-specific)
+//   Use for high-performance internal operations.
+//   algorithm_parameters: { "encoding": "raw" }
+//
+// Pattern 3: JSON Web Format (JWS/JOSE for REST APIs)
+//   Use for REST/OpenAPI endpoints.
+//   algorithm_parameters: { "encoding": "jws" }
+//
+// Pattern 4: CBOR (For mobile/IoT constraints)
+//   Use for bandwidth-constrained environments.
+//   algorithm_parameters: { "encoding": "cbor" }
+//
+// IMPLEMENTATION GUIDANCE:
+// ========================
+//
+// 1. DISCOVER SUPPORTED ENCODINGS:
+//    - Query TemplateInfo.algorithm details and scoped_capabilities for encoding options
+//    - Each template documents supported formats via its AlgorithmDetails
+//
+// 2. REQUEST SPECIFIC ENCODING:
+//    - Use scope_spec properties in CreateKeyRequest/TransformKeyRequest
+//    - The service selects templates supporting the requested encoding
+//
+// 3. PARSE BASED ON METADATA:
+//    - Always use algorithm_parameters["encoding"] to parse artifacts
+//    - Never assume encoding based on template_id alone
+//    - Different providers may use different encodings for same template
+//
+// 4. STORE WITH METADATA:
+//    - Store artifacts alongside OperationMetadata
+//    - Include algorithm_parameters with artifact for future parsing
+//    - Enables graceful migration if encoding changes
+//
+// EXAMPLE: Complete Encryption/Decryption Round-trip
+// ====================================================
+//
+// ENCRYPTION:
+//   EncryptRequest { key_name: "my-key", plaintext: <data> }
+//   →
+//   EncryptResponse {
+//     ciphertext: <encrypted_data || tag>,
+//     metadata: OperationMetadata {
+//       key_version: 2,
+//       provider_output: ProviderOutput {
+//         algorithm_output: {
+//           aead_output: { nonce: <12-byte nonce>, tag_length_bytes: 16 }
+//         },
+//         encoding: "raw"
+//       },
+//       api_version: "1.0"
+//     }
+//   }
+//   → STORAGE: Store (ciphertext, metadata) pair
+//
+// DECRYPTION (Later):
+//   1. Load (ciphertext, metadata) from storage
+//   2. DecryptRequest {
+//        key_name: "my-key",
+//        ciphertext: <ciphertext>,
+//        metadata: <stored OperationMetadata>,
+//        aead_params: { aad: <same_aad> }
+//      }
+//   3. Service extracts provider_output from metadata
+//   4. Service extracts nonce from provider_output.aead_output.nonce
+//   5. Service uses metadata.key_version to get correct decryption key
+//   6. Service decrypts and returns plaintext
+//
+// NOTE: OperationMetadata intentionally contains ONLY key_version,
+// provider_output (algorithm output + encoding), api_version, and user_context.
+// Fields such as template_id, provider_id, timestamp are NOT present
+// because this message is NOT signed (see threat model above).
+// The provider_output fields (nonce, tag_length) are implicitly protected
+// by the AEAD authentication tag — wrong nonce causes decryption failure.
+
+// ============================================================================
+// Typed Algorithm Output Messages
+// ============================================================================
+//
+// Each message corresponds to a family of PKCS#11 mechanisms that share the
+// same system-generated output parameters.
+//
+// The taxonomy is by OUTPUT structure (what the system generates), NOT by
+// algorithm family (which governs INPUT parameters).  This is intentional:
+// - AES-GCM, AES-CCM, ChaCha20-Poly1305 all produce { nonce, tag_length }
+// - AES-CBC, AES-OFB, 3DES-CBC all produce { iv }
+// - ECDSA, EdDSA, ML-DSA, RSA-OAEP produce nothing
+//
+// When the oneof is unset, there are no system-generated parameters to store
+// (covers all signature algorithms, asymmetric encryption, key wrapping, etc.).
+
+// AeadOutput — system-generated parameters for AEAD encryption and GMAC.
+// Covers: AES-GCM, AES-CCM, AES-GCM-SIV, ChaCha20-Poly1305,
+//         XChaCha20-Poly1305, Salsa20-Poly1305, AES-GMAC.
+//
+// PKCS#11 mapping:
+//   CK_GCM_PARAMS.pIv                          → nonce
+//   CK_GCM_PARAMS.ulTagBits / 8                → tag_length_bytes
+//   CK_CCM_PARAMS.pNonce                        → nonce
+//   CK_CCM_PARAMS.ulMACLen                      → tag_length_bytes
+//   CK_SALSA20_CHACHA20_POLY1305_PARAMS.pNonce  → nonce
+//   (Poly1305 tag is always 16 bytes)           → tag_length_bytes = 16
+//
+// GMAC NOTE: AES-GMAC is authentication-only GCM (zero-length plaintext).
+// The MAC IS the primary output, but a system-generated IV is required
+// for verification.  We reuse AeadOutput: nonce carries the IV,
+// tag_length_bytes carries the MAC length.  This matches the PKCS#11
+// mapping since GMAC uses CK_GCM_PARAMS with the same fields.
+//
+// GCM/CCM Message mode NOTE: PKCS#11 Message APIs (CK_GCM_MESSAGE_PARAMS,
+// CK_CCM_MESSAGE_PARAMS) expose pTag/pMAC as separate output buffers.
+// The provider should concatenate the tag to the ciphertext per standard
+// AEAD convention.  AeadOutput records tag_length_bytes so the caller
+// knows where to split.
+message AeadOutput {
+  bytes  nonce            = 1;  // system-generated IV/nonce
+  uint32 tag_length_bytes = 2;  // authentication tag size in bytes
+}
+
+// BlockCipherOutput — system-generated IV for block cipher modes.
+// Covers: AES-CBC, AES-CBC-PAD, AES-OFB, AES-CFB, 3DES-CBC,
+//         Camellia-CBC, ARIA-CBC, SEED-CBC, GOST 28147 (CFB).
+//
+// PKCS#11 mapping:
+//   CK_<CIPHER>_CBC_PARAMS.iv → iv  (16 bytes for AES, 8 bytes for DES/3DES)
+message BlockCipherOutput {
+  bytes iv = 1;  // system-generated initialization vector
+}
+
+// CounterModeOutput — system-generated initial counter block.
+// Covers: AES-CTR, Camellia-CTR.
+//
+// PKCS#11 mapping:
+//   CK_AES_CTR_PARAMS.cb         → counter_block  (16 bytes)
+//   CK_AES_CTR_PARAMS.ulCounterBits → counter_bits
+message CounterModeOutput {
+  bytes  counter_block = 1;  // full 16-byte initial counter block (nonce || counter)
+  uint32 counter_bits  = 2;  // how many rightmost bits are the counter
+}
+
+// StreamCipherOutput — system-generated nonce + block counter for stream ciphers.
+// Covers: ChaCha20 (non-AEAD), Salsa20 (non-AEAD).
+//
+// PKCS#11 mapping:
+//   CK_CHACHA20_PARAMS.pNonce        → nonce
+//   CK_CHACHA20_PARAMS.pBlockCounter → block_counter
+message StreamCipherOutput {
+  bytes nonce         = 1;  // system-generated nonce
+  bytes block_counter = 2;  // initial block counter value
+}
+
+// KdfOutput — system-generated parameters for key derivation.
+// Covers: HKDF, PBKDF2, Argon2 (system-generated salt),
+//         SP800-108 Feedback KDF (system-generated IV).
+//
+// PKCS#11 mapping:
+//   CK_HKDF_PARAMS.pSalt                          → salt  (when bExtract && !pSalt)
+//   CK_PKCS5_PBKD2_PARAMS2.pSaltSourceData        → salt  (when CKZ_SALT_SPECIFIED)
+//   CK_SP800_108_FEEDBACK_KDF_PARAMS.pIV           → iv    (PRF block size, [SYSTEM-GEN])
+message KdfOutput {
+  bytes salt = 1;  // system-generated salt (HKDF, PBKDF2, Argon2)
+  bytes iv   = 2;  // system-generated initial value (SP800-108 Feedback mode)
+}
+
+// NoAlgorithmOutput — explicit marker that no system-generated parameters exist.
+// Covers: All signature algorithms (ECDSA, EdDSA, ML-DSA, SLH-DSA, RSA-PSS, DSA),
+//         asymmetric encryption (RSA-OAEP, RSA-PKCS1v15),
+//         deterministic key wrapping (AES-KW, AES-KWP),
+//         disk encryption (AES-XTS — tweak is user-provided),
+//         all MACs (HMAC, CMAC, KMAC, Poly1305),
+//         key agreement (ECDH, X25519, X448, DH).
+//
+// The provider MUST set this arm explicitly for algorithms with no output.
+// An unset oneof is treated as a provider bug — the core rejects the response.
+// This follows the same pattern as NoParams in operation_params.proto.
+message NoAlgorithmOutput {}
+
+// VendorOutput — opaque vendor-specific output for mechanisms not covered
+// by the typed arms above.
+//
+// Escape hatch for:
+//   - Proprietary HSM mechanisms (CKM_VENDOR_DEFINED range in PKCS#11)
+//   - Pre-standard algorithms not yet added to the typed taxonomy
+//   - Provider-specific artifacts (e.g., HSM audit tokens, key attestation blobs)
+//
+// The core passes this through opaquely — it cannot validate the contents.
+// Providers SHOULD migrate to typed arms once standard coverage is added.
+//
+// Keys:   Short, descriptive ASCII names (e.g., "iv", "attestation_blob")
+// Values: Raw bytes; interpretation is provider-specific
+message VendorOutput {
+  map<string, bytes> parameters = 1;
+}
+
+// ProviderOutput — the provider-supplied subset of operation metadata.
+//
+// Providers set ONLY these fields in their responses. 
+// This separation ensures providers cannot set fields they don't own
+// (key_version, api_version) and makes the provider contract explicit.
+//
+message ProviderOutput {
+  // Typed algorithm output — system-generated parameters that must be stored
+  // alongside the cryptographic artifact for later decryption/verification.
+  //
+  // Each arm is one-to-one with a PKCS#11 mechanism output structure.
+  //
+  // MUST always be explicitly set by the provider:
+  //   - Encryption with IV/nonce: set the appropriate typed arm
+  //   - Signatures, asymmetric enc, key wrapping, MACs: set no_output
+  //
+  // An unset oneof means the provider FORGOT to set it — the core MUST
+  // reject the response.  This distinguishes "no system-generated params"
+  // (intentional) from "provider bug" (forgot to return the IV).
+  oneof algorithm_output {
+    NoAlgorithmOutput   no_output            = 10;  // explicit: no system-generated params
+    AeadOutput          aead_output          = 11;  // GCM, CCM, ChaCha20-Poly
+    BlockCipherOutput   block_cipher_output  = 12;  // CBC, OFB, CFB
+    CounterModeOutput   counter_mode_output  = 13;  // CTR
+    StreamCipherOutput  stream_cipher_output = 14;  // ChaCha20/Salsa20 non-AEAD
+    KdfOutput           kdf_output           = 15;  // HKDF, PBKDF2, Argon2
+    VendorOutput        vendor_output        = 16;  // proprietary/pre-standard mechanisms
+  }
+
+  // Artifact encoding format.
+  // Documents how the cryptographic output (ciphertext, signature, wrapped key)
+  // is serialized.
+  //
+  // Values: "raw" (default), "der" (ASN.1), "jws" (JOSE), "cbor"
+  // Different providers may use different encodings for the same algorithm.
+  string encoding = 1;
+}
+
+message OperationMetadata {
+  // Key version that was used for this operation.
+  // Critical for backward compatibility as keys are rotated.
+  // NOTE: Using wrong version results in decryption failure or garbage plaintext.
+  //
+  // This is a CORE concept — the provider never sets it.
+  // The core fills key_version after receiving the provider's response.
+  uint32 key_version = 1;
+
+  // Provider-supplied output — algorithm parameters and encoding.
+  // The core copies this directly from the provider response.
+  // For decrypt, the core extracts this from the stored OperationMetadata
+  // and passes it to the provider.
+  ProviderOutput provider_output = 2;
+  
+  // API version that produced this metadata.
+  // Format: "major.minor" (e.g., "1.0", "1.1", "2.0")
+  //
+  // CRITICAL for long-lived artifacts:
+  //   - Ciphertext stored for years may outlive API versions
+  //   - Clients parsing metadata need to know which version produced it
+  //   - Migration tooling can identify artifacts needing upgrade
+  //   - Backward compatibility logic can branch on this field
+  //
+  // Versioning Policy:
+  //   - Minor version bump: additive changes (new fields, new enum values)
+  //   - Major version bump: breaking changes (field semantics change, removals)
+  //
+  // If empty/missing, assume "1.0" (initial version).
+  string api_version = 3;
+  
+  // User-provided context passed through from the request.
+  // Carried in the metadata for audit trail enrichment.
+  // Examples: {"tenant_id": "acme", "classification": "pci", "request_id": "abc-123"}
+  //
+  // This field is NOT cryptographically authenticated — it is for audit/logging only.
+  // For application-level authenticated data, use AEAD's associated_data field.
+  map<string, string> user_context = 4;
+}

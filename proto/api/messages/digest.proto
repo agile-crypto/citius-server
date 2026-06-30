@@ -1,0 +1,201 @@
+syntax = "proto3";
+
+package caas.crypto.v1;
+option go_package = "github.ibm.com/citius/citius-server/gen/go/api/messages;api";
+
+import "api/types/common.proto";
+import "api/messages/metadata.proto";
+import "buf/validate/validate.proto";
+
+// ============================================================================
+// Digest Operations
+// ============================================================================
+
+// DigestInitRequest initializes a streaming digest operation.
+// Algorithm selection via template_id (explicit) or scope_spec (intent-based).
+// When scope_spec is used, the template registry selects the best ACTIVE template
+// matching the scope and security properties.
+message DigestInitRequest {
+  // Scope specification to select the template used for computing a digest. The scope specification 
+  // describes the scope (ie. cryptographic intent) and properties that the template must satisfy.
+  // If a template is explicitly provided, the scope specification must at least 
+  // include the scope to be associated with the key.
+  ScopeSpecification scope_spec = 1;
+  // Optional: explicit template ID. If set, it must match the scope specification
+  // and be allowed by the policy. If not set, the template is determined based on
+  // the scope specification and the policy.
+  optional string template_id = 2;
+  
+  // Unique identifier for this streaming operation
+  string operation_id = 3;
+  
+  // Optional: Policy name for additional validation and enforcement.
+  // If provided, validates whether this operation and selected template are allowed.
+  string policy_name = 4;
+  
+  // Optional: User-provided context for audit trail enrichment.
+  map<string, string> user_context = 5;
+}
+
+message DigestInitResponse {
+  bool success = 1;
+  // The template that was selected for this operation
+  string selected_template_id = 2;
+}
+
+// DigestRequest performs a single-shot digest operation.
+// Algorithm selection via template_id (explicit) or scope_spec (intent-based).
+// When scope_spec is used, the template registry selects the best ACTIVE template
+// matching the scope and security properties.
+message DigestRequest {
+  // Scope specification to select the template used for computing a digest. The scope specification 
+  // describes the scope (ie. cryptographic intent) and properties that the template must satisfy.
+  // If a template is explicitly provided, the scope specification must at least 
+  // include the scope to be associated with the key.
+  ScopeSpecification scope_spec = 1;
+  // Optional: explicit template ID. If set, it must match the scope specification
+  // and be allowed by the policy. If not set, the template is determined based on
+  // the scope specification and the policy.
+  optional string template_id = 2;
+  
+  // The data to hash
+  bytes data = 4;
+  
+  // Optional: Policy name for additional validation and enforcement.
+  // If provided, validates whether this operation and selected template are allowed.
+  string policy_name = 5;
+  
+  // Optional: User-provided context for audit trail enrichment.
+  map<string, string> user_context = 6;
+}
+
+message DigestResponse {
+  bytes digest = 1;
+  OperationMetadata metadata = 2;
+}
+
+message DigestUpdateRequest {
+  string operation_id = 1;
+  bytes data_chunk = 2;
+}
+
+message DigestUpdateResponse {
+  bool success = 1;
+}
+
+message DigestKeyRequest {
+  string operation_id = 1;
+  string key_name = 2;
+}
+
+message DigestKeyResponse {
+  bool success = 1;
+}
+
+message DigestFinalRequest {
+  string operation_id = 1;
+}
+
+message DigestFinalResponse {
+  bytes digest = 1;
+  // Operation metadata for audit and tracking
+  OperationMetadata metadata = 2;
+}
+
+// ============================================================================
+// XOF (Extendable Output Function) Operations
+// ============================================================================
+// XOFs (SHAKE128, SHAKE256, BLAKE3, etc.) produce variable-length output
+// controlled by the caller. These are separated from digest operations because
+// they are a distinct primitive (CRYPTO_PRIMITIVE_XOF) with different semantics:
+// digests produce fixed-length output; XOFs produce caller-specified-length output.
+
+// XofRequest performs a single-shot XOF operation.
+// Algorithm selection via template_id (explicit) or scope_spec (intent-based with HASH_SCOPE_XOF).
+message XofRequest {
+  // Scope specification to select the template used for computing a digest. The scope specification 
+  // describes the scope (ie. cryptographic intent) and properties that the template must satisfy.
+  // If a template is explicitly provided, the scope specification must at least 
+  // include the scope to be associated with the key.
+  ScopeSpecification scope_spec = 1;
+  // Optional: explicit template ID. If set, it must match the scope specification
+  // and be allowed by the policy. If not set, the template is determined based on
+  // the scope specification and the policy.
+  optional string template_id = 2;
+
+  // The data to process
+  bytes data = 3;
+
+  // Required: the desired output length in bytes.
+  // XOFs produce variable-length output; this field specifies how many bytes to generate.
+  uint32 output_length_bytes = 4;
+
+  // Optional: Policy name for additional validation and enforcement.
+  string policy_name = 5;
+  
+  // Optional: User-provided context for audit trail enrichment.
+  map<string, string> user_context = 6;
+}
+
+message XofResponse {
+  // The XOF output of the requested length
+  bytes output = 1;
+  OperationMetadata metadata = 2;
+}
+
+// XofInitRequest initializes a streaming XOF operation.
+// Algorithm selection via template_id (explicit) or scope_spec (intent-based with HASH_SCOPE_XOF).
+message XofInitRequest {
+  // Scope specification to select the template used for computing a digest. The scope specification 
+  // describes the scope (ie. cryptographic intent) and properties that the template must satisfy.
+  // If a template is explicitly provided, the scope specification must at least 
+  // include the scope to be associated with the key.
+  ScopeSpecification scope_spec = 1;
+  // Optional: explicit template ID. If set, it must match the scope specification
+  // and be allowed by the policy. If not set, the template is determined based on
+  // the scope specification and the policy.
+  optional string template_id = 2;
+
+  // Unique identifier for this streaming operation
+  string operation_id = 3;
+
+  // Required: the desired output length in bytes.
+  uint32 output_length_bytes = 4;
+
+  // Optional: Policy name for additional validation and enforcement.
+  string policy_name = 5;
+  
+  // Optional: User-provided context for audit trail enrichment.
+  map<string, string> user_context = 6;
+}
+
+message XofInitResponse {
+  bool success = 1;
+  // The template that was selected for this operation
+  string selected_template_id = 2;
+}
+
+// XofUpdateRequest feeds a data chunk into a streaming XOF operation.
+// Dedicated type (not reusing DigestUpdateRequest) to allow independent
+// evolution of XOF and digest streaming interfaces.
+message XofUpdateRequest {
+  string operation_id = 1;
+  bytes data_chunk = 2;
+}
+
+message XofUpdateResponse {
+  bool success = 1;
+}
+
+// XofFinalRequest completes a streaming XOF operation.
+// Data chunks are fed via XofUpdateRequest.
+message XofFinalRequest {
+  string operation_id = 1;
+}
+
+message XofFinalResponse {
+  // The XOF output of the requested length
+  bytes output = 1;
+  // Operation metadata for audit and tracking
+  OperationMetadata metadata = 2;
+}

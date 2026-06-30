@@ -6,8 +6,8 @@ import (
 	"crypto/x509"
 	"testing"
 
-	providerpb "github.ibm.com/citius/citius-server/gen/go/provider"
-	types "github.ibm.com/citius/citius-server/gen/go/types"
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
+	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/provider/software"
 )

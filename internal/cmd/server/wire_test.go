@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"testing"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
-	typespb "github.ibm.com/citius/citius-server/gen/go/types"
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
+	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/cmd/server"
 )
 
@@ -72,13 +72,19 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 	// TODO: change to CreatePolicy
 	policyName := seedPolicy(t, ctx, h, "ecdsa-allow", []string{"ecdsa-p256-sha256-der"})
 
+	templateID := "ecdsa-p256-sha256-der"
 	// CreateKey
 	createResp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   "smoke-key",
 		Policy: policyName,
-		KeySpecification: &messagespb.CreateKeyRequest_TemplateId{
-			TemplateId: "ecdsa-p256-sha256-der",
+		ScopeSpec: &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Signature{
+				Signature: &typespb.SignatureScopeSpec{
+					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+				},
+			},
 		},
+		TemplateId: &templateID,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

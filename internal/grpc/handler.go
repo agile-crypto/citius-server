@@ -3,8 +3,8 @@ package grpc
 import (
 	"context"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/messages"
-	servicespb "github.ibm.com/citius/citius-server/gen/go/services"
+	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
+	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/crypto"
 	engerr "github.ibm.com/citius/citius-server/internal/errors"
@@ -100,17 +100,15 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 	}
 
 	// Handle key_specification oneof: template_id XOR scope_spec.
-	switch ks := req.GetKeySpecification().(type) {
-	case *messagespb.CreateKeyRequest_TemplateId:
-		spec.TemplateID = ks.TemplateId
-	case *messagespb.CreateKeyRequest_ScopeSpec:
-		if ks.ScopeSpec != nil {
-			raw, merr := proto.Marshal(ks.ScopeSpec)
-			if merr != nil {
-				return nil, ToStatusError(engerr.New(ctx, createOp, engerr.CodeInvalidArgument, "invalid scope_spec encoding"))
-			}
-			spec.Scope = raw
+	if req.TemplateId != nil {
+		spec.TemplateID = *req.TemplateId
+	}
+	if req.ScopeSpec != nil {
+		raw, merr := proto.Marshal(req.ScopeSpec)
+		if merr != nil {
+			return nil, ToStatusError(engerr.Wrap(ctx, createOp, merr, engerr.WithMessage("invalid scope_spec encoding")))
 		}
+		spec.Scope = raw
 	}
 
 	md, err := scope.Keys().CreateKey(ctx, spec)

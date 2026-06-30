@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package caas.crypto.v1;
+option go_package = "github.ibm.com/citius/citius-server/gen/go/api/services;api";
+
+import "google/api/annotations.proto";
+import "api/messages/encryption.proto";
+import "api/messages/signing.proto";
+import "api/messages/digest.proto";
+import "api/messages/mac.proto";
+import "api/messages/random.proto";
+
+// ============================================================================
+// Crypto Service - Single-Shot Cryptographic Operations
+// ============================================================================
+//
+// All operations are stateless, single request/response
+//
+// This is part of the service family:
+//   - KeyManagementService:     Key lifecycle (CRUD, rotate, transform, migrate)
+//   - CryptoPolicyService:      Policy lifecycle and evaluation
+//   - CryptoService:            Single-shot crypto operations (this service)
+//   - StreamingCryptoService:   Multi-part and message-based stateful operations
+//   - KeyEstablishmentService:  Key-to-key operations (wrap, derive, KEM, agreement)
+//   - AlgorithmDiscoveryService: Template and scope discovery
+//   - ProviderService:          Provider catalog and instance management
+
+service CryptoService {
+  // ==================== Encryption ====================
+
+  rpc Encrypt(EncryptRequest) returns (EncryptResponse) {
+    option (google.api.http) = {
+      post: "/v1/encrypt/{key_name}"
+      body: "*"
+    };
+  }
+
+  rpc Decrypt(DecryptRequest) returns (DecryptResponse) {
+    option (google.api.http) = {
+      post: "/v1/decrypt/{key_name}"
+      body: "*"
+    };
+  }
+
+  // ==================== Signing ====================
+
+  rpc Sign(SignRequest) returns (SignResponse) {
+    option (google.api.http) = {
+      post: "/v1/sign/{key_name}"
+      body: "*"
+    };
+  }
+
+  rpc Verify(VerifyRequest) returns (VerifyResponse) {
+    option (google.api.http) = {
+      post: "/v1/verify/{key_name}"
+      body: "*"
+    };
+  }
+
+  // Sign/verify pre-hashed data (for large files, external hashing)
+  rpc DigestSign(DigestSignRequest) returns (DigestSignResponse) {
+    option (google.api.http) = {
+      post: "/v1/sign/digest/{key_name}"
+      body: "*"
+    };
+  }
+
+  rpc DigestVerify(DigestVerifyRequest) returns (DigestVerifyResponse) {
+    option (google.api.http) = {
+      post: "/v1/verify/digest/{key_name}"
+      body: "*"
+    };
+  }
+
+  // ==================== MAC Operations ====================
+
+  rpc GenerateMAC(GenerateMACRequest) returns (GenerateMACResponse) {
+    option (google.api.http) = {
+      post: "/v1/mac/{key_name}/generate"
+      body: "*"
+    };
+  }
+
+  rpc VerifyMAC(VerifyMACRequest) returns (VerifyMACResponse) {
+    option (google.api.http) = {
+      post: "/v1/mac/{key_name}/verify"
+      body: "*"
+    };
+  }
+
+  // ==================== Digest Operations ====================
+
+  rpc Digest(DigestRequest) returns (DigestResponse) {
+    option (google.api.http) = {
+      post: "/v1/digest"
+      body: "*"
+    };
+  }
+
+  // ==================== XOF (Extendable Output Function) ====================
+  // XOFs produce variable-length output (SHAKE128, SHAKE256, BLAKE3, etc.)
+  // Separated from digest because they are a distinct primitive (CRYPTO_PRIMITIVE_XOF)
+  // with caller-specified output length.
+
+  rpc Xof(XofRequest) returns (XofResponse) {
+    option (google.api.http) = {
+      post: "/v1/xof"
+      body: "*"
+    };
+  }
+
+  // ==================== Random Number Generation ====================
+
+  rpc GenerateRandom(GenerateRandomRequest) returns (GenerateRandomResponse) {
+    option (google.api.http) = {
+      post: "/v1/random/generate"
+      body: "*"
+    };
+  }
+
+  rpc SeedRandom(SeedRandomRequest) returns (SeedRandomResponse) {
+    option (google.api.http) = {
+      post: "/v1/random/seed"
+      body: "*"
+    };
+  }
+}

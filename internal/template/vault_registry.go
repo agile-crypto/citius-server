@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/hashicorp/vault/sdk/logical"
-	api "github.ibm.com/citius/citius-server/gen/go/types"
+	api "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"
