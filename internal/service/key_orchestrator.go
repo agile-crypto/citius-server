@@ -31,6 +31,14 @@ type KeyOrchestrator interface {
 	// Returns ErrNotFound if the key does not exist.
 	UpdateKeyPolicy(ctx context.Context, keyName string, policyName string) error
 
+	// TransformKey transforms an existing key to a new template. The template is selected
+	// with the following precedence:
+	// 1. If spec.TemplateID is non-empty, the template with that ID is used.
+	// 2. Otherwise, the key's scope specification and policy are used to find a matching
+	// template. If multiple templates match, the one with the highest priority is used.
+	// (TODO: Definition of highest priority)
+	//
+	// Specifying a scope specification is currently not supported.
 	TransformKey(ctx context.Context, spec TransformKeySpec) (*KeyMetadata, error)
 }
 
