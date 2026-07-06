@@ -382,3 +382,52 @@ func (h *Handler) UpdateCryptoPolicy(ctx context.Context, req *messagespb.Update
 		Message: "policy updated",
 	}, nil
 }
+
+// TransformKey handles the TransformKey RPC.
+func (h *Handler) TransformKey(ctx context.Context, req *messagespb.TransformKeyRequest) (*messagespb.TransformKeyResponse, error) {
+	const op = handlerOp + ".TransformKey"
+
+	keyName := req.GetName()
+	if err := authorizeKeyName(ctx, op, keyName); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	if req.ScopeSpec == nil {
+		err := engerr.New(ctx, op, engerr.CodeInvalidArgument, "scope_spec is required with at least a scope set")
+		return nil, ToStatusError(err)
+	}
+
+	transformSpec := service.TransformKeySpec{
+		KeyName:     keyName,
+		RetainBytes: req.GetRetainKeyBytes(),
+		TemplateID:  req.GetTemplateId(), // default to empty; will be set below if present in request
+	}
+
+	if req.ScopeSpec != nil {
+		scopeSpec, err0 := core.ScopeSpecificationFromProto(ctx, req.GetScopeSpec())
+		if err0 != nil {
+			err0 := engerr.Wrap(ctx, op, err0, engerr.WithMessage("invalid scope_spec"))
+			return nil, ToStatusError(err0)
+		}
+		transformSpec.ScopeSpecification = scopeSpec
+	}
+
+	md, err := scope.Keys().TransformKey(ctx, transformSpec)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	mdProto, err := md.ToProto(ctx)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+
+	return &messagespb.TransformKeyResponse{
+		Success:     true,
+		KeyMetadata: mdProto,
+	}, nil
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
 
 	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
@@ -95,6 +96,7 @@ type mockKeyOrchestrator struct {
 	createFn             func(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error)
 	readFn               func(ctx context.Context, name string) (*service.KeyMetadata, error)
 	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
+	transformFn          func(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error)
 }
 
 func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
@@ -143,7 +145,10 @@ func (m *mockKeyOrchestrator) UpdateKeyPolicy(_ context.Context, _ string, _ str
 	panic("mockKeyOrchestrator.UpdateKeyPolicy: not implemented")
 }
 
-func (m *mockKeyOrchestrator) TransformKey(_ context.Context, _ service.TransformKeySpec) (*service.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error) {
+	if m.transformFn != nil {
+		return m.transformFn(ctx, spec)
+	}
 	panic("mockKeyOrchestrator.TransformKey: not implemented")
 }
 
@@ -367,4 +372,59 @@ func TestHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 	if resp.GetValid() {
 		t.Error("Verify response: expected valid=false")
 	}
+}
+
+func TestHandler_TransformKey_Success(t *testing.T) {
+	ctx := context.Background()
+	km := &mockKeyOrchestrator{
+		transformFn: func(_ context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error) {
+			if spec.KeyName == "" {
+				t.Error("expected non-empty key name in TransformKey spec")
+			}
+			return &service.KeyMetadata{
+				Name:       spec.KeyName,
+				KeyID:      spec.KeyName,
+				Version:    1,
+				TemplateID: "ecdsa-p256-sha256-der",
+				Provider:   "software",
+			}, nil
+		},
+	}
+	h := wireHandler(km, nil)
+
+	resp, err := h.TransformKey(ctx, &messagespb.TransformKeyRequest{
+		Name: "key_123",
+		ScopeSpec: &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Signature{
+				Signature: &typespb.SignatureScopeSpec{
+					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("TransformKey handler: %v", err)
+	}
+	md := resp.GetKeyMetadata()
+	require.Equal(t, "key_123", md.GetName())
+	require.Equal(t, "ecdsa-p256-sha256-der", md.GetTemplateId())
+	require.True(t, resp.GetSuccess())
+	require.Equal(t, "key_123", md.KeyId)
+	require.Equal(t, "software", md.Provider)
+	require.Equal(t, uint32(1), md.Version)
+}
+
+func TestHandler_TransformKey_WithErrors(t *testing.T) {
+	ctx := context.Background()
+	km := &mockKeyOrchestrator{
+		transformFn: func(_ context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error) {
+			return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "name required")
+		},
+	}
+	h := wireHandler(km, nil)
+
+	_, err := h.TransformKey(ctx, &messagespb.TransformKeyRequest{})
+	require.NotNil(t, err)
+	st, _ := status.FromError(err)
+	require.Equal(t, codes.InvalidArgument, st.Code())
 }
