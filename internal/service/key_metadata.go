@@ -1,8 +1,12 @@
 package service
 
 import (
+	"context"
+
+	messages "github.ibm.com/citius/citius-server/gen/go/api/messages"
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	"github.ibm.com/citius/citius-server/internal/core"
+	"github.ibm.com/citius/citius-server/internal/errors"
 	"github.ibm.com/citius/citius-server/internal/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -42,4 +46,43 @@ type KeyMetadata struct {
 	LifecycleState  types.KeyLifecycleState
 	PublicKeyBytes  []byte           // Public-key material for asymmetric keys
 	PublicKeyFormat *types.KeyFormat // Format of public key material (e.g., RAW, PKCS8, JWK)
+}
+
+// ToProto converts KeyMetadata to its protobuf representation.
+// Returns nil if m is nil.
+func (m *KeyMetadata) ToProto(ctx context.Context) (*messages.KeyMetadata, error) {
+	const op = "service.(KeyMetadata).ToProto"
+	if m == nil {
+		return nil, nil
+	}
+
+	res := &messages.KeyMetadata{
+		Name:                     m.Name,
+		Version:                  m.Version,
+		KeyId:                    m.KeyID,
+		TemplateId:               m.TemplateID,
+		ScopeSpec:                nil, // set below if m.ScopeSpec is not nil
+		Provider:                 m.Provider,
+		CreatedTime:              m.CreatedTime,
+		UpdatedTime:              m.UpdatedTime,
+		Policy:                   m.Policy,
+		ProviderMetadata:         m.ProviderMetadata,
+		TemplateInfo:             nil, // set below if m.TemplateInfo is not nil
+		ImplementationProperties: nil, // TODO: Add to KeyMetadata if needed
+		Extractable:              m.Extractable,
+		LifecycleState:           m.LifecycleState,
+		PublicKeyBytes:           m.PublicKeyBytes,
+		PublicKeyFormat:          m.PublicKeyFormat,
+	}
+	if m.ScopeSpec != nil {
+		scopeSpecProto, err := m.ScopeSpec.ToProto(ctx)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		res.ScopeSpec = scopeSpecProto
+	}
+	if m.TemplateInfo != nil {
+		res.TemplateInfo = m.TemplateInfo.Proto()
+	}
+	return res, nil
 }
