@@ -387,17 +387,26 @@ func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpe
 	// instead of failing later
 
 	// Generate new key material
-	resp, err := provider.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
+	genResp, err := provider.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
 		Algorithm: template.GetAlgorithm(),
 	})
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
+
+	// Marshal the full GenerateKeyResponse so that both KeyMaterial (private)
+	// and PublicKeyBytes are persisted.  The crypto orchestrator unmarshals to
+	// pick the right bytes per operation (Sign => private, Verify => public).
+	genRespBytes, err := proto.Marshal(genResp)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
 	// Create new key version with the new material, same key ID, and incremented version number.
 	newVersionNumber := lastVersion.GetVersion() + 1
 	newVersionID := computeVersionID(keyO.GetPublicId(), newVersionNumber)
 	newVersion, err := key.NewVersion(ctx, newVersionID, keyO.GetPublicId(), template.TemplateID(), provider.Name(), newVersionNumber,
-		resp.KeyMaterial, key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+		genRespBytes, key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
