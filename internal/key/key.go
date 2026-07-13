@@ -43,6 +43,10 @@ func NewKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpeci
 		// if no name is provided, default to id
 		opts.withName = id
 	}
+	if opts.withState == types.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED {
+		// if no state is provided, default to PRE_ACTIVE
+		opts.withState = types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE
+	}
 	spBytes, err := scopeSpec.Serialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)

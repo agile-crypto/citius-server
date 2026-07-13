@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
@@ -41,7 +42,10 @@ func NewVersion(ctx context.Context, publicID, keyID, templateID, providerID str
 	if keyID == "" {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "key ID is required")
 	}
-
+	if opts.withState == types.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED {
+		// if no state is provided, default to PRE_ACTIVE
+		opts.withState = types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE
+	}
 	kv := &storepb.KeyVersion{
 		PublicId:      publicID,
 		KeyId:         keyID,

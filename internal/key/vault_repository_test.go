@@ -8,15 +8,15 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
 
 	"github.ibm.com/citius/citius-server/internal/core"
 	"github.ibm.com/citius/citius-server/internal/errors"
 )
 
 // helper: create a valid Key domain object.
-func newTestKey(publicID, name string, scopeSpec *core.ScopeSpecification) (*Key, error) {
-	return NewKey(context.Background(), publicID, "policy-test", scopeSpec, 1, WithName(name))
+func newTestKey(publicID, name string, scopeSpec *core.ScopeSpecification, opts ...Option) (*Key, error) {
+	opts = append(opts, WithName(name))
+	return NewKey(context.Background(), publicID, "policy-test", scopeSpec, 1, opts...)
 }
 
 func mustNewCreateKeyInputs(
@@ -323,21 +323,22 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "signing-key", core.ScopeSignatureStandard)
 
-	// Build an updated Key with new status.
-	updated := &Key{
-		Key: &storepb.Key{
-			PublicId:       "key_01HXYZ",
-			Name:           "signing-key",
-			Primitive:      "signature",
-			State:          types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
-			CurrentVersion: 1,
-		},
+	got, err := r.GetKeyByID(ctx, "key_01HXYZ")
+	if err != nil {
+		t.Fatalf("GetKey after update: %v", err)
 	}
-	if err := r.UpdateKey(ctx, updated); err != nil {
+	sp := &core.ScopeSpecification{}
+	err = sp.Deserialize(ctx, got.ScopeSpecification)
+	require.NoError(t, err)
+	// Same key but state is different
+	updated, err := NewKey(ctx, got.PublicId, got.PolicyId, sp, got.CurrentVersion, WithName(got.Name),
+		WithLabels(got.Labels), WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED))
+	require.NoError(t, err)
+	if err = r.UpdateKey(ctx, updated); err != nil {
 		t.Fatalf("UpdateKey: %v", err)
 	}
 
-	got, err := r.GetKeyByID(ctx, "key_01HXYZ")
+	got, err = r.GetKeyByID(ctx, "key_01HXYZ")
 	if err != nil {
 		t.Fatalf("GetKey after update: %v", err)
 	}
@@ -492,18 +493,19 @@ func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T)
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "signing-key", core.ScopeSignatureStandard)
 
-	updated := &Key{
-		Key: &storepb.Key{
-			PublicId:       "key_01",
-			Name:           "signing-key",
-			Primitive:      "signature",
-			State:          types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED,
-			CurrentVersion: 1,
-		},
-	}
-	require.NoError(t, r.UpdateKey(ctx, updated))
-
 	got, err := r.GetKeyByName(ctx, "signing-key")
+	require.NoError(t, err)
+	sp := &core.ScopeSpecification{}
+	err = sp.Deserialize(ctx, got.ScopeSpecification)
+	require.NoError(t, err)
+	// Same key but state is different
+	updated, err := NewKey(ctx, got.PublicId, got.PolicyId, sp, got.CurrentVersion, WithName(got.Name),
+		WithLabels(got.Labels), WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED))
+	require.NoError(t, err)
+	err = r.UpdateKey(ctx, updated)
+	require.NoError(t, err)
+
+	got, err = r.GetKeyByName(ctx, "signing-key")
 	require.NoError(t, err)
 	assert.Equal(t, "key_01", got.PublicId)
 	assert.Equal(t, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, got.GetState())
@@ -555,16 +557,16 @@ func Test_VaultRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "original-name", core.ScopeSignatureStandard)
 
-	renamed := &Key{
-		Key: &storepb.Key{
-			PublicId:       "key_01",
-			Name:           "new-name",
-			Primitive:      "signature",
-			State:          types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
-			CurrentVersion: 1,
-		},
-	}
-	err := r.UpdateKey(ctx, renamed)
+	got, err := r.GetKeyByName(ctx, "original-name")
+	require.NoError(t, err)
+	sp := &core.ScopeSpecification{}
+	err = sp.Deserialize(ctx, got.ScopeSpecification)
+	require.NoError(t, err)
+	// Same key but state is different
+	renamed, err := NewKey(ctx, got.PublicId, got.PolicyId, sp, got.CurrentVersion, WithName("new-name"),
+		WithLabels(got.Labels), WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED))
+	require.NoError(t, err)
+	err = r.UpdateKey(ctx, renamed)
 	require.Error(t, err)
 	require.True(t, errors.IsInvalidArgument(err), "expected InvalidArgument for name change, got: %v", err)
 }
