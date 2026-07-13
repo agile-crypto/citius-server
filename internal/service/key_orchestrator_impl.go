@@ -363,19 +363,7 @@ func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpe
 	if spec.RetainBytes {
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented, "transformation with retain bytes is not supported")
 	}
-	// Validation (same as for key creation)
-	// Policy: validate that create_key with this template is permitted.
-	if err = r.policy.ValidateOperation(ctx, keyO.PolicyId,
-		core.OperationCreateKey, template.TemplateID(), ""); err != nil {
-		return nil, errors.Wrap(ctx, op, err)
-	}
 
-	// Policy: validate key configuration constraints (extractable, rotation, etc.)
-	// Note: the existing policy validation for key creation expects a KeyCreationSpec.
-	// TODO: Should it be validated also for transform spec?
-	// if err := r.policy.ValidateKeyCreation(ctx, key.PolicyId, scopeSpec); err != nil {
-	// 	return nil, errors.Wrap(ctx, op, err)
-	// }
 	lastVersion, err := r.keys.GetVersion(ctx, keyO.PublicId, keyO.CurrentVersion)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
@@ -387,6 +375,11 @@ func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpe
 	}
 	// TODO: check that the provider supports the new template --> returns specific error if it does not
 	// instead of failing later
+
+	// Validation (same as for key creation)
+	if err = r.validateTransformOp(ctx, keyO.GetName(), keyO.GetPolicyId(), scopeSpec, provider, template, keyO.GetLabels()); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
 
 	// Generate new key material
 	genResp, err := provider.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
@@ -425,6 +418,32 @@ func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpe
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return metadata, nil
+}
+
+// Validates a transform operation against the policy with given policyID. Returns an error if the operation is not permitted.
+// A transform operation is authorized if an equivalent create key operation is allowed.
+func (r *keyOrchestrator) validateTransformOp(ctx context.Context, keyName string, policyID string, scopeSpec *core.ScopeSpecification, provider provider.Backend,
+	template *template.Template, keyLabels map[string]string) error {
+	const op = "service.(keyOrchestrator).validateTransformOp"
+	// Policy: validate that create_key with this template is permitted.
+	if err := r.policy.ValidateOperation(ctx, policyID,
+		core.OperationCreateKey, template.TemplateID(), ""); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	// Policy: validate key configuration constraints (extractable, rotation, etc.)
+	// Validation is equivalent to validating a key creation with the new template.
+	keyCreationSpec := &core.KeyCreationSpec{
+		Name:               keyName,
+		PolicyID:           policyID,
+		ScopeSpecification: scopeSpec,
+		TemplateID:         template.TemplateID(),
+		ProviderInstanceID: provider.Name(),
+		Labels:             keyLabels,
+	}
+	if err := r.policy.ValidateKeyCreation(ctx, policyID, keyCreationSpec); err != nil {
+		return errors.Wrap(ctx, op, err)
+	}
+	return nil
 }
 
 // Compile-time assertion: keyOrchestrator implements KeyOrchestrator.
