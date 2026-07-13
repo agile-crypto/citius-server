@@ -335,6 +335,9 @@ func (r *keyOrchestrator) UpdateKeyPolicy(ctx context.Context, _ string, _ strin
 
 func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpec) (*KeyMetadata, error) {
 	const op = "service.(keyOrchestrator).TransformKey"
+	if spec.KeyName == "" {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "key name is required")
+	}
 	// Retrieve the keyO's current scope specification and use that for template selection.
 	keyO, err := r.keys.GetKeyByName(ctx, spec.KeyName)
 	if err != nil {
