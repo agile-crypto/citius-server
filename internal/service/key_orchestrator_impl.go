@@ -115,7 +115,7 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"policy ID must not be empty")
 	}
-	if req.Scope == nil {
+	if req.ScopeSpecification == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"scope specification must not be nil and contain at least a scope")
 	}
@@ -124,11 +124,11 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	//    Two paths: explicit template_id OR scope-based selection.
 	var tmpl *template.Template
 
-	if req.Scope.Scope == core.ScopeUnknown {
+	if req.ScopeSpecification.Scope == core.ScopeUnknown {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"scope is unknown or missing; scope is required for key creation")
 	}
-	tmpl, err := r.pickTemplate(ctx, req.PolicyID, req.TemplateID, req.Scope)
+	tmpl, err := r.pickTemplate(ctx, req.PolicyID, req.TemplateID, req.ScopeSpecification)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -145,7 +145,7 @@ func (r *keyOrchestrator) CreateKey(ctx context.Context, req core.KeyCreationSpe
 	}
 
 	// 3. Generate key material and persist key + initial version.
-	return r.generateAndPersistKey(ctx, op, req, tmpl, req.Scope)
+	return r.generateAndPersistKey(ctx, op, req, tmpl, req.ScopeSpecification)
 }
 
 // buildKeyMetadata projects a key.Key and its current key.Version into the

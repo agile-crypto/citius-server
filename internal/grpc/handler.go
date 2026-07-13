@@ -107,7 +107,7 @@ func (h *Handler) CreateKey(ctx context.Context, req *messagespb.CreateKeyReques
 		if err0 != nil {
 			return nil, ToStatusError(engerr.Wrap(ctx, createOp, err0, engerr.WithMessage("invalid scope_spec")))
 		}
-		spec.Scope = scopeSpec
+		spec.ScopeSpecification = scopeSpec
 	}
 
 	md, err := scope.Keys().CreateKey(ctx, spec)

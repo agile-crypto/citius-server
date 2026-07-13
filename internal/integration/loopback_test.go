@@ -225,10 +225,10 @@ func TestIntegration_Loopback_CreateKey_Sign_Verify_ECDSA(t *testing.T) {
 
 	// Create key
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "loopback-ecdsa-key",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "loopback-ecdsa-key",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -289,10 +289,10 @@ func TestIntegration_Loopback_CreateKey_Sign_Verify_MLDSA(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "loopback-mldsa-key",
-		TemplateID: "ml-dsa-65",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "loopback-mldsa-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey ml-dsa-65: %v", err)
@@ -343,10 +343,10 @@ func TestIntegration_Loopback_TamperedPayload_ReturnsFalse(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "tamper-test-key",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "tamper-test-key",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -412,9 +412,9 @@ func TestIntegration_Loopback_ScopeBased_CreateKey(t *testing.T) {
 
 	// Create key by scope — the registry selects the best matching template.
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:     "scope-based-key",
-		Scope:    scopeSpec,
-		PolicyID: policyName,
+		Name:               "scope-based-key",
+		ScopeSpecification: scopeSpec,
+		PolicyID:           policyName,
 	})
 	if err != nil {
 		t.Fatalf("scope-based CreateKey: %v", err)
@@ -456,13 +456,13 @@ func TestIntegration_Loopback_MultipleKeys_IsolatedStorage(t *testing.T) {
 	)
 
 	k1, err := requestScope1.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name: "key-in-store1", TemplateID: "ecdsa-p256-sha256-der", PolicyID: pol1Name, Scope: sigScopeSpec(),
+		Name: "key-in-store1", TemplateID: "ecdsa-p256-sha256-der", PolicyID: pol1Name, ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey in store1: %v", err)
 	}
 	k2, err := requestScope2.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name: "key-in-store2", TemplateID: "ecdsa-p256-sha256-der", PolicyID: pol1Name, Scope: sigScopeSpec(),
+		Name: "key-in-store2", TemplateID: "ecdsa-p256-sha256-der", PolicyID: pol1Name, ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey in store2: %v", err)
@@ -499,10 +499,10 @@ func TestIntegration_Loopback_TransformKey_Sign_Verify(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "loopback-transform-key",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "loopback-transform-key",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

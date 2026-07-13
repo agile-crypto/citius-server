@@ -109,10 +109,10 @@ func TestIntegration_Software_ECDSA_RoundTrip(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "real-ecdsa-key",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "real-ecdsa-key",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -164,10 +164,10 @@ func TestIntegration_Software_MLDSA_RoundTrip(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "real-mldsa-key",
-		TemplateID: "ml-dsa-65",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "real-mldsa-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey ml-dsa-65: %v", err)
@@ -223,10 +223,10 @@ func TestIntegration_Software_TamperedPayload_ECDSA(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "tamper-payload-ecdsa",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "tamper-payload-ecdsa",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -276,10 +276,10 @@ func TestIntegration_Software_TamperedSignature_ECDSA(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "tamper-sig-ecdsa",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "tamper-sig-ecdsa",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -334,13 +334,13 @@ func TestIntegration_Software_SignatureSizes_Different(t *testing.T) {
 	)
 
 	ecdsaKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name: "size-ecdsa", TemplateID: "ecdsa-p256-sha256-der", PolicyID: policyName, Scope: sigScopeSpec(),
+		Name: "size-ecdsa", TemplateID: "ecdsa-p256-sha256-der", PolicyID: policyName, ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey ecdsa: %v", err)
 	}
 	mldsaKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name: "size-mldsa", TemplateID: "ml-dsa-65", PolicyID: policyName, Scope: sigScopeSpec(),
+		Name: "size-mldsa", TemplateID: "ml-dsa-65", PolicyID: policyName, ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey mldsa: %v", err)
@@ -396,10 +396,10 @@ func TestIntegration_Software_MultipleSignatures_NotDeterministic(t *testing.T) 
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "nonce-test",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "nonce-test",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -463,10 +463,10 @@ func TestIntegration_Software_ReadKey_AfterCreate(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "persist-test",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "persist-test",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -505,10 +505,10 @@ func TestIntegration_Software_TransformKey_Sign_Verify(t *testing.T) {
 	)
 
 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "real-transform-key",
-		TemplateID: "ecdsa-p256-sha256-der",
-		PolicyID:   policyName,
-		Scope:      sigScopeSpec(),
+		Name:               "real-transform-key",
+		TemplateID:         "ecdsa-p256-sha256-der",
+		PolicyID:           policyName,
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

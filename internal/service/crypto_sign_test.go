@@ -51,10 +51,10 @@ func setupCryptoWithKey(t *testing.T) (CryptoOrchestrator, string) {
 	seedCryptoPolicy(t, ctx, pol)
 
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "sign-test-key",
-		TemplateID: "ml-dsa-65",
-		PolicyID:   cryptoPolicyName,
-		Scope:      defaultScopeSpec(t),
+		Name:               "sign-test-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           cryptoPolicyName,
+		ScopeSpecification: defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -158,10 +158,10 @@ func TestSign_policyDeniesSign_returnsError(t *testing.T) {
 
 	// Create key under the restrictive policy.
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "no-sign-key",
-		TemplateID: "ml-dsa-65",
-		PolicyID:   "no-sign-policy",
-		Scope:      defaultScopeSpec(t),
+		Name:               "no-sign-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           "no-sign-policy",
+		ScopeSpecification: defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

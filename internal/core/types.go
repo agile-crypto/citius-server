@@ -42,7 +42,7 @@ const (
 type KeyCreationSpec struct {
 	Name               string
 	TemplateID         string // set when key_specification=template_id
-	Scope              *ScopeSpecification
+	ScopeSpecification *ScopeSpecification
 	PolicyID           string
 	ProviderInstanceID string // optional: if empty, use default provider
 	Labels             map[string]string

@@ -52,10 +52,10 @@ func setupCryptoWithKeyForVerify(t *testing.T) (CryptoOrchestrator, string) {
 	seedVerifyPolicy(t, ctx, pol)
 
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "verify-test-key",
-		TemplateID: "ml-dsa-65",
-		PolicyID:   verifyPolicyName,
-		Scope:      defaultScopeSpec(t),
+		Name:               "verify-test-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           verifyPolicyName,
+		ScopeSpecification: defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -258,10 +258,10 @@ func TestVerify_policyDeniesVerify_returnsError(t *testing.T) {
 
 	// Create key under the restrictive policy.
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:       "no-verify-key",
-		TemplateID: "ml-dsa-65",
-		PolicyID:   "no-verify-policy",
-		Scope:      defaultScopeSpec(t),
+		Name:               "no-verify-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           "no-verify-policy",
+		ScopeSpecification: defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)

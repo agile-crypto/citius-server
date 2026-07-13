@@ -21,7 +21,7 @@ func TestReadKey_happyPath(t *testing.T) {
 
 	scopeSpecBytes := defaultScopeSpec(t)
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "read-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes,
+		Name: "read-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, ScopeSpecification: scopeSpecBytes,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -59,9 +59,9 @@ func TestListKeys_returnsAll(t *testing.T) {
 	ctx := context.Background()
 
 	scopeSpecBytes := defaultScopeSpec(t)
-	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k1", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes})
+	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k1", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, ScopeSpecification: scopeSpecBytes})
 	require.NoError(t, err, "CreateKey k1")
-	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k2", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: scopeSpecBytes})
+	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{Name: "k2", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, ScopeSpecification: scopeSpecBytes})
 	require.NoError(t, err, "CreateKey k2")
 
 	keys, err := orch.ListKeys(ctx)
@@ -96,7 +96,7 @@ func TestDeleteKey_happyPath(t *testing.T) {
 	ctx := context.Background()
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "to-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpec(t),
+		Name: "to-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, ScopeSpecification: defaultScopeSpec(t),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -119,11 +119,11 @@ func TestDeleteKey_removedFromList(t *testing.T) {
 	ctx := context.Background()
 
 	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "list-then-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpec(t),
+		Name: "list-then-delete", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, ScopeSpecification: defaultScopeSpec(t),
 	})
 	require.NoError(t, err, "CreateKey")
 	_, err = orch.CreateKey(ctx, core.KeyCreationSpec{
-		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, Scope: defaultScopeSpec(t),
+		Name: "keep-me", TemplateID: "ml-dsa-65", PolicyID: testPolicyName, ScopeSpecification: defaultScopeSpec(t),
 	})
 	require.NoError(t, err, "CreateKey")
 
