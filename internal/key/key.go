@@ -43,11 +43,7 @@ func NewKey(ctx context.Context, id, policyID string, scopeSpec *core.ScopeSpeci
 		// if no name is provided, default to id
 		opts.withName = id
 	}
-	sp, err := scopeSpec.ToProto(ctx)
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
-	}
-	spBytes, err := proto.Marshal(sp)
+	spBytes, err := scopeSpec.Serialize(ctx)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}

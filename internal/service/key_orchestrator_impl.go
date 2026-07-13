@@ -163,7 +163,6 @@ func buildKeyMetadata(ctx context.Context, k *key.Key, v *key.Version) (*KeyMeta
 	}
 
 	if data := k.GetScopeSpecification(); len(data) > 0 {
-		// ScopeSpecification is stored as JSON-encoded core.ScopeSpec.
 		scopeSpec := &core.ScopeSpecification{}
 		if err := scopeSpec.Deserialize(ctx, data); err != nil {
 			return nil, errors.Wrap(ctx, op, err)
