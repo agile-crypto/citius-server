@@ -33,33 +33,36 @@ func TestKey_NewKey(t *testing.T) {
 		},
 	}
 	for _, tt := range tc {
-		ctx := context.Background()
-		sp, err := core.NewScopeSpecification(ctx, core.ScopeSignatureStandard, nil, nil, nil)
-		require.NoError(t, err)
-		var opts []key.Option
-		if tt.withOpts {
-			opts = append(opts, key.WithName(tt.keyName))
-			opts = append(opts, key.WithLabels(tt.labels))
-			opts = append(opts, key.WithState(tt.state))
-		}
-		spBytes, err := sp.Serialize(ctx)
-		require.NoError(t, err)
-		k, err := key.NewKey(ctx, "id", "policyID", sp, 13, opts...)
-		require.NoError(t, err)
-		require.Equal(t, k.PublicId, "id")
-		require.Equal(t, k.PolicyId, "policyID")
-		require.Equal(t, k.ScopeSpecification, spBytes)
-		require.Equal(t, k.CurrentVersion, uint32(13))
-		if tt.withOpts {
-			require.Equal(t, k.Name, tt.keyName)
-			require.Equal(t, k.Labels, tt.labels)
-			require.Equal(t, k.State, tt.state)
-		} else {
-			// defaults for newly created keys
-			require.Equal(t, k.Name, "id")
-			require.Empty(t, k.Labels)
-			require.Equal(t, k.State, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			sp, err := core.NewScopeSpecification(ctx, core.ScopeSignatureStandard, nil, nil, nil)
+			require.NoError(t, err)
+			var opts []key.Option
+			if tt.withOpts {
+				opts = append(opts, key.WithName(tt.keyName))
+				opts = append(opts, key.WithLabels(tt.labels))
+				opts = append(opts, key.WithState(tt.state))
+			}
+			spBytes, err := sp.Serialize(ctx)
+			require.NoError(t, err)
+			k, err := key.NewKey(ctx, "id", "policyID", sp, 13, opts...)
+			require.NoError(t, err)
+			require.Equal(t, k.PublicId, "id")
+			require.Equal(t, k.PolicyId, "policyID")
+			require.Equal(t, k.ScopeSpecification, spBytes)
+			require.Equal(t, k.CurrentVersion, uint32(13))
+			if tt.withOpts {
+				require.Equal(t, k.Name, tt.keyName)
+				require.Equal(t, k.Labels, tt.labels)
+				require.Equal(t, k.State, tt.state)
+			} else {
+				// defaults for newly created keys
+				require.Equal(t, k.Name, "id")
+				require.Empty(t, k.Labels)
+				require.Equal(t, k.State, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_PRE_ACTIVE)
+			}
+		})
+
 	}
 
 }
