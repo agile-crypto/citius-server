@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"testing"
 
 	"github.com/hashicorp/vault/sdk/logical"
@@ -102,18 +103,21 @@ func TestNewKeyOrchestrator_returnsInterface(t *testing.T) {
 
 func TestKeyOrchestrator_TransformKey(t *testing.T) {
 	tc := []struct {
-		name          string
-		wantErr       bool
-		errCode       errors.Code
-		transformSpec TransformKeySpec
-		policyRules   *policy.Rules
+		name             string
+		initialScopeSpec *core.ScopeSpecification
+		wantErr          bool
+		errCode          errors.Code
+		transformSpec    TransformKeySpec
+		policyRules      *policy.Rules
 	}{
-		// {
-		// 	name:          "empty req fails",
-		// 	wantErr:       true,
-		// 	errCode:       errors.CodeInvalidArgument,
-		// 	transformSpec: TransformKeySpec{},
-		// },
+		{
+			name:    "missing key name",
+			wantErr: true,
+			errCode: errors.CodeInvalidArgument,
+			transformSpec: TransformKeySpec{
+				TemplateID: "ml-dsa-65",
+			},
+		},
 		{
 			name:    "key name only",
 			wantErr: false,
@@ -121,10 +125,20 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 				KeyName: "test-key-1",
 			},
 		},
+		// {
+		// 	name:             "with unchanged scope specification",
+		// 	initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+		// 	wantErr:          false,
+		// 	transformSpec: TransformKeySpec{
+		// 		KeyName:            "test-key-2",
+		// 		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+		// 	},
+		// },
 		{
-			name:    "with scope specification",
-			wantErr: true,
-			errCode: errors.CodeNotImplemented,
+			name:             "with changed scope specification",
+			initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+			wantErr:          true,
+			errCode:          errors.CodeNotImplemented,
 			transformSpec: TransformKeySpec{
 				KeyName:            "test-key-2",
 				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
@@ -173,10 +187,19 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			initTemplateID := "ecdsa-p256-sha256-der"
 			initVersion := uint32(1)
 			keyName := tt.transformSpec.KeyName
+			// for tests with missing key name, we generate a unique key name to avoid collisions used for creating the initial key version
+			if keyName == "" {
+				keyName = fmt.Sprintf("key-%s", tt.name)
+			}
 			keyID := keyName
 
 			seedPolicy(t, ctx, engine, policyName, tt.policyRules)
-			k0, v0 := setupFirstKeyVersion(t, ctx, keyName, keyID, providers, templates, keys, policyName, initTemplateID, initVersion)
+			if tt.initialScopeSpec == nil {
+				tt.initialScopeSpec = scopeSpecWithScope(t, core.ScopeSignatureStandard)
+			}
+			k0, v0 := setupFirstKeyVersion(t, ctx, keyName, keyID, providers, templates, keys, policyName, initTemplateID, initVersion, tt.initialScopeSpec)
+			// reset keyName in case it was generated for the test
+			keyName = tt.transformSpec.KeyName
 			// transform the key
 			metadata, err := orch.TransformKey(ctx, tt.transformSpec)
 			if tt.wantErr {
@@ -196,25 +219,88 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			require.NoError(t, err)
 			// GetCurrent and GetVersion should return the same version
 			require.Equal(t, v1, v11)
+			// Immutable fields of the key should not change after transformation
 			assertKeyStaticFieldsUnchanged(t, k0, k1)
 			// Version match
-			require.Equal(t, initVersion+1, k1.CurrentVersion)
-			require.Equal(t, initVersion+1, metadata.Version)
-			require.Equal(t, initVersion+1, v1.Version)
+			assertVersionConsistent(t, initVersion+1, k1, v1, metadata)
 			// Template match spec
-			if tt.transformSpec.TemplateID != "" {
-				require.Equal(t, tt.transformSpec.TemplateID, v1.TemplateId)
-			}
-			if tt.transformSpec.ScopeSpecification != nil {
-				// scope specification is updated
-				// TODO: this may be updated depending on the scope specification lifecycle rules
-				require.Equal(t, tt.transformSpec.ScopeSpecification, k1.ScopeSpecification)
-			}
-			if tt.transformSpec.RetainBytes {
-				// bytes are retained
-				require.Equal(t, v0.KeyMaterial, v1.KeyMaterial)
-			}
+			assertMatchTransformSpec(t, tt.transformSpec, v1, k1, v0)
 			assertMetadataMatchKeyAndVersion(t, ctx, metadata, k1, v1)
+		})
+	}
+}
+
+func assertMatchTransformSpec(t *testing.T, expectedSpec TransformKeySpec, v *key.Version, k *key.Key, oldVersion *key.Version) {
+	if expectedSpec.TemplateID != "" {
+		require.Equal(t, expectedSpec.TemplateID, v.TemplateId)
+	}
+	if expectedSpec.ScopeSpecification != nil {
+		// scope specification is updated
+		// TODO: this may be updated depending on the scope specification lifecycle rules
+		require.Equal(t, expectedSpec.ScopeSpecification, k.ScopeSpecification)
+	}
+	if expectedSpec.RetainBytes {
+		// bytes are retained
+		require.Equal(t, oldVersion.KeyMaterial, v.KeyMaterial)
+	}
+}
+func assertVersionConsistent(t *testing.T, expectedVersion uint32, k *key.Key, v *key.Version, md *KeyMetadata) {
+	require.Equal(t, expectedVersion, k.CurrentVersion)
+	require.Equal(t, expectedVersion, md.Version)
+	require.Equal(t, expectedVersion, v.Version)
+}
+
+func TestKeyOrchestrator_TransformKey_SuccessiveTransforms(t *testing.T) {
+	tc := []struct {
+		name   string
+		rounds int
+	}{
+		{
+			name:   "2 rounds",
+			rounds: 2,
+		},
+		{
+			name:   "3 rounds",
+			rounds: 3,
+		},
+		{
+			name:   "N rounds",
+			rounds: rand.Intn(10) + 4, // random number of rounds between 4 and 13
+		},
+	}
+	for _, tt := range tc {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			orch, keys, providers, engine, templates := setupOrchestratorFull(t)
+			// Seed policy
+			policyName := fmt.Sprintf("pol-%s", tt.name)
+			initTemplateID := "ecdsa-p256-sha256-der"
+			initVersion := uint32(1)
+			keyName := fmt.Sprintf("key-%s", tt.name)
+			keyID := keyName
+
+			seedPolicy(t, ctx, engine, policyName, nil)
+			k0, _ := setupFirstKeyVersion(t, ctx, keyName, keyID, providers, templates, keys, policyName, initTemplateID, initVersion, scopeSpecWithScope(t, core.ScopeSignatureStandard))
+			for i := range tt.rounds {
+				// transform the key
+				metadata, err := orch.TransformKey(ctx, TransformKeySpec{
+					KeyName: keyName,
+				})
+				require.NoError(t, err)
+				k1, err := keys.GetKeyByName(ctx, keyName)
+				require.NoError(t, err)
+				v1, err := keys.GetCurrentVersion(ctx, keyID)
+				require.NoError(t, err)
+				v11, err := keys.GetVersion(ctx, keyID, metadata.Version)
+				require.NoError(t, err)
+				// GetCurrent and GetVersion should return the same version
+				require.Equal(t, v1, v11)
+				// Immutable fields of the key should not change after transformation
+				assertKeyStaticFieldsUnchanged(t, k0, k1)
+				// Version match
+				assertVersionConsistent(t, initVersion+uint32(i)+1, k1, v1, metadata)
+				assertMetadataMatchKeyAndVersion(t, ctx, metadata, k1, v1)
+			}
 		})
 	}
 }
@@ -247,7 +333,7 @@ func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadat
 }
 
 func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, keyID string, providers provider.Registry, templates template.Registry, keys key.Repository,
-	policyName string, initTemplateID string, initVersion uint32) (*key.Key, *key.Version) {
+	policyName string, initTemplateID string, initVersion uint32, scopeSpec *core.ScopeSpecification) (*key.Key, *key.Version) {
 	provider0, err := providers.MatchForTemplate(ctx, initTemplateID)
 	require.NoError(t, err)
 	templateInfo0, err := templates.Get(ctx, initTemplateID)
@@ -260,7 +346,6 @@ func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, key
 
 	// Create a key to transform
 	versionID := fmt.Sprintf("%s:%d", keyName, initVersion)
-	scopeSpec := scopeSpecWithScope(t, core.ScopeSignatureStandard)
 	k0, err := key.NewKey(ctx, keyID, policyName, scopeSpec, initVersion, key.WithName(keyName))
 	require.NoError(t, err)
 	v0, err := key.NewVersion(ctx, versionID, keyID, initTemplateID, provider0.Name(), initVersion, keyMaterial, key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
@@ -270,6 +355,8 @@ func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, key
 	return k0, v0
 }
 
+// Check that the static fields of both keys are equal. Static fields are those that should not change
+// after initial creation of the key: Name, PolicyId, Primitive, PublicId, and Labels.
 func assertKeyStaticFieldsUnchanged(t *testing.T, k0, k1 *key.Key) {
 	require.Equal(t, k0.Name, k1.Name)
 	require.Equal(t, k0.PolicyId, k1.PolicyId)
