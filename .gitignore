@@ -27,8 +27,8 @@ Thumbs.db
 .env
 .env.*
 
-# Generated proto (tracked but good to note)
-# gen/ is tracked — do NOT add to .gitignore
+# Generated proto — regenerated via `make proto` (or in CI); not committed
+gen/
 
 # OS
 .DS_Store
