@@ -3,12 +3,12 @@ package app
 import (
 	"context"
 
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/policy"
-	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/service"
-	"github.ibm.com/citius/citius-server/internal/storage"
-	"github.ibm.com/citius/citius-server/internal/template"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/service"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/template"
 )
 
 const (

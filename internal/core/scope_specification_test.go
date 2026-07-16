@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/stretchr/testify/require"
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 )
 
 // extractScopeSpecFields returns (Security, AdditionalProperties) from any ScopeSpec variant.

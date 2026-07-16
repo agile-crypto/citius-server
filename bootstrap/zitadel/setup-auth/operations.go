@@ -1,6 +1,6 @@
 package main
 
-import "github.ibm.com/citius/zitadel-grpc-auth/admin"
+import "github.com/agile-crypto/zitadel-grpc-auth/admin"
 
 // methodPrefix is the gRPC FQN prefix for all Citius services. It must
 // match the proto package name in proto/services/*.proto exactly — the

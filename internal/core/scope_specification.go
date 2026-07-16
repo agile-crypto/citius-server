@@ -3,8 +3,8 @@ package core
 import (
 	"context"
 
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/errors"
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"
 )
 

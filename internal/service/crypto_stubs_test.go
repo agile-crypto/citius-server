@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.ibm.com/citius/citius-server/internal/crypto"
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/crypto"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // ============================================================================

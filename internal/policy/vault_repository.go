@@ -4,9 +4,9 @@ import (
 	"context"
 	"sync"
 
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/hashicorp/vault/sdk/logical"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
-	"github.ibm.com/citius/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -6,11 +6,11 @@ import (
 
 	"github.com/hashicorp/vault/sdk/logical"
 
-	api "github.ibm.com/citius/citius-server/gen/go/api/types"
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	"github.ibm.com/citius/citius-server/internal/app"
-	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/template"
+	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/app"
+	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/template"
 )
 
 // ============================================================================

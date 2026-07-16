@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.ibm.com/citius/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // Rules is the parsed representation of StoredPolicy.rules_json.

@@ -3,7 +3,7 @@ package core_test
 import (
 	"testing"
 
-	"github.ibm.com/citius/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // Types tests are compile-only test to verify that the types exist and have the expected fields.

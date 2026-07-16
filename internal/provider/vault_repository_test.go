@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/hashicorp/vault/sdk/logical"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/provider"
 )
 
 func newTestProviderInstance(publicID, name, provType string) *provider.Instance {

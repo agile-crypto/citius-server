@@ -33,8 +33,8 @@ This folder contains scripts used to modify import paths and packages of proto a
         - `--keep-state`: Keep a copy of the old state, even after successful linting. If used, the operation must be terminated with `--continue`, explicitly. This option is used when other checks must be performed on the pulled content before commiting the changes.
         - `--tmp-dir`: Name of the directory in which the old state is kept while the program runs (default: `proto`). This must be changed to a direectory outside of `proto`, if Go code is to be generated with `buf generate`, otherwise the conflicts between the saved state and the pulled proto files will cause an error.
         - `--go-module`: Go module name of the current repo, used to construct go_package options
-                    (default: github.ibm.com/citius/citius-server).
+                    (default: github.com/agile-crypto/citius-server).
         - `--proto-packages`: Comma-separated list of proto packages to copy from the fetched repo and update (default: messages,services,types).
    - Usage to pull proto files from API repo: 
-   `python3 update_api_proto.py --branch main --go-module github.ibm.com/citius/citius-server --proto-packages messages,services,types git@github.ibm.com:citius/api.git proto`
+   `python3 update_api_proto.py --branch main --go-module github.com/agile-crypto/citius-server --proto-packages messages,services,types git@github.ibm.com:citius/api.git proto`
 

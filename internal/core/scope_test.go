@@ -4,8 +4,8 @@ import (
 	"slices"
 	"testing"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/stretchr/testify/require"
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 )
 
 func TestScope_AllScopesCanBeConvertedToString(t *testing.T) {

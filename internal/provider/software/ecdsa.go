@@ -8,7 +8,7 @@ import (
 	"crypto/sha256"
 	"crypto/x509"
 
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 func generateECDSAP256Key(ctx context.Context) (pubDER, privDER []byte, _ error) {

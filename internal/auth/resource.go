@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
+	zauth "github.com/agile-crypto/zitadel-grpc-auth"
 )
 
 // AuthorizeKey enforces deny-by-default glob matching of name against

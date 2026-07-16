@@ -21,9 +21,9 @@ import (
 	"runtime"
 	"syscall"
 
-	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
-	"github.ibm.com/citius/citius-server/internal/auth"
-	"github.ibm.com/citius/citius-server/internal/cmd/server"
+	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	"github.com/agile-crypto/citius-server/internal/auth"
+	"github.com/agile-crypto/citius-server/internal/cmd/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"

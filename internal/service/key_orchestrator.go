@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
+	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // KeyOrchestrator orchestrates key lifecycle workflows.

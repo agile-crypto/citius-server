@@ -6,7 +6,7 @@ import (
 	"os"
 	"sort"
 
-	"github.ibm.com/citius/zitadel-grpc-auth/admin"
+	"github.com/agile-crypto/zitadel-grpc-auth/admin"
 	"gopkg.in/yaml.v3"
 )
 

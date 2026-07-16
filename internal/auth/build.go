@@ -3,7 +3,7 @@ package auth
 import (
 	"sync/atomic"
 
-	zsrv "github.ibm.com/citius/zitadel-grpc-auth/server"
+	zsrv "github.com/agile-crypto/zitadel-grpc-auth/server"
 	"google.golang.org/grpc"
 )
 

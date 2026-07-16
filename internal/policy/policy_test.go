@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/policy"
 )
 
 func TestPolicy_VetForWrite_Create_happyPath(t *testing.T) {

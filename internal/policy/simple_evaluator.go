@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"slices"
 
-	"github.ibm.com/citius/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // SimpleRulesEvaluator implements RulesEvaluator for JSON schema v1.

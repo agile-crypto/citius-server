@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/require"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/policy"
 )
 
 // setupWithRulesPolicy is defined in validate_test.go - shared across test files

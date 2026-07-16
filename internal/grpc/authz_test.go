@@ -5,10 +5,10 @@ import (
 	"errors"
 	"testing"
 
+	citiusauth "github.com/agile-crypto/citius-server/internal/auth"
+	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	zauth "github.com/agile-crypto/zitadel-grpc-auth"
 	"github.com/stretchr/testify/require"
-	citiusauth "github.ibm.com/citius/citius-server/internal/auth"
-	engerr "github.ibm.com/citius/citius-server/internal/errors"
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
 )
 
 const testOp engerr.Op = "grpc.authz.test"

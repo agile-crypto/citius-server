@@ -14,7 +14,7 @@ The script performs the following steps in order:
      NB: Update the list PROTO_PACKAGES_API in this script if the structure of the fetched proto changes (e.g. new subfolders are added).
   4. Remove every existing go_package option from proto/api/**/*.proto
   5. For each direct subfolder F of proto/api:
-       a. Add  option go_package = "github.ibm.com/citius/citius-server/gen/go/api/F;api";
+       a. Add  option go_package = "github.com/agile-crypto/citius-server/gen/go/api/F;api";
           to every .proto file inside that subfolder.
        b. For every *other* subfolder S of proto/api, rewrite import paths
           inside proto/api/F/**  of the form
@@ -24,7 +24,7 @@ The script performs the following steps in order:
   6. For every .proto file directly in proto/api/ (root-level, not in
      subdirectories):
        a. Remove any existing go_package option and add
-            option go_package = "github.ibm.com/citius/citius-server/gen/go/api;api";
+            option go_package = "github.com/agile-crypto/citius-server/gen/go/api;api";
        b. Rewrite import paths as in step 5b (S/... → api/S/...) for every
           subfolder S.
   7. Run  buf lint  from the proto/ directory.
@@ -75,7 +75,7 @@ OPTIONS
                     per-file actions). Hidden by default.
   -h, --help        Show this help message and exit.
   --go-module       Go module name of the current repo, used to construct go_package options
-                    (default: github.ibm.com/citius/citius-server).
+                    (default: github.com/agile-crypto/citius-server).
   --proto-packages  Comma-separated list of proto packages to copy from the fetched repo and update (default: messages,services,types).
   --tmp-dir         Directory to use for temporary state (default: proto/).
 
@@ -115,7 +115,7 @@ FETCHED_REPO_DIRNAME = 'fetched-repo'
 PROTO_SUBFOLDERS_SERVER = ['api', 'server']
 DEFAULT_PROTO_PACKAGES_API = ['messages', 'services', 'types']
 
-DEFAULT_GO_MODULE = 'github.ibm.com/citius/citius-server'
+DEFAULT_GO_MODULE = 'github.com/agile-crypto/citius-server'
 GO_PKG_API_ROOT_RELATIVE = 'gen/go/api'
 DEFAULT_GO_PKG_API_ROOT = f'{DEFAULT_GO_MODULE}/{GO_PKG_API_ROOT_RELATIVE}'
 

@@ -3,8 +3,8 @@ package grpc
 import (
 	"context"
 
-	citiusauth "github.ibm.com/citius/citius-server/internal/auth"
-	engerr "github.ibm.com/citius/citius-server/internal/errors"
+	citiusauth "github.com/agile-crypto/citius-server/internal/auth"
+	engerr "github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // authorizeKeyName runs the per-resource glob check for a key name and

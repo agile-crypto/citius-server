@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
     echo "Usage: $0 <repo_url> <go_module> <proto_packages> <proto_folder> <tmp_dir>" >&2
     echo "  repo_url       Git URL of the API repo  (e.g. git@github.ibm.com:org/api.git)" >&2
-    echo "  go_module      Go module name            (e.g. github.ibm.com/citius/citius-server)" >&2
+    echo "  go_module      Go module name            (e.g. github.com/agile-crypto/citius-server)" >&2
     echo "  proto_packages Comma-separated packages  (e.g. messages,services,types)" >&2
     echo "  proto_folder   Folder containing proto files (e.g. proto)" >&2
     echo "  tmp_dir        Temporary directory for keeping old state during the update" >&2

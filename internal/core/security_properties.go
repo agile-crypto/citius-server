@@ -1,6 +1,6 @@
 package core
 
-import types "github.ibm.com/citius/citius-server/gen/go/api/types"
+import types "github.com/agile-crypto/citius-server/gen/go/api/types"
 
 type SecurityProperties struct {
 	SecurityStrength uint32

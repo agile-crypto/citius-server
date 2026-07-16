@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/stretchr/testify/require"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
 )
 
 // Uses setupOrchestrator from key_create_test.go

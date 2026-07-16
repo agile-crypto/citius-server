@@ -15,9 +15,9 @@ import (
 	"testing"
 
 	protovalidate "buf.build/go/protovalidate"
-	metapb "github.ibm.com/citius/citius-server/gen/go/api/messages"
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
+	metapb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"google.golang.org/protobuf/proto"
 )
 

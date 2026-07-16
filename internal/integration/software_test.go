@@ -14,16 +14,16 @@ import (
 
 	"github.com/hashicorp/vault/sdk/logical"
 
-	api "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/app"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/crypto"
-	"github.ibm.com/citius/citius-server/internal/policy"
-	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/provider/software"
-	"github.ibm.com/citius/citius-server/internal/service"
-	"github.ibm.com/citius/citius-server/internal/storage"
-	"github.ibm.com/citius/citius-server/internal/template"
+	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/app"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/crypto"
+	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/provider/software"
+	"github.com/agile-crypto/citius-server/internal/service"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/template"
 )
 
 // ============================================================================
@@ -583,3 +583,102 @@ func TestIntegration_Software_TransformKey_Sign_Verify(t *testing.T) {
 	}
 	t.Log(" TransformKey Sign+Verify round-trip (software, ECDSA->ML-DSA-65): PASSED")
 }
+
+// func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t *testing.T) {
+// 	svc := wireWithSoftwareProvider(t)
+// 	ctx := context.Background()
+// 	store := &logical.InmemStorage{}
+
+// 	requestScope, err := svc.ForStorage(ctx, store)
+// 	if err != nil {
+// 		t.Fatalf("ForStorage: %v", err)
+// 	}
+
+// 	// Policy must allow both the original and the target template for
+// 	// CreateKey — TransformKey re-validates via core.OperationCreateKey.
+// 	policyName := seedPolicy(t, ctx, requestScope.Policy(),
+// 		"sw-transform-allow",
+// 		[]string{"ecdsa-p256-sha256-der", "ml-dsa-65"},
+// 		[]core.Operation{core.OperationCreateKey, core.OperationSign, core.OperationVerify},
+// 	)
+
+// 	createdKey, err := requestScope.Keys().CreateKey(ctx, core.KeyCreationSpec{
+// 		Name:               "real-transform-key",
+// 		TemplateID:         "ecdsa-p256-sha256-der",
+// 		PolicyID:           policyName,
+// 		ScopeSpecification: sigScopeSpec(),
+// 	})
+// 	if err != nil {
+// 		t.Fatalf("CreateKey: %v", err)
+// 	}
+// 	keyName := createdKey.Name
+
+// 	// Sanity check: v1 (real ECDSA-P256) signs and verifies before transforming.
+// 	payload := []byte("real crypto integration test payload — transform to ML-DSA-65")
+// 	signV1, err := requestScope.Crypto().Sign(ctx, crypto.SignRequest{
+// 		KeyName:              keyName,
+// 		Payload:              payload,
+// 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &api.NoParams{}},
+// 	})
+// 	if err != nil {
+// 		t.Fatalf("Sign (v1, ECDSA): %v", err)
+// 	}
+// 	verifyV1, err := requestScope.Crypto().Verify(ctx, crypto.VerifyRequest{
+// 		KeyName:              keyName,
+// 		KeyVersion:           signV1.KeyVersion,
+// 		Payload:              payload,
+// 		Signature:            signV1.Signature,
+// 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &api.NoParams{}},
+// 	})
+// 	if err != nil || !verifyV1.Valid {
+// 		t.Fatalf("Verify (v1, ECDSA) pre-transform sanity check failed: err=%v valid=%v", err, verifyV1.Valid)
+// 	}
+
+// 	// Transform the key from ecdsa-p256-sha256-der to ml-dsa-65 (post-quantum).
+// 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+// 		KeyName:            keyName,
+// 		TemplateID:         "ml-dsa-65",
+// 		ScopeSpecification: sigScopeSpec(),
+// 	})
+// 	if err != nil {
+// 		t.Fatalf("TransformKey: %v", err)
+// 	}
+// 	if transformedMeta.TemplateID != "ml-dsa-65" {
+// 		t.Errorf("TransformKey: expected template ml-dsa-65, got %s", transformedMeta.TemplateID)
+// 	}
+// 	if transformedMeta.Version != 2 {
+// 		t.Errorf("TransformKey: expected version 2, got %d", transformedMeta.Version)
+// 	}
+// 	t.Logf("Transformed key: %s -> template=%s version=%d", keyName, transformedMeta.TemplateID, transformedMeta.Version)
+
+// 	// Sign+Verify round-trip on the transformed (current) ML-DSA-65 version.
+// 	signV2, err := requestScope.Crypto().Sign(ctx, crypto.SignRequest{
+// 		KeyName:              keyName,
+// 		Payload:              payload,
+// 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &api.NoParams{}},
+// 	})
+// 	if err != nil {
+// 		t.Fatalf("Sign (v2, post-transform ML-DSA-65): %v", err)
+// 	}
+// 	if signV2.KeyVersion != 2 {
+// 		t.Fatalf("expected post-transform sign to use version 2, got %d", signV2.KeyVersion)
+// 	}
+// 	if len(signV2.Signature) != 3309 {
+// 		t.Errorf("ML-DSA-65 signature length: got %d, want 3309", len(signV2.Signature))
+// 	}
+
+// 	verifyV2, err := requestScope.Crypto().Verify(ctx, crypto.VerifyRequest{
+// 		KeyName:              keyName,
+// 		KeyVersion:           signV2.KeyVersion,
+// 		Payload:              payload,
+// 		Signature:            signV2.Signature,
+// 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &api.NoParams{}},
+// 	})
+// 	if err != nil {
+// 		t.Fatalf("Verify (v2, post-transform ML-DSA-65): %v", err)
+// 	}
+// 	if !verifyV2.Valid {
+// 		t.Error("TransformKey round-trip FAILED: Sign+Verify on transformed ML-DSA-65 version is not valid")
+// 	}
+// 	t.Log(" TransformKey Sign+Verify round-trip (software, ECDSA->ML-DSA-65): PASSED")
+// }

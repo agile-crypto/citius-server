@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	zauth "github.com/agile-crypto/zitadel-grpc-auth"
 	"github.com/stretchr/testify/require"
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
 )
 
 func ctxWith(t *testing.T, allow, deny []string, claimAllow, claimDeny string) context.Context {

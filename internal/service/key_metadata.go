@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 
-	messages "github.ibm.com/citius/citius-server/gen/go/api/messages"
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/template"
+	messages "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

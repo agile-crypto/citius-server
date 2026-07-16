@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
+	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/hashicorp/vault/sdk/logical"
-	api "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"
 )
 

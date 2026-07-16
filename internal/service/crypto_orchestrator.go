@@ -3,8 +3,8 @@ package service
 import (
 	"context"
 
-	"github.ibm.com/citius/citius-server/internal/crypto"
-	"github.ibm.com/citius/citius-server/internal/key"
+	"github.com/agile-crypto/citius-server/internal/crypto"
+	"github.com/agile-crypto/citius-server/internal/key"
 )
 
 // CryptoOrchestrator performs cryptographic operations using stored keys.

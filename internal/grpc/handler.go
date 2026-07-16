@@ -3,14 +3,14 @@ package grpc
 import (
 	"context"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
-	servicespb "github.ibm.com/citius/citius-server/gen/go/api/services"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/crypto"
-	engerr "github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/policy"
-	"github.ibm.com/citius/citius-server/internal/service"
-	"github.ibm.com/citius/citius-server/internal/storage"
+	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/crypto"
+	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/service"
+	"github.com/agile-crypto/citius-server/internal/storage"
 )
 
 // ScopeGateway is the per-request subset of *app.RequestScope used by the Handler.

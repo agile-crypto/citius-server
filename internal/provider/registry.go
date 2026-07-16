@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // Registry manages the set of available Backend implementations.

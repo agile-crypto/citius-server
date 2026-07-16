@@ -5,7 +5,7 @@ import (
 	stderrors "errors"
 	"testing"
 
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 const testOp errors.Op = "errors_test.(suite).method"

@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"testing"
 
+	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
-	api "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/template"
 )
 
 // catalogPath returns the absolute path to the standard_algorithms.json catalog.

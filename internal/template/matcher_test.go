@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/stretchr/testify/require"
-	api "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/template"
 )
 
 // ============================================================================

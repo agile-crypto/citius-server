@@ -7,14 +7,14 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/key"
+	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/key"
-	"github.ibm.com/citius/citius-server/internal/policy"
-	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/provider/software"
 
-	"github.ibm.com/citius/citius-server/internal/template"
+	"github.com/agile-crypto/citius-server/internal/template"
 )
 
 // ============================================================================

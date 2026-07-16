@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/stretchr/testify/require"
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/key"
 )
 
 func TestKey_NewKey(t *testing.T) {

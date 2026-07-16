@@ -4,13 +4,13 @@ import (
 	"context"
 	"testing"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
 
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // helper: create a valid Key domain object.

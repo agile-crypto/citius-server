@@ -13,8 +13,8 @@ import (
 	"bytes"
 	"context"
 
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	"github.ibm.com/citius/citius-server/internal/provider"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/provider"
 )
 
 // Provider is a loopback provider.Backend implementation.

@@ -6,7 +6,7 @@ import (
 
 	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
 
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 func generateMLDSA65Key(ctx context.Context) (pubBytes, privBytes []byte, _ error) {

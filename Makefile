@@ -56,7 +56,7 @@ BIN_DIR ?= bin
 SERVER_BIN := $(BIN_DIR)/caas-server
 SERVER_PKG := ./internal/cmd/server/main
 
-MODULE := github.ibm.com/citius/citius-server
+MODULE := github.com/agile-crypto/citius-server
 
 # ---------------------------------------------------------------------------
 # CI gate — MUST pass before merge

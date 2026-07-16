@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.ibm.com/citius/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // PrimitiveSpecificProperties groups properties that are specific to a given primitive

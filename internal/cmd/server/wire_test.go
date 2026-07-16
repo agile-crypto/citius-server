@@ -7,9 +7,9 @@ import (
 	"runtime"
 	"testing"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
-	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
-	"github.ibm.com/citius/citius-server/internal/cmd/server"
+	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
+	"github.com/agile-crypto/citius-server/internal/cmd/server"
 )
 
 // catalogPath returns the absolute path to standard_algorithms.json.

@@ -1,7 +1,7 @@
 package crypto
 
 import (
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"google.golang.org/protobuf/proto"
 )
 

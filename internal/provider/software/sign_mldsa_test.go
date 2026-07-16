@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	"github.ibm.com/citius/citius-server/internal/provider/software"
 )
 
 // genMLDSAKey generates an ML-DSA-65 key and returns the provider and key material.

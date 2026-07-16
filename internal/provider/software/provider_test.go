@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/provider/software"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
 
 // Compile-time assertion: Provider implements provider.Backend.

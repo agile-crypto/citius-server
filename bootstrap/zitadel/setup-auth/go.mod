@@ -2,13 +2,14 @@
 // catalog, and seed service users in a Zitadel instance brought up by
 // ../bootstrap.sh. It is a separate Go module so that bootstrap-only
 // dependencies do not leak into the citius-server build.
-module github.ibm.com/citius/citius-server/bootstrap/zitadel/setup-auth
+module github.com/agile-crypto/citius-server/bootstrap/zitadel/setup-auth
 
 go 1.25.0
 
 require (
+	github.com/agile-crypto/zitadel-grpc-auth v0.1.0
 	github.com/joho/godotenv v1.5.1
-	github.ibm.com/citius/zitadel-grpc-auth v0.0.0-00010101000000-000000000000
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -37,13 +38,4 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260209200024-4cfbd4190f57 // indirect
 	google.golang.org/grpc v1.80.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-// Dev-time replace: the zitadel-grpc-auth module is consumed from a
-// sibling working copy until a release tag is published. Operators
-// without the sibling clone should remove this directive and pin to a
-// tagged version, e.g.:
-//
-//	require github.ibm.com/citius/zitadel-grpc-auth v0.X.Y
-replace github.ibm.com/citius/zitadel-grpc-auth => ../../../../../zitadel-experiments/zitadel-grpc-auth

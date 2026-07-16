@@ -3,7 +3,7 @@ package policy
 import (
 	"testing"
 
-	"github.ibm.com/citius/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 func newSimple() *SimpleRulesEvaluator {

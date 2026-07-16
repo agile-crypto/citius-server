@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"testing"
 
+	zauth "github.com/agile-crypto/zitadel-grpc-auth"
 	"github.com/stretchr/testify/require"
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
 )
 
 // claimsCtx wraps the upstream ContextWithClaims helper for tests.

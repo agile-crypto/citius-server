@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	protovalidate "buf.build/go/protovalidate"
-	typespb "github.ibm.com/citius/citius-server/gen/go/api/types"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
+	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"google.golang.org/protobuf/proto"
 )
 

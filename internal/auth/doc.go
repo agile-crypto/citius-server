@@ -2,7 +2,7 @@
 // interceptors into the Citius gRPC server.
 //
 // The package is a thin, pure-library layer over
-// github.ibm.com/citius/zitadel-grpc-auth. It exposes:
+// github.com/agile-crypto/zitadel-grpc-auth. It exposes:
 //
 //   - Config      — typed env contract (LoadFromEnv reads it once).
 //   - Build       — returns gRPC server options + a Closer.

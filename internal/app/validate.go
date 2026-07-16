@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/provider"
-	"github.ibm.com/citius/citius-server/internal/template"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/template"
 )
 
 // ValidateProviderCapabilities checks that every algorithm ID declared by a

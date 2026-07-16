@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	messagespb "github.ibm.com/citius/citius-server/gen/go/api/messages"
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
-	engerr "github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/policy"
+	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/policy"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

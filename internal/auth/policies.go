@@ -3,7 +3,7 @@ package auth
 import (
 	"context"
 
-	zauth "github.ibm.com/citius/zitadel-grpc-auth"
+	zauth "github.com/agile-crypto/zitadel-grpc-auth"
 )
 
 // PolicyFunc re-exports the upstream type so handlers and tests do not

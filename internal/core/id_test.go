@@ -5,7 +5,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.ibm.com/citius/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 func TestNewID_hasPrefix(t *testing.T) {

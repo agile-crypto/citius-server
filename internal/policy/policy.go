@@ -3,9 +3,9 @@ package policy
 import (
 	"context"
 
-	storepb "github.ibm.com/citius/citius-server/gen/go/server/store"
-	"github.ibm.com/citius/citius-server/internal/core"
-	"github.ibm.com/citius/citius-server/internal/errors"
+	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	"github.com/agile-crypto/citius-server/internal/core"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"google.golang.org/protobuf/proto"
 )
 

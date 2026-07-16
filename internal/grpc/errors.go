@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	engerr "github.ibm.com/citius/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-server/internal/errors"
 )
 
 // ToStatusError converts a core error to a gRPC status error.

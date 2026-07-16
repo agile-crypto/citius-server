@@ -6,10 +6,10 @@ import (
 	"context"
 	"fmt"
 
-	types "github.ibm.com/citius/citius-server/gen/go/api/types"
-	providerpb "github.ibm.com/citius/citius-server/gen/go/server/provider"
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/provider"
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/provider"
 )
 
 // Provider is a stateless software-backed provider.Backend implementation.

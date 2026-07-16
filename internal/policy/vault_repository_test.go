@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/hashicorp/vault/sdk/logical"
-	"github.ibm.com/citius/citius-server/internal/errors"
-	"github.ibm.com/citius/citius-server/internal/policy"
 )
 
 func newTestPolicy(name string) *policy.Policy {
