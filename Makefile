@@ -121,8 +121,8 @@ vet: ## Run 'go vet' on all internal packages
 
 lint: lint-go lint-proto ## Run all linters (Go + proto)
 
-lint-go: ## Run golangci-lint on internal/...
-	golangci-lint run ./internal/...
+lint-go: ## Run golangci-lint on the whole module (gen/ excluded via .golangci.yml)
+	golangci-lint run ./...
 
 lint-proto: ## Run 'buf lint' on the proto tree
 	cd proto && buf lint

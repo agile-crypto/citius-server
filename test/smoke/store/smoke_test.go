@@ -4,6 +4,7 @@
 package store_test
 
 import (
+	"bytes"
 	"testing"
 
 	protovalidate "buf.build/go/protovalidate"
@@ -49,9 +50,11 @@ func TestKey_roundtrip(t *testing.T) {
 }
 
 func TestKeyVersion_fourFields(t *testing.T) {
-	// Verify all four fields of the version pattern exist and can be set.
+	// Verify all fields of the plaintext-material variant round-trip through the
+	// wire format. Setting every field (rather than only the ones asserted below)
+	// also means a future proto change that removes a field fails to compile here.
 	// Only one of plaintext_material / ciphertext_material should be populated at a time.
-	v := &storepb.KeyVersion{
+	orig := &storepb.KeyVersion{
 		PublicId:      "ver_01HXYZ",
 		KeyId:         "key_01HXYZ",
 		KeyMaterial:   []byte("secret"),
@@ -60,17 +63,40 @@ func TestKeyVersion_fourFields(t *testing.T) {
 		WrappingKeyId: "",
 		ProviderId:    "software",
 	}
-	if len(v.KeyMaterial) == 0 {
-		t.Error("expected plaintext_material to be set")
+	b, err := proto.Marshal(orig)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
 	}
-	if len(v.Digest) == 0 {
-		t.Error("expected Digest to be set")
+	got := new(storepb.KeyVersion)
+	if err := proto.Unmarshal(b, got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.PublicId != orig.PublicId {
+		t.Errorf("public_id: got %q want %q", got.PublicId, orig.PublicId)
+	}
+	if got.KeyId != orig.KeyId {
+		t.Errorf("key_id: got %q want %q", got.KeyId, orig.KeyId)
+	}
+	if !bytes.Equal(got.KeyMaterial, orig.KeyMaterial) {
+		t.Errorf("key_material: got %q want %q", got.KeyMaterial, orig.KeyMaterial)
+	}
+	if !bytes.Equal(got.CtKeyMaterial, orig.CtKeyMaterial) {
+		t.Errorf("ciphertext_material: got %q want %q", got.CtKeyMaterial, orig.CtKeyMaterial)
+	}
+	if !bytes.Equal(got.Digest, orig.Digest) {
+		t.Errorf("digest: got %q want %q", got.Digest, orig.Digest)
+	}
+	if got.WrappingKeyId != orig.WrappingKeyId {
+		t.Errorf("wrapping_key_id: got %q want %q", got.WrappingKeyId, orig.WrappingKeyId)
+	}
+	if got.ProviderId != orig.ProviderId {
+		t.Errorf("provider_id: got %q want %q", got.ProviderId, orig.ProviderId)
 	}
 }
 
 func TestKeyVersion_fourFields_ciphertext(t *testing.T) {
-	// Verify the ciphertext variant works — material is wrapped by a KEK.
-	v := &storepb.KeyVersion{
+	// Verify the ciphertext variant round-trips — material is wrapped by a KEK.
+	orig := &storepb.KeyVersion{
 		PublicId:      "ver_01HABC",
 		KeyId:         "key_01HABC",
 		KeyMaterial:   nil,
@@ -78,11 +104,31 @@ func TestKeyVersion_fourFields_ciphertext(t *testing.T) {
 		Digest:        []byte("mac"),
 		WrappingKeyId: "key_01HWRAP",
 	}
-	if len(v.CtKeyMaterial) == 0 {
-		t.Error("expected ciphertext_material to be set")
+	b, err := proto.Marshal(orig)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
 	}
-	if v.WrappingKeyId == "" {
-		t.Error("expected wrapping_key_id to be set when using ciphertext")
+	got := new(storepb.KeyVersion)
+	if err := proto.Unmarshal(b, got); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if got.PublicId != orig.PublicId {
+		t.Errorf("public_id: got %q want %q", got.PublicId, orig.PublicId)
+	}
+	if got.KeyId != orig.KeyId {
+		t.Errorf("key_id: got %q want %q", got.KeyId, orig.KeyId)
+	}
+	if !bytes.Equal(got.KeyMaterial, orig.KeyMaterial) {
+		t.Errorf("key_material: got %q want %q", got.KeyMaterial, orig.KeyMaterial)
+	}
+	if !bytes.Equal(got.CtKeyMaterial, orig.CtKeyMaterial) {
+		t.Errorf("ciphertext_material: got %q want %q", got.CtKeyMaterial, orig.CtKeyMaterial)
+	}
+	if !bytes.Equal(got.Digest, orig.Digest) {
+		t.Errorf("digest: got %q want %q", got.Digest, orig.Digest)
+	}
+	if got.WrappingKeyId != orig.WrappingKeyId {
+		t.Errorf("wrapping_key_id: got %q want %q", got.WrappingKeyId, orig.WrappingKeyId)
 	}
 }
 
