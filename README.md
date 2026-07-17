@@ -57,7 +57,7 @@ The server binary accepts:
 
 ## Talking to the server
 
-Use the [Citius Go SDK](../citius-go-sdk) as a client. A typical
+Use the Citius [Go SDK](https://github.com/agile-crypto/citius-go-sdk) as a client. A typical
 intent-based flow — create a key by policy, sign by name, then transform the key
 to a post-quantum algorithm without touching the call site:
 
@@ -76,7 +76,7 @@ _, err = kmClient.TransformKey(ctx,
         WithSecurityProperties(&common.SecurityProperties{QuantumSafe: true}))
 ```
 
-See the SDK's [`examples/`](../citius-go-sdk/examples) directory for complete,
+See the SDK's [`examples/`](https://github.com/agile-crypto/citius-go-sdk/tree/main/examples) directory for complete,
 runnable clients (including TLS and token auth).
 
 ## Optional authentication
