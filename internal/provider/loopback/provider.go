@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 
+	metapb "github.com/agile-crypto/citius-server/gen/go/api/messages"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/provider"
 )
@@ -69,8 +70,38 @@ func (p *Provider) Verify(_ context.Context, req *providerpb.VerifyRequest) (*pr
 	}, nil
 }
 
+// DigestSign echoes the digest as the "signature" (loopback invariant).
+func (p *Provider) DigestSign(_ context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	return &providerpb.DigestSignResponse{Signature: req.GetDigest()}, nil
+}
+
+// DigestVerify returns valid=true when signature == digest (loopback invariant).
+func (p *Provider) DigestVerify(_ context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	return &providerpb.DigestVerifyResponse{
+		Valid: bytes.Equal(req.GetSignature(), req.GetDigest()),
+	}, nil
+}
+
+// Encrypt echoes the plaintext as ciphertext (loopback — not real encryption).
+func (p *Provider) Encrypt(_ context.Context, req *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
+	return &providerpb.EncryptResponse{
+		Ciphertext: req.GetPlaintext(),
+		Output:     &metapb.ProviderOutput{AlgorithmOutput: &metapb.ProviderOutput_NoOutput{NoOutput: &metapb.NoAlgorithmOutput{}}},
+	}, nil
+}
+
+// Decrypt echoes the ciphertext as plaintext (loopback — not real decryption).
+func (p *Provider) Decrypt(_ context.Context, req *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
+	return &providerpb.DecryptResponse{
+		Plaintext: req.GetCiphertext(),
+		Output:    &metapb.ProviderOutput{AlgorithmOutput: &metapb.ProviderOutput_NoOutput{NoOutput: &metapb.NoAlgorithmOutput{}}},
+	}, nil
+}
+
 // Compile-time assertions.
 var (
 	_ provider.Backend                     = (*Provider)(nil)
+	_ provider.Signer                      = (*Provider)(nil)
+	_ provider.Cipher                      = (*Provider)(nil)
 	_ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
 )
