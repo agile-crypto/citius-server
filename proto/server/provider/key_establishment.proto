@@ -1,0 +1,234 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+option go_package = "github.com/agile-crypto/citius-server/gen/go/server/provider;provider";
+
+import "buf/validate/validate.proto";
+import "api/types/operation_params.proto";
+import "api/types/templates.proto";
+import "api/types/common.proto";
+import "api/messages/metadata.proto";
+
+// ============================================================================
+// Key Wrapping / Transport  (NIST SP 800-56B)
+// ============================================================================
+
+// WrapKeyRequest asks the provider to encrypt (wrap) target key material using
+// the wrapping key material.
+//
+// The core loads both keys' opaque material before calling — providers never
+// touch the key store.
+//
+// PKCS #11 equivalent: C_WrapKey.
+message WrapKeyRequest {
+  // Opaque material of the wrapping key (e.g. AES-256-KW key, RSA-4096 key).
+  bytes wrapping_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  // Opaque plaintext material of the key being wrapped.
+  bytes target_key_material   = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // Encoding format for the wrapped output.
+  caas.crypto.v1.WrapFormat format = 3;
+
+  // Scope-based operation parameters.
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_params        = 4;  // AES-KW/KWP, RSA-OAEP
+    caas.crypto.v1.KeyAgreementWrapParams  ka_wrap_params   = 5;  // ECDH-ES+AES-KW
+    caas.crypto.v1.GostWrapOperationParams gost_wrap_params = 6;
+    caas.crypto.v1.VendorWrapParams        vendor_params    = 7;
+  }
+
+  // Typed algorithm of the wrapping key (AES-KW, RSA-OAEP, …).
+  caas.crypto.v1.AlgorithmDetails wrapping_algorithm = 8;
+}
+
+// WrapKeyResponse returns the wrapped (encrypted) key blob.
+message WrapKeyResponse {
+  bytes wrapped_key = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// UnwrapKeyRequest asks the provider to decrypt a wrapped key blob and return
+// the raw key material bytes.
+//
+// PKCS #11 equivalent: C_UnwrapKey.  The provider returns raw bytes; the core
+// stores them as a new key version.
+message UnwrapKeyRequest {
+  // Opaque material of the wrapping key used during WrapKey.
+  bytes wrapping_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  bytes wrapped_key           = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  caas.crypto.v1.WrapFormat format = 3;
+
+  // Must match the scope used during wrapping.
+  oneof scope_params {
+    caas.crypto.v1.NoParams                no_params        = 4;
+    caas.crypto.v1.KeyAgreementWrapParams  ka_wrap_params   = 5;
+    caas.crypto.v1.GostWrapOperationParams gost_wrap_params = 6;
+    caas.crypto.v1.VendorWrapParams        vendor_params    = 7;
+  }
+
+  caas.crypto.v1.AlgorithmDetails wrapping_algorithm = 8;
+  // Provider output captured during WrapKey (e.g. IV for wrapped-key-with-IV schemes).
+  caas.crypto.v1.ProviderOutput output = 9;
+}
+
+// UnwrapKeyResponse returns the recovered raw key material.
+message UnwrapKeyResponse {
+  // Raw plaintext key material.  The core wraps this in a new GenerateKeyResponse
+  // record and stores it.
+  bytes unwrapped_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Key Derivation  (NIST SP 800-108 / SP 800-56C)
+// ============================================================================
+
+// DeriveKeyRequest asks the provider to derive new key material from a base key.
+//
+// PKCS #11 equivalent: C_DeriveKey.  Returns raw derived bytes; the core stores
+// them as a new key.
+//
+// The base key's template specifies BOTH the KDF algorithm AND the output key type —
+// there is no per-call algorithm choice at the top-level API.  The core resolves
+// both AlgorithmDetails from the template and passes them here.
+message DeriveKeyRequest {
+  bytes base_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+
+  // KDF-specific user-provided parameters.  Mirrors api/messages/key_derivation.proto
+  // DeriveKeyRequest.kdf_params exactly so the orchestrator forwards 1:1.
+  oneof kdf_params {
+    caas.crypto.v1.HkdfOperationParams     hkdf_params      = 3;
+    caas.crypto.v1.Pbkdf2OperationParams   pbkdf2_params    = 4;
+    caas.crypto.v1.Argon2OperationParams   argon2_params    = 5;
+    caas.crypto.v1.EcdhOperationParams     ecdh_params      = 6;
+    caas.crypto.v1.X942DhOperationParams   x942_dh_params   = 7;
+    caas.crypto.v1.TlsPrfOperationParams   tls_prf_params   = 8;
+    caas.crypto.v1.Tls12KdfOperationParams tls12_kdf_params = 9;
+    caas.crypto.v1.Sp800108OperationParams sp800_108_params = 10;
+    caas.crypto.v1.GostKdfOperationParams  gost_kdf_params  = 11;
+    caas.crypto.v1.X3dhOperationParams     x3dh_params      = 12;
+    caas.crypto.v1.VendorKdfParams         vendor_params    = 13;
+  }
+
+  // KDF algorithm resolved from the base key's template.
+  caas.crypto.v1.AlgorithmDetails kdf_algorithm    = 14;
+  // Output key algorithm (type + size) resolved from the base key's template.
+  // HSM providers use this to mint a typed internal handle; software providers
+  // use it to validate/trim the derived byte length.
+  caas.crypto.v1.AlgorithmDetails output_algorithm = 15;
+}
+
+// DeriveKeyResponse returns the derived key material bytes.
+message DeriveKeyResponse {
+  bytes derived_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  // Carries system-generated salt/IV (KdfOutput) when applicable, else no_output.
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Key Agreement  (NIST SP 800-56A)
+// ============================================================================
+
+// KeyAgreementRequest asks the provider to perform a two-party key agreement and
+// return the shared secret material bytes.
+//
+// PKCS #11 equivalent: C_DeriveKey with CKM_ECDH1_DERIVE / CKM_X9_42_DH_DERIVE /
+// CKM_XEDDSA_* mechanisms.
+message KeyAgreementRequest {
+  bytes private_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  // Peer's raw public key bytes.
+  // Encoding is algorithm-specific (uncompressed point, raw scalar, DER SPKI).
+  bytes peer_public_key      = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // Algorithm-specific key agreement parameters.
+  oneof agreement_params {
+    caas.crypto.v1.EcdhOperationParams   ecdh_params    = 3;  // ECDH (P-256/384/521), X25519, X448
+    caas.crypto.v1.X942DhOperationParams x942_dh_params = 4;
+    caas.crypto.v1.X3dhOperationParams   x3dh_params    = 5;
+    caas.crypto.v1.VendorKdfParams       vendor_params  = 6;
+  }
+
+  // Agreement algorithm resolved from the private key's template.
+  caas.crypto.v1.AlgorithmDetails agreement_algorithm = 7;
+  // Output key type for the resulting shared secret.
+  caas.crypto.v1.AlgorithmDetails output_algorithm    = 8;
+}
+
+// KeyAgreementResponse returns the shared secret material bytes.
+message KeyAgreementResponse {
+  bytes shared_secret_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Key Encapsulation  (FIPS 203 / NIST SP 800-56C)
+// ============================================================================
+
+// EncapsulateKeyRequest asks the provider to perform KEM encapsulation against
+// a recipient's public key.
+//
+// PKCS #11 equivalent: C_EncapsulateKey (v3.2).
+// Returns BOTH the KEM ciphertext (sent to the recipient) and the shared secret
+// material (stored as a new key by the core).
+message EncapsulateKeyRequest {
+  // Recipient's raw public key bytes (DER SubjectPublicKeyInfo or raw format).
+  bytes recipient_public_key = 1 [(buf.validate.field).bytes.min_len = 1];
+
+  // KEM algorithm (ML-KEM-512/768/1024).
+  caas.crypto.v1.AlgorithmDetails kem_algorithm    = 2;
+  // Output key type for the resulting shared secret.
+  caas.crypto.v1.AlgorithmDetails output_algorithm = 3;
+}
+
+// EncapsulateKeyResponse returns the KEM ciphertext and shared secret.
+message EncapsulateKeyResponse {
+  // KEM ciphertext — transmitted to the recipient out-of-band.
+  bytes ciphertext             = 1 [(buf.validate.field).bytes.min_len = 1];
+  // Raw shared secret material — stored as a new key by the core.
+  bytes shared_secret_material = 2 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 3;
+}
+
+// DecapsulateKeyRequest asks the provider to perform KEM decapsulation using the
+// private key material and return the shared secret bytes.
+//
+// PKCS #11 equivalent: C_DecapsulateKey (v3.2).
+message DecapsulateKeyRequest {
+  bytes private_key_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  // KEM ciphertext received from the encapsulating party.
+  bytes ciphertext           = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  caas.crypto.v1.AlgorithmDetails kem_algorithm    = 3;
+  caas.crypto.v1.AlgorithmDetails output_algorithm = 4;
+}
+
+// DecapsulateKeyResponse returns the recovered shared secret material.
+message DecapsulateKeyResponse {
+  bytes shared_secret_material = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+// KeyEstablishmentService — provider-level key-to-key cryptographic operations.
+//
+// All RPCs are byte-in / byte-out: the core loads the operand key material,
+// dispatches here, and stores whatever raw bytes the provider returns as a new
+// key version.  Providers never see or access the key store.
+//
+// Covers NIST key establishment categories:
+//   Key Transport  (SP 800-56B): WrapKey / UnwrapKey
+//   Key Derivation (SP 800-56C): DeriveKey
+//   Key Agreement  (SP 800-56A): KeyAgreement
+//   Key Encapsulation (FIPS 203): EncapsulateKey / DecapsulateKey
+service KeyEstablishmentService {
+  rpc WrapKey(WrapKeyRequest)               returns (WrapKeyResponse);
+  rpc UnwrapKey(UnwrapKeyRequest)           returns (UnwrapKeyResponse);
+  rpc DeriveKey(DeriveKeyRequest)           returns (DeriveKeyResponse);
+  rpc KeyAgreement(KeyAgreementRequest)     returns (KeyAgreementResponse);
+  rpc EncapsulateKey(EncapsulateKeyRequest) returns (EncapsulateKeyResponse);
+  rpc DecapsulateKey(DecapsulateKeyRequest) returns (DecapsulateKeyResponse);
+}
