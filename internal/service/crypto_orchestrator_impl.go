@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/core"
@@ -72,6 +73,18 @@ func NewCryptoOrchestrator(
 // Sign / Verify
 // ---------------------------------------------------------------------------
 
+// applySignScopeParams copies the caller's scope_params oneof into provReq.
+func applySignScopeParams(req crypto.SignRequest, provReq *providerpb.SignRequest) {
+	switch {
+	case req.NoContext != nil:
+		provReq.ScopeParams = &providerpb.SignRequest_NoContext{NoContext: req.NoContext}
+	case req.DomainContext != nil:
+		provReq.ScopeParams = &providerpb.SignRequest_DomainContext{DomainContext: req.DomainContext}
+	case req.VendorContext != nil:
+		provReq.ScopeParams = &providerpb.SignRequest_VendorContext{VendorContext: req.VendorContext}
+	}
+}
+
 func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error) {
 	const op errors.Op = "service.(cryptoOrchestrator).Sign"
 
@@ -138,17 +151,15 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 		Input:       req.Payload,
 		Algorithm:   tmpl.GetAlgorithm(),
 	}
-	switch {
-	case req.NoContext != nil:
-		provReq.ScopeParams = &providerpb.SignRequest_NoContext{NoContext: req.NoContext}
-	case req.DomainContext != nil:
-		provReq.ScopeParams = &providerpb.SignRequest_DomainContext{DomainContext: req.DomainContext}
-	case req.VendorContext != nil:
-		provReq.ScopeParams = &providerpb.SignRequest_VendorContext{VendorContext: req.VendorContext}
-	}
+	applySignScopeParams(req, provReq)
 
 	// 7. Perform sign.
-	signResp, err := prov.Sign(ctx, provReq)
+	signer, ok := prov.(provider.Signer)
+	if !ok {
+		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("provider %q does not support signing", prov.Name()))
+	}
+	signResp, err := signer.Sign(ctx, provReq)
 	if err != nil {
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
@@ -240,7 +251,12 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 	}
 
 	// 7. Perform verify.
-	verifyResp, err := prov.Verify(ctx, provReq)
+	verifier, ok := prov.(provider.Signer)
+	if !ok {
+		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("provider %q does not support verification", prov.Name()))
+	}
+	verifyResp, err := verifier.Verify(ctx, provReq)
 	if err != nil {
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
