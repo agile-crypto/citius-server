@@ -1,0 +1,60 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+option go_package = "github.com/agile-crypto/citius-server/gen/go/server/provider;provider";
+
+import "buf/validate/validate.proto";
+
+// ============================================================================
+// Random Number Generation
+// ============================================================================
+
+// GenerateRandomRequest asks the provider to produce cryptographically secure
+// random bytes.
+//
+// Random generation is keyless and algorithm-less — the provider uses its own
+// CSPRNG (crypto/rand for software, hardware RNG for HSM).
+//
+// PKCS #11 equivalent: C_GenerateRandom.
+message GenerateRandomRequest {
+  uint32 num_bytes = 1 [(buf.validate.field).uint32.gt = 0];
+}
+
+// GenerateRandomResponse returns the requested random bytes.
+message GenerateRandomResponse {
+  bytes random_bytes = 1 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// SeedRandomRequest mixes additional entropy into the provider's CSPRNG.
+//
+// Providers that manage their own entropy pool MAY ignore the seed (return
+// accepted=false) without returning an error.  The core MUST NOT reduce its
+// entropy budget based on the accepted field alone.
+//
+// SECURITY: seed material is MIXED with existing entropy, never used as the
+// sole source.  Providers MUST reject seeds from untrusted sources or route
+// them through the DRBG mixing function (NIST SP 800-90A §8.7.2).
+//
+// PKCS #11 equivalent: C_SeedRandom.
+message SeedRandomRequest {
+  bytes seed = 1 [(buf.validate.field).bytes.min_len = 1];
+}
+
+// SeedRandomResponse indicates whether the seed was accepted.
+message SeedRandomResponse {
+  bool   accepted = 1;  // false if the provider ignored the seed (not an error)
+  string message  = 2;
+}
+
+// ============================================================================
+// Service Definition
+// ============================================================================
+
+// RandomService — cryptographically secure random-byte generation.
+//
+// Separated from CryptoService because it is keyless and algorithm-less;
+// provider selection is driven by the core (hardware RNG, software CSPRNG, etc.).
+service RandomService {
+  rpc GenerateRandom(GenerateRandomRequest) returns (GenerateRandomResponse);
+  rpc SeedRandom(SeedRandomRequest)         returns (SeedRandomResponse);
+}
