@@ -43,6 +43,18 @@ func (m *mockProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*prov
 func (m *mockProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	return &providerpb.VerifyResponse{}, nil
 }
+func (m *mockProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	return &providerpb.DigestSignResponse{}, nil
+}
+func (m *mockProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	return &providerpb.DigestVerifyResponse{}, nil
+}
+func (m *mockProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
+	return &providerpb.EncryptResponse{}, nil
+}
+func (m *mockProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
+	return &providerpb.DecryptResponse{}, nil
+}
 
 // Compile-time checks.
 var (
@@ -73,6 +85,18 @@ func (b *basicProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*pro
 }
 func (b *basicProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	return &providerpb.VerifyResponse{}, nil
+}
+func (b *basicProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	return &providerpb.DigestSignResponse{}, nil
+}
+func (b *basicProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	return &providerpb.DigestVerifyResponse{}, nil
+}
+func (b *basicProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
+	return &providerpb.EncryptResponse{}, nil
+}
+func (b *basicProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
+	return &providerpb.DecryptResponse{}, nil
 }
 
 var _ provider.Backend = (*basicProvider)(nil)

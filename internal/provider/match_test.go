@@ -31,6 +31,18 @@ func (c *capableProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*p
 func (c *capableProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	return nil, nil
 }
+func (c *capableProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	return nil, nil
+}
+func (c *capableProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	return nil, nil
+}
+func (c *capableProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
+	return nil, nil
+}
+func (c *capableProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
+	return nil, nil
+}
 
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
 // Used by MatchForTemplate for matching.
@@ -152,6 +164,18 @@ func (m *minimalProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*p
 	return nil, nil
 }
 func (m *minimalProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	return nil, nil
+}
+func (m *minimalProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	return nil, nil
+}
+func (m *minimalProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	return nil, nil
+}
+func (m *minimalProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
+	return nil, nil
+}
+func (m *minimalProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
 	return nil, nil
 }
 
