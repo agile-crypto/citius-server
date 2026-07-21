@@ -1,7 +1,7 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
-  "description": "Hybrid/composite algorithms for PQ transition. CycloneDX naming: hybrid-{classical}-{pqc}-{combiner}",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
+  "description": "Hybrid/composite algorithms for PQ transition. CaaS naming (the CycloneDX registry defines no hybrid convention): hybrid-{classical}-{pqc}-{combiner}. OIDs are from the Bouncy Castle private arc (1.3.6.1.4.1.22554).",
   "templates": {
     "hybrid-x25519-mlkem768-concat": {
       "templateId": "hybrid-x25519-mlkem768-concat",
@@ -15,8 +15,7 @@
               "security": {
                 "securityStrengthBits": 192,
                 "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
-                "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "quantumSafe": true
               }
             }
           },
@@ -39,9 +38,9 @@
             "keyAgreement": {
               "scope": "KEY_AGREEMENT_SCOPE_HYBRID",
               "security": {
-                "securityStrengthBits": 128,
+                "securityStrengthBits": 192,
                 "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_3"
               },
               "forwardSecrecy": true
             }
@@ -50,10 +49,6 @@
             "CRYPTO_OPERATION_KEY_AGREEMENT"
           ],
           "securityGuarantees": {
-            "formal": {
-              "indCca2": true,
-              "owCca": true
-            },
             "practical": {
               "confidentiality": true
             }
@@ -108,8 +103,7 @@
               "security": {
                 "securityStrengthBits": 256,
                 "nistSecurityLevel": "NIST_SECURITY_LEVEL_5",
-                "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "quantumSafe": true
               }
             }
           },
@@ -132,9 +126,9 @@
             "keyAgreement": {
               "scope": "KEY_AGREEMENT_SCOPE_HYBRID",
               "security": {
-                "securityStrengthBits": 224,
+                "securityStrengthBits": 256,
                 "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "nistSecurityLevel": "NIST_SECURITY_LEVEL_5"
               },
               "forwardSecrecy": true
             }
@@ -143,10 +137,6 @@
             "CRYPTO_OPERATION_KEY_AGREEMENT"
           ],
           "securityGuarantees": {
-            "formal": {
-              "indCca2": true,
-              "owCca": true
-            },
             "practical": {
               "confidentiality": true
             }
@@ -201,10 +191,9 @@
               "security": {
                 "securityStrengthBits": 192,
                 "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
-                "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "quantumSafe": true
               },
-              "nonMalleable": true,
+              "nonMalleable": false,
               "deterministic": false
             }
           },
@@ -214,8 +203,7 @@
           ],
           "securityGuarantees": {
             "formal": {
-              "eufCma": true,
-              "sufCma": true
+              "eufCma": true
             },
             "practical": {
               "integrity": true,
@@ -276,11 +264,10 @@
               "security": {
                 "securityStrengthBits": 192,
                 "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
-                "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "quantumSafe": true
               },
               "nonMalleable": true,
-              "deterministic": true
+              "deterministic": false
             }
           },
           "operations": [
@@ -349,8 +336,7 @@
               "security": {
                 "securityStrengthBits": 192,
                 "nistSecurityLevel": "NIST_SECURITY_LEVEL_3",
-                "quantumSafe": true,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "quantumSafe": true
               },
               "nonMalleable": true,
               "deterministic": false
@@ -388,7 +374,7 @@
                   "hash": "HASH_ALGORITHM_SHA256",
                   "mgf": "MGF_MGF1",
                   "mgfHash": "HASH_ALGORITHM_SHA256",
-                  "saltLength": 32
+                  "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
                 }
               },
               "label": "classical",

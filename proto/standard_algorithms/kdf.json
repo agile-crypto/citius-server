@@ -1,11 +1,11 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
-  "description": "Key Derivation Functions. CycloneDX naming: {algorithm}-{hash}-{outputlen} or {algorithm}-{variant}-{memory}-{iterations}-{parallelism}",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
+  "description": "Key Derivation Functions. CycloneDX registry naming: hkdf-{hash}, pbkdf2-{hash}-{iterations}-{dkLen}, argon2(id|i|d)-{memoryKiB}-{passes}-{parallelism}.",
   "templates": {
-    "hkdf-sha256-32": {
-      "templateId": "hkdf-sha256-32",
-      "displayName": "HKDF-SHA256-32",
+    "hkdf-sha256": {
+      "templateId": "hkdf-sha256",
+      "displayName": "HKDF-SHA-256",
       "description": "HKDF using SHA-256, 32-byte (256-bit) output. Recommended for key expansion.",
       "scopedCapabilities": [
         {
@@ -48,9 +48,9 @@
         "NIST SP 800-56C"
       ]
     },
-    "hkdf-sha384-48": {
-      "templateId": "hkdf-sha384-48",
-      "displayName": "HKDF-SHA384-48",
+    "hkdf-sha384": {
+      "templateId": "hkdf-sha384",
+      "displayName": "HKDF-SHA-384",
       "description": "HKDF using SHA-384, 48-byte (384-bit) output. Higher security level.",
       "scopedCapabilities": [
         {
@@ -93,9 +93,9 @@
         "NIST SP 800-56C"
       ]
     },
-    "hkdf-sha512-64": {
-      "templateId": "hkdf-sha512-64",
-      "displayName": "HKDF-SHA512-64",
+    "hkdf-sha512": {
+      "templateId": "hkdf-sha512",
+      "displayName": "HKDF-SHA-512",
       "description": "HKDF using SHA-512, 64-byte (512-bit) output. Maximum security level.",
       "scopedCapabilities": [
         {
@@ -240,8 +240,7 @@
             "kdf": {
               "scope": "KDF_SCOPE_PASSWORD",
               "security": {
-                "securityStrengthBits": 256,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "securityStrengthBits": 256
               },
               "memoryHard": true
             }
@@ -286,8 +285,7 @@
             "kdf": {
               "scope": "KDF_SCOPE_PASSWORD",
               "security": {
-                "securityStrengthBits": 256,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "securityStrengthBits": 256
               },
               "memoryHard": true
             }

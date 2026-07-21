@@ -36,8 +36,15 @@ done
 # - Filter out comment entries (keys starting with _comment)
 # - Concatenate all families arrays
 # - Add metadata
+# Refuse to merge if the split files disagree on the catalog version.
+VERSIONS=$(jq -rs 'map(.version) | unique | join(" ")' $JSON_FILES)
+if [ "$(echo "$VERSIONS" | wc -w)" -ne 1 ]; then
+    echo "Error: split catalog files disagree on version: $VERSIONS" >&2
+    exit 1
+fi
+
 jq -s '{
-  "version": "1.0.0",
+  "version": (map(.version) | first),
   "description": "CaaS Standard Algorithm Catalog - Merged from category files",
   "lastUpdated": (now | strftime("%Y-%m-%dT%H:%M:%SZ")),
   "templates": (map(.templates // {}) | add | with_entries(select(.key | startswith("_") | not))),

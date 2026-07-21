@@ -1,6 +1,6 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
   "description": "Key Encapsulation Mechanisms. CycloneDX naming: ml-kem-{parameterset} or {algorithm}",
   "templates": {
     "ml-kem-512": {
@@ -141,15 +141,14 @@
     "x25519": {
       "templateId": "x25519",
       "displayName": "X25519",
-      "description": "Curve25519 ECDH key agreement. Fast, constant-time. RFC 7748.",
+      "description": "Curve25519 ECDH key agreement. Fast, constant-time. RFC 7748. Curve approved in NIST SP 800-186; the key-agreement scheme itself is not yet FIPS-approved (pending SP 800-56A incorporation).",
       "scopedCapabilities": [
         {
           "scope": {
             "keyAgreement": {
               "scope": "KEY_AGREEMENT_SCOPE_STANDARD",
               "security": {
-                "securityStrengthBits": 128,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "securityStrengthBits": 128
               },
               "forwardSecrecy": true
             }
@@ -158,9 +157,6 @@
             "CRYPTO_OPERATION_KEY_AGREEMENT"
           ],
           "securityGuarantees": {
-            "formal": {
-              "indCca2": true
-            },
             "practical": {
               "confidentiality": true
             }
@@ -180,15 +176,14 @@
     "x448": {
       "templateId": "x448",
       "displayName": "X448",
-      "description": "Curve448 ECDH key agreement. Higher security than X25519. RFC 7748.",
+      "description": "Curve448 ECDH key agreement. Higher security than X25519. RFC 7748. Curve approved in NIST SP 800-186; the key-agreement scheme itself is not yet FIPS-approved (pending SP 800-56A incorporation).",
       "scopedCapabilities": [
         {
           "scope": {
             "keyAgreement": {
               "scope": "KEY_AGREEMENT_SCOPE_STANDARD",
               "security": {
-                "securityStrengthBits": 224,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "securityStrengthBits": 224
               },
               "forwardSecrecy": true
             }
@@ -197,9 +192,6 @@
             "CRYPTO_OPERATION_KEY_AGREEMENT"
           ],
           "securityGuarantees": {
-            "formal": {
-              "indCca2": true
-            },
             "practical": {
               "confidentiality": true
             }

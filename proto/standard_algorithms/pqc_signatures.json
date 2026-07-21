@@ -1,7 +1,7 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
-  "description": "Post-quantum signatures. CycloneDX naming: ml-dsa-{parameterset} or slh-dsa-{hash}-{parameterset}",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
+  "description": "Post-quantum signatures. CycloneDX registry naming: ml-dsa-{parameterset}, slh-dsa-{hash}-{parameterset}, hash-ml-dsa-{parameterset} / hash-slh-dsa-... (HashML-DSA / HashSLH-DSA prehash modes per FIPS 204/205).",
   "templates": {
     "ml-dsa-44": {
       "templateId": "ml-dsa-44",
@@ -76,7 +76,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_44",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -157,7 +157,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_65",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -238,7 +238,7 @@
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_87",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -477,7 +477,7 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.28",
+        "oid": "2.16.840.1.101.3.4.3.30",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "slhDsa": {
           "hashType": "SLH_DSA_SHAKE",
@@ -489,12 +489,10 @@
         "FIPS 205"
       ]
     },
-    "_comment_prehashed": "======== PQC PREHASHED SIGNATURE TEMPLATES ========",
-    "_comment_prehashed_desc": "Templates for signing pre-computed digests with PQC algorithms. Use DigestSign/DigestVerify APIs.",
-    "ml-dsa-44-prehashed": {
-      "templateId": "ml-dsa-44-prehashed",
-      "displayName": "ML-DSA-44-Prehashed",
-      "description": "ML-DSA-44 for pre-computed digests. Caller provides digest, service signs directly. FIPS 204. Supports optional context string.",
+    "hash-ml-dsa-44": {
+      "templateId": "hash-ml-dsa-44",
+      "displayName": "HashML-DSA-44",
+      "description": "HashML-DSA-44 (FIPS 204): ML-DSA-44 over a caller-provided digest. Use with DigestSign API. Supports optional context string. OID omitted: NIST Hash* OIDs are digest-specific.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -560,11 +558,10 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.17",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_44",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -572,10 +569,10 @@
         "FIPS 204"
       ]
     },
-    "ml-dsa-65-prehashed": {
-      "templateId": "ml-dsa-65-prehashed",
-      "displayName": "ML-DSA-65-Prehashed",
-      "description": "ML-DSA-65 for pre-computed digests. Recommended PQC prehashed signature. FIPS 204. Supports optional context string.",
+    "hash-ml-dsa-65": {
+      "templateId": "hash-ml-dsa-65",
+      "displayName": "HashML-DSA-65",
+      "description": "HashML-DSA-65 (FIPS 204): ML-DSA-65 over a caller-provided digest. Recommended PQC prehashed signature. Supports optional context string. OID omitted: NIST Hash* OIDs are digest-specific.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -641,11 +638,10 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.18",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_65",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -653,10 +649,10 @@
         "FIPS 204"
       ]
     },
-    "ml-dsa-87-prehashed": {
-      "templateId": "ml-dsa-87-prehashed",
-      "displayName": "ML-DSA-87-Prehashed",
-      "description": "ML-DSA-87 for pre-computed digests. Highest security PQC prehashed signature. FIPS 204. Supports optional context string.",
+    "hash-ml-dsa-87": {
+      "templateId": "hash-ml-dsa-87",
+      "displayName": "HashML-DSA-87",
+      "description": "HashML-DSA-87 (FIPS 204): ML-DSA-87 over a caller-provided digest. Highest security. Supports optional context string. OID omitted: NIST Hash* OIDs are digest-specific.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -722,11 +718,10 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.19",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "mlDsa": {
           "parameterSet": "ML_DSA_87",
-          "hedged": false
+          "deterministic": false
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -734,10 +729,10 @@
         "FIPS 204"
       ]
     },
-    "slh-dsa-sha2-128s-prehashed": {
-      "templateId": "slh-dsa-sha2-128s-prehashed",
-      "displayName": "SLH-DSA-SHA2-128s-Prehashed",
-      "description": "SLH-DSA SHA2-128s for pre-computed digests. Small signatures, moderate speed. FIPS 205. Supports optional context string.",
+    "hash-slh-dsa-sha2-128s": {
+      "templateId": "hash-slh-dsa-sha2-128s",
+      "displayName": "HashSLH-DSA-SHA2-128s",
+      "description": "HashSLH-DSA-SHA2-128s (FIPS 205): SLH-DSA over a caller-provided digest. Small signatures. Supports optional context string. OID omitted: NIST Hash* OIDs are digest-specific.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -803,7 +798,6 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.20",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "slhDsa": {
           "hashType": "SLH_DSA_SHA2",
@@ -815,10 +809,10 @@
         "FIPS 205"
       ]
     },
-    "slh-dsa-sha2-128f-prehashed": {
-      "templateId": "slh-dsa-sha2-128f-prehashed",
-      "displayName": "SLH-DSA-SHA2-128f-Prehashed",
-      "description": "SLH-DSA SHA2-128f for pre-computed digests. Fast signing, larger signatures. FIPS 205. Supports optional context string.",
+    "hash-slh-dsa-sha2-128f": {
+      "templateId": "hash-slh-dsa-sha2-128f",
+      "displayName": "HashSLH-DSA-SHA2-128f",
+      "description": "HashSLH-DSA-SHA2-128f (FIPS 205): SLH-DSA over a caller-provided digest. Fast signing. Supports optional context string. OID omitted: NIST Hash* OIDs are digest-specific.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -884,7 +878,6 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.21",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "slhDsa": {
           "hashType": "SLH_DSA_SHA2",
@@ -896,10 +889,10 @@
         "FIPS 205"
       ]
     },
-    "slh-dsa-shake-256s-prehashed": {
-      "templateId": "slh-dsa-shake-256s-prehashed",
-      "displayName": "SLH-DSA-SHAKE-256s-Prehashed",
-      "description": "SLH-DSA SHAKE-256s for pre-computed digests. Highest security, small signatures. FIPS 205. Supports optional context string.",
+    "hash-slh-dsa-shake-256s": {
+      "templateId": "hash-slh-dsa-shake-256s",
+      "displayName": "HashSLH-DSA-SHAKE-256s",
+      "description": "HashSLH-DSA-SHAKE-256s (FIPS 205): SLH-DSA over a caller-provided digest. Highest security. Supports optional context string. OID omitted: NIST Hash* OIDs are digest-specific.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -965,7 +958,6 @@
         }
       ],
       "algorithm": {
-        "oid": "2.16.840.1.101.3.4.3.28",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "slhDsa": {
           "hashType": "SLH_DSA_SHAKE",

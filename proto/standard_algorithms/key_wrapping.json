@@ -1,11 +1,11 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
-  "description": "Key Wrapping algorithms. CycloneDX naming: aes-kw-{keysize}[-pad]",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
+  "description": "Key Wrapping. CycloneDX registry naming: aes-{keysize}-kw / aes-{keysize}-kwp.",
   "templates": {
-    "aes-kw-128": {
-      "templateId": "aes-kw-128",
-      "displayName": "AES-KW-128",
+    "aes-128-kw": {
+      "templateId": "aes-128-kw",
+      "displayName": "AES-128-KW",
       "description": "AES Key Wrap with 128-bit KEK. RFC 3394, NIST approved.",
       "scopedCapabilities": [
         {
@@ -48,9 +48,9 @@
         "NIST SP 800-38F"
       ]
     },
-    "aes-kw-192": {
-      "templateId": "aes-kw-192",
-      "displayName": "AES-KW-192",
+    "aes-192-kw": {
+      "templateId": "aes-192-kw",
+      "displayName": "AES-192-KW",
       "description": "AES Key Wrap with 192-bit KEK. RFC 3394, NIST approved.",
       "scopedCapabilities": [
         {
@@ -93,9 +93,9 @@
         "NIST SP 800-38F"
       ]
     },
-    "aes-kw-256": {
-      "templateId": "aes-kw-256",
-      "displayName": "AES-KW-256",
+    "aes-256-kw": {
+      "templateId": "aes-256-kw",
+      "displayName": "AES-256-KW",
       "description": "AES Key Wrap with 256-bit KEK. RFC 3394, NIST approved. Recommended.",
       "scopedCapabilities": [
         {
@@ -138,9 +138,9 @@
         "NIST SP 800-38F"
       ]
     },
-    "aes-kwp-128": {
-      "templateId": "aes-kwp-128",
-      "displayName": "AES-KWP-128",
+    "aes-128-kwp": {
+      "templateId": "aes-128-kwp",
+      "displayName": "AES-128-KWP",
       "description": "AES Key Wrap with Padding, 128-bit KEK. RFC 5649, supports arbitrary data.",
       "scopedCapabilities": [
         {
@@ -183,9 +183,9 @@
         "NIST SP 800-38F"
       ]
     },
-    "aes-kwp-192": {
-      "templateId": "aes-kwp-192",
-      "displayName": "AES-KWP-192",
+    "aes-192-kwp": {
+      "templateId": "aes-192-kwp",
+      "displayName": "AES-192-KWP",
       "description": "AES Key Wrap with Padding, 192-bit KEK. RFC 5649, supports arbitrary data.",
       "scopedCapabilities": [
         {
@@ -228,9 +228,9 @@
         "NIST SP 800-38F"
       ]
     },
-    "aes-kwp-256": {
-      "templateId": "aes-kwp-256",
-      "displayName": "AES-KWP-256",
+    "aes-256-kwp": {
+      "templateId": "aes-256-kwp",
+      "displayName": "AES-256-KWP",
       "description": "AES Key Wrap with Padding, 256-bit KEK. RFC 5649, supports arbitrary data. Recommended.",
       "scopedCapabilities": [
         {

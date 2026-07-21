@@ -1,7 +1,7 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
-  "description": "Classical digital signatures. CycloneDX naming: {algorithm}-{curve|keysize}-{hash}[-{format}]",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
+  "description": "Classical digital signatures. IDs follow CycloneDX registry naming (RSA-PSS[-hash][-mgf][-saltLength][-keyLength], ECDSA-{curve}-{hash}); -der/-p1363 output-format and -prehashed qualifiers are CaaS extensions.",
   "templates": {
     "ecdsa-p256-sha256-der": {
       "templateId": "ecdsa-p256-sha256-der",
@@ -160,8 +160,7 @@
             "signature": {
               "scope": "SIGNATURE_SCOPE_STANDARD",
               "security": {
-                "securityStrengthBits": 128,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "securityStrengthBits": 128
               },
               "nonMalleable": false,
               "deterministic": false
@@ -184,7 +183,7 @@
         }
       ],
       "algorithm": {
-        "oid": "1.3.132.0.10",
+        "oid": "1.2.840.10045.4.3.2",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "ecdsa": {
           "curve": "ELLIPTIC_CURVE_SECP256K1",
@@ -197,8 +196,8 @@
         "SEC 2"
       ]
     },
-    "ed25519-pure": {
-      "templateId": "ed25519-pure",
+    "ed25519": {
+      "templateId": "ed25519",
       "displayName": "Ed25519",
       "description": "Edwards-curve DSA using Curve25519, pure variant. High performance, deterministic.",
       "scopedCapabilities": [
@@ -248,7 +247,7 @@
     "ed25519ph": {
       "templateId": "ed25519ph",
       "displayName": "Ed25519ph",
-      "description": "Ed25519 prehashed variant. Allows signing large messages with external hashing.",
+      "description": "Ed25519 prehashed variant. Allows signing large messages with external hashing. No distinct OID: RFC 8410 removed the draft ph OIDs.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -256,7 +255,8 @@
               "scope": "SIGNATURE_SCOPE_PREHASHED",
               "security": {
                 "securityStrengthBits": 128,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
               },
               "nonMalleable": true,
               "deterministic": true
@@ -280,7 +280,6 @@
         }
       ],
       "algorithm": {
-        "oid": "1.3.101.114",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "ed25519": {
           "variant": "ED25519_VARIANT_PH"
@@ -288,13 +287,14 @@
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
       "standards": [
-        "RFC 8032"
+        "RFC 8032",
+        "FIPS 186-5"
       ]
     },
     "ed25519ctx": {
       "templateId": "ed25519ctx",
       "displayName": "Ed25519ctx",
-      "description": "Ed25519 with context variant. Allows domain separation via context string.",
+      "description": "Ed25519 with context variant. Allows domain separation via context string. No distinct OID assigned by RFC 8410.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -326,7 +326,6 @@
         }
       ],
       "algorithm": {
-        "oid": "1.3.101.112",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "ed25519": {
           "variant": "ED25519_VARIANT_CTX"
@@ -337,8 +336,8 @@
         "RFC 8032"
       ]
     },
-    "ed448-pure": {
-      "templateId": "ed448-pure",
+    "ed448": {
+      "templateId": "ed448",
       "displayName": "Ed448",
       "description": "Edwards-curve DSA using Curve448, pure variant. Higher security than Ed25519. Supports optional context string.",
       "scopedCapabilities": [
@@ -348,7 +347,8 @@
               "scope": "SIGNATURE_SCOPE_STANDARD",
               "security": {
                 "securityStrengthBits": 224,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
               },
               "nonMalleable": true,
               "deterministic": true
@@ -376,7 +376,8 @@
               "scope": "SIGNATURE_SCOPE_WITH_CONTEXT",
               "security": {
                 "securityStrengthBits": 224,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "nistStatus": "NIST_STATUS_APPROVED",
+                "fipsApproved": true
               },
               "nonMalleable": true,
               "deterministic": true
@@ -408,12 +409,13 @@
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
       "standards": [
-        "RFC 8032"
+        "RFC 8032",
+        "FIPS 186-5"
       ]
     },
-    "rsa-pss-2048-sha256-32": {
-      "templateId": "rsa-pss-2048-sha256-32",
-      "displayName": "RSA-PSS-2048-SHA256",
+    "rsa-pss-sha256-mgf1-32-2048": {
+      "templateId": "rsa-pss-sha256-mgf1-32-2048",
+      "displayName": "RSA-PSS-SHA-256-MGF1-32-2048",
       "description": "RSA-PSS with 2048-bit key, SHA-256, 32-byte salt. NIST approved.",
       "scopedCapabilities": [
         {
@@ -454,7 +456,7 @@
           "hash": "HASH_ALGORITHM_SHA256",
           "mgf": "MGF_MGF1",
           "mgfHash": "HASH_ALGORITHM_SHA256",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -464,9 +466,9 @@
         "FIPS 186-5"
       ]
     },
-    "rsa-pss-3072-sha256-32": {
-      "templateId": "rsa-pss-3072-sha256-32",
-      "displayName": "RSA-PSS-3072-SHA256",
+    "rsa-pss-sha256-mgf1-32-3072": {
+      "templateId": "rsa-pss-sha256-mgf1-32-3072",
+      "displayName": "RSA-PSS-SHA-256-MGF1-32-3072",
       "description": "RSA-PSS with 3072-bit key, SHA-256, 32-byte salt. Recommended minimum for long-term.",
       "scopedCapabilities": [
         {
@@ -507,7 +509,7 @@
           "hash": "HASH_ALGORITHM_SHA256",
           "mgf": "MGF_MGF1",
           "mgfHash": "HASH_ALGORITHM_SHA256",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -517,9 +519,9 @@
         "FIPS 186-5"
       ]
     },
-    "rsa-pss-4096-sha384-48": {
-      "templateId": "rsa-pss-4096-sha384-48",
-      "displayName": "RSA-PSS-4096-SHA384",
+    "rsa-pss-sha384-mgf1-48-4096": {
+      "templateId": "rsa-pss-sha384-mgf1-48-4096",
+      "displayName": "RSA-PSS-SHA-384-MGF1-48-4096",
       "description": "RSA-PSS with 4096-bit key, SHA-384, 48-byte salt. High security.",
       "scopedCapabilities": [
         {
@@ -560,7 +562,7 @@
           "hash": "HASH_ALGORITHM_SHA384",
           "mgf": "MGF_MGF1",
           "mgfHash": "HASH_ALGORITHM_SHA384",
-          "saltLength": 48
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -570,9 +572,9 @@
         "FIPS 186-5"
       ]
     },
-    "rsa-pkcs1v15-2048-sha256": {
-      "templateId": "rsa-pkcs1v15-2048-sha256",
-      "displayName": "RSA-PKCS1v15-2048-SHA256",
+    "rsa-pkcs1v15-sha256-2048": {
+      "templateId": "rsa-pkcs1v15-sha256-2048",
+      "displayName": "RSA-PKCS1-1.5-SHA-256-2048",
       "description": "RSA PKCS#1 v1.5 with 2048-bit key, SHA-256. Legacy, prefer RSA-PSS.",
       "scopedCapabilities": [
         {
@@ -619,8 +621,6 @@
         "RFC 8017"
       ]
     },
-    "_comment_prehashed": "======== PREHASHED SIGNATURE TEMPLATES ========",
-    "_comment_prehashed_desc": "Templates for signing pre-computed digests. Use DigestSign/DigestVerify APIs.",
     "ecdsa-p256-prehashed-der": {
       "templateId": "ecdsa-p256-prehashed-der",
       "displayName": "ECDSA-P256-Prehashed",
@@ -772,8 +772,7 @@
             "signature": {
               "scope": "SIGNATURE_SCOPE_PREHASHED",
               "security": {
-                "securityStrengthBits": 128,
-                "nistStatus": "NIST_STATUS_ACCEPTABLE"
+                "securityStrengthBits": 128
               },
               "nonMalleable": false,
               "deterministic": false
@@ -796,7 +795,6 @@
         }
       ],
       "algorithm": {
-        "oid": "1.3.132.0.10",
         "primitive": "CRYPTO_PRIMITIVE_SIGNATURE",
         "ecdsa": {
           "curve": "ELLIPTIC_CURVE_SECP256K1",
@@ -849,7 +847,7 @@
         "rsaPss": {
           "keySizeBits": 2048,
           "mgf": "MGF_MGF1",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -900,7 +898,7 @@
         "rsaPss": {
           "keySizeBits": 3072,
           "mgf": "MGF_MGF1",
-          "saltLength": 32
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -913,7 +911,7 @@
     "rsa-pss-4096-prehashed": {
       "templateId": "rsa-pss-4096-prehashed",
       "displayName": "RSA-PSS-4096-Prehashed",
-      "description": "RSA-PSS 4096-bit for pre-computed digests. High security for external hashing workflows.",
+      "description": "RSA-PSS 4096-bit for pre-computed digests. High security for external hashing workflows. 152-bit strength per SP 800-56B Appendix D estimate.",
       "scopedCapabilities": [
         {
           "scope": {
@@ -951,7 +949,7 @@
         "rsaPss": {
           "keySizeBits": 4096,
           "mgf": "MGF_MGF1",
-          "saltLength": 48
+          "saltLengthMode": "SALT_LENGTH_MODE_HASH_LENGTH"
         }
       },
       "status": "TEMPLATE_STATUS_ACTIVE",
@@ -963,7 +961,7 @@
     },
     "rsa-pkcs1v15-2048-prehashed": {
       "templateId": "rsa-pkcs1v15-2048-prehashed",
-      "displayName": "RSA-PKCS1v15-2048-Prehashed",
+      "displayName": "RSA-PKCS1-1.5-2048-Prehashed",
       "description": "RSA PKCS#1 v1.5 2048-bit for pre-computed digests. Legacy, prefer RSA-PSS-prehashed.",
       "scopedCapabilities": [
         {

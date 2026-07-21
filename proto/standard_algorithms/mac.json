@@ -1,7 +1,7 @@
 {
-  "version": "4.0.0",
-  "lastUpdated": "2026-01-19T00:00:00Z",
-  "description": "Message Authentication Codes. CycloneDX naming: {algorithm}-{hash} or {algorithm}-{securitybits}-{outputbits}",
+  "version": "0.1.0",
+  "lastUpdated": "2026-07-17T00:00:00Z",
+  "description": "Message Authentication Codes. CycloneDX registry naming: hmac-{hash}-{taglen}, kmac(128|256)-{outputbits}.",
   "templates": {
     "hmac-sha256-256": {
       "templateId": "hmac-sha256-256",
@@ -183,8 +183,8 @@
         "FIPS 202"
       ]
     },
-    "kmac-128-256": {
-      "templateId": "kmac-128-256",
+    "kmac128-256": {
+      "templateId": "kmac128-256",
       "displayName": "KMAC128-256",
       "description": "KECCAK MAC with 128-bit security, 256-bit output. Based on SHA-3.",
       "scopedCapabilities": [
@@ -228,8 +228,8 @@
         "NIST SP 800-185"
       ]
     },
-    "kmac-256-512": {
-      "templateId": "kmac-256-512",
+    "kmac256-512": {
+      "templateId": "kmac256-512",
       "displayName": "KMAC256-512",
       "description": "KECCAK MAC with 256-bit security, 512-bit output. Based on SHA-3.",
       "scopedCapabilities": [
