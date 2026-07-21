@@ -149,8 +149,36 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 	}
 }
 
-// Compile-time assertion: Provider implements provider.Backend.
-var _ provider.Backend = (*Provider)(nil)
+// DigestSign signs a pre-computed digest.
+// The software provider signs the raw digest bytes without any internal hashing.
+// Algorithm dispatch uses the key material type; currently only ECDSA-P256 is supported.
+func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	const op errors.Op = "software.(Provider).DigestSign"
+	sig, err := signECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest())
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return &providerpb.DigestSignResponse{Signature: sig}, nil
+}
+
+// DigestVerify verifies a signature over a pre-computed digest.
+// Currently only ECDSA-P256 is supported.
+func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	const op errors.Op = "software.(Provider).DigestVerify"
+	valid, err := verifyECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature())
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return &providerpb.DigestVerifyResponse{Valid: valid}, nil
+}
+
+// Compile-time assertion: Provider implements provider.Backend and the Signer
+// capability. The software provider does not (yet) implement Cipher, Macer,
+// Hasher, Randomizer, or KeyEstablisher.
+var (
+	_ provider.Backend = (*Provider)(nil)
+	_ provider.Signer  = (*Provider)(nil)
+)
 
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.
 var _ provider.AlgorithmCapabilityProvider = (*Provider)(nil)

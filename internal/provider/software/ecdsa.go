@@ -49,6 +49,24 @@ func signECDSAP256(ctx context.Context, privDER, payload []byte) ([]byte, error)
 	return sig, nil
 }
 
+// signECDSAP256Digest signs a pre-computed digest directly, without hashing.
+// Used by DigestSign where the caller has already computed the digest.
+func signECDSAP256Digest(ctx context.Context, privDER, digest []byte) ([]byte, error) {
+	const op errors.Op = "software.signECDSAP256Digest"
+
+	privKey, err := x509.ParseECPrivateKey(privDER)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	sig, err := ecdsa.SignASN1(rand.Reader, privKey, digest)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	return sig, nil
+}
+
 func verifyECDSAP256(ctx context.Context, pubDER, payload, signature []byte) (bool, error) {
 	const op errors.Op = "software.verifyECDSAP256"
 
@@ -64,4 +82,22 @@ func verifyECDSAP256(ctx context.Context, pubDER, payload, signature []byte) (bo
 
 	digest := sha256.Sum256(payload)
 	return ecdsa.VerifyASN1(pubKey, digest[:], signature), nil
+}
+
+// verifyECDSAP256Digest verifies a signature over a pre-computed digest directly,
+// without hashing.  Used by DigestVerify.
+func verifyECDSAP256Digest(ctx context.Context, pubDER, digest, signature []byte) (bool, error) {
+	const op errors.Op = "software.verifyECDSAP256Digest"
+
+	pubKeyAny, err := x509.ParsePKIXPublicKey(pubDER)
+	if err != nil {
+		return false, errors.Wrap(ctx, op, err)
+	}
+
+	pubKey, ok := pubKeyAny.(*ecdsa.PublicKey)
+	if !ok {
+		return false, errors.New(ctx, op, errors.CodeInvalidArgument, "public key is not ECDSA")
+	}
+
+	return ecdsa.VerifyASN1(pubKey, digest, signature), nil
 }
