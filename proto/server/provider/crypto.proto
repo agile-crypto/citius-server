@@ -37,11 +37,11 @@ message SignRequest {
   // REQUIRED: always set one option to make intent explicit.
   //
   // PKCS #11 mapping:
-  //   no_context       → CKM_ECDSA, CKM_RSA_PKCS_PSS, CKM_DSA (no mechanism param)
-  //   domain_context   → CK_EDDSA_PARAMS.pContextData (EdDSA)
+  //   no_context       => CKM_ECDSA, CKM_RSA_PKCS_PSS, CKM_DSA (no mechanism param)
+  //   domain_context   => CK_EDDSA_PARAMS.pContextData (EdDSA)
   //                      CK_ML_DSA_PARAMS.pContext     (ML-DSA)
   //                      CK_SLH_DSA_PARAMS.pContext    (SLH-DSA)
-  //   vendor_context   → vendor-specific mechanism params
+  //   vendor_context   => vendor-specific mechanism params
   oneof scope_params {
     caas.crypto.v1.NoParams                no_context     = 3;
     caas.crypto.v1.SignatureDomainContext   domain_context = 4;
@@ -167,11 +167,11 @@ message DigestVerifyResponse {
 // the provider generates them and returns them in ProviderOutput.
 //
 // PKCS #11 equivalents:
-//   no_params         → CKM_AES_CBC, CKM_AES_CTR (IV is system-generated)
-//   aead_params       → CK_GCM_PARAMS.pAAD (AES-GCM), CK_CCM_PARAMS.pAAD (AES-CCM),
+//   no_params         => CKM_AES_CBC, CKM_AES_CTR (IV is system-generated)
+//   aead_params       => CK_GCM_PARAMS.pAAD (AES-GCM), CK_CCM_PARAMS.pAAD (AES-CCM),
 //                        CK_SALSA20_CHACHA20_POLY1305_PARAMS.pAAD (ChaCha20-Poly1305)
-//   xts_params        → CK_AES_XTS_PARAMS tweak value
-//   asymmetric_params → CK_RSA_PKCS_OAEP_PARAMS.pSourceData (OAEP label)
+//   xts_params        => CK_AES_XTS_PARAMS tweak value
+//   asymmetric_params => CK_RSA_PKCS_OAEP_PARAMS.pSourceData (OAEP label)
 message EncryptRequest {
   bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
   bytes plaintext    = 2 [(buf.validate.field).bytes.min_len = 1];
@@ -230,6 +230,110 @@ message DecryptResponse {
 }
 
 // ============================================================================
+// MAC Operations
+// ============================================================================
+
+// GenerateMacRequest asks the provider to compute a MAC over a message.
+//
+// PKCS #11 equivalents:
+//   no_params          => CKM_SHA256_HMAC, CKM_AES_CMAC, CKM_POLY1305
+//   customizable_params => CKM_KMAC128, CKM_KMAC256 (NIST SP 800-185)
+message GenerateMacRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  bytes message      = 2 [(buf.validate.field).bytes.min_len = 1];
+
+  // Scope-based operation parameters.
+  oneof scope_params {
+    caas.crypto.v1.NoParams              no_params           = 3;  // HMAC, CMAC, Poly1305
+    caas.crypto.v1.CustomizableMacParams customizable_params = 4;  // KMAC
+    caas.crypto.v1.VendorMacParams       vendor_params       = 5;
+  }
+
+  // Typed algorithm specification for provider dispatch.
+  caas.crypto.v1.AlgorithmDetails algorithm = 6;
+}
+
+// GenerateMacResponse returns the MAC tag.
+//
+// GMAC (authentication-only GCM) generates a system IV — the provider sets
+// aead_output.  All other MACs set no_output.
+message GenerateMacResponse {
+  bytes mac = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// VerifyMacRequest asks the provider to verify a MAC in constant time.
+//
+// PKCS #11 equivalent: C_VerifyInit/C_Verify with a MAC mechanism.
+message VerifyMacRequest {
+  bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
+  bytes message      = 2 [(buf.validate.field).bytes.min_len = 1];
+  bytes mac          = 3 [(buf.validate.field).bytes.min_len = 1];
+
+  // Must match the scope used during MAC generation.
+  oneof scope_params {
+    caas.crypto.v1.NoParams              no_params           = 4;
+    caas.crypto.v1.CustomizableMacParams customizable_params = 5;
+    caas.crypto.v1.VendorMacParams       vendor_params       = 6;
+  }
+
+  caas.crypto.v1.AlgorithmDetails algorithm = 7;
+  // Provider output from generation — carries the GMAC IV when applicable.
+  caas.crypto.v1.ProviderOutput output = 8;
+}
+
+// VerifyMacResponse reports whether the MAC is valid.
+message VerifyMacResponse {
+  bool valid = 1;
+  caas.crypto.v1.ProviderOutput output = 2;
+}
+
+// ============================================================================
+// Digest / XOF Operations
+// ============================================================================
+
+// DigestRequest asks the provider to hash data (single-shot, fixed-length output).
+//
+// Digest is keyless — no key_material.  The provider selects the implementation
+// based on hash_algorithm.
+//
+// PKCS #11 equivalent: C_DigestInit/C_Digest.
+message DigestRequest {
+  bytes data = 1 [(buf.validate.field).bytes.min_len = 1];
+
+  // Hash algorithm selection.
+  // Use hash_algorithm_oid when hash_algorithm = HASH_ALGORITHM_OTHER.
+  caas.crypto.v1.HashAlgorithm hash_algorithm    = 2;
+  string                       hash_algorithm_oid = 3;
+}
+
+// DigestResponse returns the digest bytes.
+message DigestResponse {
+  bytes digest = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output = 2;  // always no_output
+}
+
+// XofRequest asks the provider to run an extendable-output function.
+//
+// XOF is keyless — no key_material.  The caller specifies the desired output
+// length; the provider truncates/extends accordingly.
+//
+// PKCS #11 equivalents: CKM_SHAKE_128, CKM_SHAKE_256 with variable output length.
+message XofRequest {
+  bytes  data                = 1 [(buf.validate.field).bytes.min_len = 1];
+  uint32 output_length_bytes = 2 [(buf.validate.field).uint32.gt = 0];
+
+  // Algorithm selection (SHAKE128, SHAKE256, BLAKE3, …).
+  caas.crypto.v1.AlgorithmDetails algorithm = 3;
+}
+
+// XofResponse returns the XOF output of the requested length.
+message XofResponse {
+  bytes output = 1 [(buf.validate.field).bytes.min_len = 1];
+  caas.crypto.v1.ProviderOutput output_meta = 2;  // always no_output
+}
+
+// ============================================================================
 // Service Definition
 // ============================================================================
 
@@ -238,9 +342,8 @@ message DecryptResponse {
 // The CaaS core engine calls these RPCs after resolving template, policy,
 // and key material.  Each provider implements the subset it supports.
 //
-// Sign + Verify (+ DigestSign/DigestVerify for prehash).
-// Encrypt + Decrypt are included for completeness
-// TODO: Add more rpcs for other primitive operations (e.g., MAC, KDF, key agreement).
+// All operations share the same wiring shape: data-in => data-out.
+// Key-to-key operations (wrap, derive, agree, KEM) live in KeyEstablishmentService.
 service CryptoService {
   // Full-message signing (provider hashes internally per template config).
   rpc Sign(SignRequest)               returns (SignResponse);
@@ -253,4 +356,14 @@ service CryptoService {
   // Encryption / Decryption (all scope families via oneof).
   rpc Encrypt(EncryptRequest)         returns (EncryptResponse);
   rpc Decrypt(DecryptRequest)         returns (DecryptResponse);
+
+  // MAC generation and verification.
+  rpc GenerateMac(GenerateMacRequest) returns (GenerateMacResponse);
+  rpc VerifyMac(VerifyMacRequest)     returns (VerifyMacResponse);
+
+  // Fixed-length digest (keyless).
+  rpc Digest(DigestRequest)           returns (DigestResponse);
+
+  // Extendable-output function (keyless, variable-length output).
+  rpc Xof(XofRequest)                 returns (XofResponse);
 }
