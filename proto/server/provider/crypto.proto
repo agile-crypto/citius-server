@@ -123,6 +123,9 @@ message DigestSignRequest {
   // Optional OID for extensibility (when hash_algorithm is HASH_ALGORITHM_OTHER).
   // Example: "2.16.840.1.101.3.4.2.1" for SHA-256
   string hash_algorithm_oid = 7;
+
+  // Typed algorithm specification for provider dispatch.
+  caas.crypto.v1.AlgorithmDetails algorithm = 8;
 }
 
 // DigestSignResponse contains the signature over the digest.
@@ -148,6 +151,14 @@ message DigestVerifyRequest {
   // Must match the hash_algorithm from the corresponding DigestSignRequest.
   caas.crypto.v1.HashAlgorithm hash_algorithm = 7;
   string hash_algorithm_oid = 8;
+
+  // Typed algorithm specification — must match the algorithm used during
+  // DigestSign.
+  caas.crypto.v1.AlgorithmDetails algorithm = 9;
+
+  // Provider output captured during DigestSign — carries the signature
+  // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
+  caas.crypto.v1.ProviderOutput output = 10;
 }
 
 // DigestVerifyResponse reports whether the digest signature is valid.
