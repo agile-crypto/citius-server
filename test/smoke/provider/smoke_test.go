@@ -12,6 +12,7 @@
 package provider_test
 
 import (
+	"errors"
 	"testing"
 
 	protovalidate "buf.build/go/protovalidate"
@@ -41,11 +42,29 @@ func mustPass(t *testing.T, v protovalidate.Validator, msg proto.Message) {
 	}
 }
 
-func mustFail(t *testing.T, v protovalidate.Validator, msg proto.Message) {
+// mustFailField asserts that validation fails BECAUSE of a violation on
+// wantField specifically — not merely that validation fails for some reason.
+//
+// A message can be invalid in several ways at once; asserting only "err != nil"
+// lets a test keep passing after the field it names stops being enforced (e.g.
+// a constraint is accidentally dropped from the .proto) as long as some other
+// constraint still fires.  Checking the violated field closes that gap.
+func mustFailField(t *testing.T, v protovalidate.Validator, msg proto.Message, wantField string) {
 	t.Helper()
-	if err := v.Validate(msg); err == nil {
-		t.Errorf("%T should be invalid, but passed validation", msg)
+	err := v.Validate(msg)
+	if err == nil {
+		t.Fatalf("%T should be invalid, but passed validation", msg)
 	}
+	var valErr *protovalidate.ValidationError
+	if !errors.As(err, &valErr) {
+		t.Fatalf("%T: expected *protovalidate.ValidationError, got %T: %v", msg, err, err)
+	}
+	for _, viol := range valErr.Violations {
+		if viol.FieldDescriptor != nil && string(viol.FieldDescriptor.Name()) == wantField {
+			return
+		}
+	}
+	t.Fatalf("%T: expected a violation on field %q, got: %v", msg, wantField, err)
 }
 
 // ============================================================================
@@ -70,14 +89,14 @@ func TestGenerateKeyRequest_validate_valid(t *testing.T) {
 
 func TestGenerateKeyRequest_validate_nilAlgorithm(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.GenerateKeyRequest{})
+	mustFailField(t, v, &providerpb.GenerateKeyRequest{}, "algorithm")
 }
 
 // --- GenerateKeyResponse ---
 
 func TestGenerateKeyResponse_validate_emptyKeyMaterial(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.GenerateKeyResponse{})
+	mustFailField(t, v, &providerpb.GenerateKeyResponse{}, "key_material")
 }
 
 // --- SignRequest ---
@@ -92,39 +111,39 @@ func TestSignRequest_validate_valid(t *testing.T) {
 
 func TestSignRequest_validate_emptyKeyMaterial(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.SignRequest{
+	mustFailField(t, v, &providerpb.SignRequest{
 		Input: []byte("message"),
-	})
+	}, "key_material")
 }
 
 func TestSignRequest_validate_emptyInput(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.SignRequest{
+	mustFailField(t, v, &providerpb.SignRequest{
 		KeyMaterial: []byte("opaque-key"),
-	})
+	}, "input")
 }
 
 // --- SignResponse ---
 
 func TestSignResponse_validate_emptySignature(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.SignResponse{})
+	mustFailField(t, v, &providerpb.SignResponse{}, "signature")
 }
 
 // --- EncryptRequest ---
 
 func TestEncryptRequest_validate_emptyPlaintext(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.EncryptRequest{
+	mustFailField(t, v, &providerpb.EncryptRequest{
 		KeyMaterial: []byte("opaque-key"),
-	})
+	}, "plaintext")
 }
 
 // --- EncryptResponse ---
 
 func TestEncryptResponse_validate_emptyCiphertext(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.EncryptResponse{})
+	mustFailField(t, v, &providerpb.EncryptResponse{}, "ciphertext")
 }
 
 // --- ProviderInfo ---
@@ -140,19 +159,19 @@ func TestProviderInfo_validate_valid(t *testing.T) {
 
 func TestProviderInfo_validate_emptyName(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.ProviderInfo{
+	mustFailField(t, v, &providerpb.ProviderInfo{
 		Version: "1.0.0",
 		Type:    "software",
-	})
+	}, "name")
 }
 
 // --- StreamingSignInitRequest ---
 
 func TestStreamingSignInitRequest_validate_emptySessionId(t *testing.T) {
 	v := validator(t)
-	mustFail(t, v, &providerpb.StreamingSignInitRequest{
+	mustFailField(t, v, &providerpb.StreamingSignInitRequest{
 		KeyMaterial: []byte("opaque-key"),
-	})
+	}, "session_id")
 }
 
 // ============================================================================
