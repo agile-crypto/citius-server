@@ -51,7 +51,7 @@ message SignRequest {
   // Typed algorithm specification for provider dispatch.
   // The core resolves this from the template and passes it through.
   // The provider SHOULD validate it matches the key_material type.
-  caas.crypto.v1.AlgorithmDetails algorithm = 6;
+  caas.crypto.v1.AlgorithmDetails algorithm = 6 [(buf.validate.field).required = true];
 }
 
 // SignResponse contains the signature and provider output.
@@ -79,7 +79,7 @@ message VerifyRequest {
   }
 
   // Typed algorithm specification — must match the algorithm used during signing.
-  caas.crypto.v1.AlgorithmDetails algorithm = 7;
+  caas.crypto.v1.AlgorithmDetails algorithm = 7 [(buf.validate.field).required = true];
 
   // Provider-generated output — algorithm parameters and encoding, retuned during signing.  The core extracts this from the stored OperationMetadata and passes it through for verification.
   caas.crypto.v1.ProviderOutput output = 8;
