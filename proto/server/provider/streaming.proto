@@ -28,7 +28,10 @@ message StreamingSignInitRequest {
   // Typed algorithm specification for provider dispatch.  Mirrors
   // SignRequest.algorithm — a multi-part sign session needs the same
   // dispatch information as a single-shot sign.
-  caas.crypto.v1.AlgorithmDetails algorithm = 6;
+  //
+  // REQUIRED — no streaming implementation exists yet, so there are no
+  // callers this constraint could break.
+  caas.crypto.v1.AlgorithmDetails algorithm = 6 [(buf.validate.field).required = true];
 }
 
 // StreamingSignChunk is one chunk of data in a multi-part sign operation.
@@ -56,8 +59,9 @@ message StreamingVerifyInitRequest {
   }
 
   // Typed algorithm specification for provider dispatch.  Must match the
-  // algorithm used to initialize signing.
-  caas.crypto.v1.AlgorithmDetails algorithm = 6;
+  // algorithm used to initialize signing.  REQUIRED — no streaming
+  // implementation exists yet.
+  caas.crypto.v1.AlgorithmDetails algorithm = 6 [(buf.validate.field).required = true];
 }
 
 // StreamingVerifyChunk is one chunk in a multi-part verify operation.
