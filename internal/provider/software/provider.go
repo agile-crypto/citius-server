@@ -50,9 +50,10 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	const op errors.Op = "software.(Provider).GenerateKey"
 
 	var (
-		pubDER  []byte
-		privDER []byte
-		err     error
+		pubDER   []byte
+		privDER  []byte
+		encoding string
+		err      error
 	)
 
 	// Dispatch on the typed AlgorithmDetails oneof.
@@ -66,6 +67,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
+		encoding = "sec1" // ECDSA: x509.MarshalECPrivateKey (SEC1, RFC 5915)
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -75,6 +77,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
+		encoding = "raw" // ML-DSA: circl native PrivateKey.Bytes(), not yet PKCS#8
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -84,6 +87,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	return &providerpb.GenerateKeyResponse{
 		PublicKeyBytes: pubDER,
 		KeyMaterial:    privDER,
+		Output:         provider.NoOutput(encoding),
 	}, nil
 }
 
@@ -101,7 +105,7 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.SignResponse{Signature: sig}, nil
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("der")}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -111,7 +115,7 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.SignResponse{Signature: sig}, nil
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for sign: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -132,7 +136,7 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.VerifyResponse{Valid: valid}, nil
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutput("der")}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -142,7 +146,7 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.VerifyResponse{Valid: valid}, nil
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for verify: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -158,7 +162,7 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return &providerpb.DigestSignResponse{Signature: sig}, nil
+	return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("der")}, nil
 }
 
 // DigestVerify verifies a signature over a pre-computed digest.
@@ -169,7 +173,7 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return &providerpb.DigestVerifyResponse{Valid: valid}, nil
+	return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutput("der")}, nil
 }
 
 // Compile-time assertion: Provider implements provider.Backend and the Signer
