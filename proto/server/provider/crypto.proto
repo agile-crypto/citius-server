@@ -124,8 +124,10 @@ message DigestSignRequest {
   // Example: "2.16.840.1.101.3.4.2.1" for SHA-256
   string hash_algorithm_oid = 7;
 
-  // Typed algorithm specification for provider dispatch.
-  caas.crypto.v1.AlgorithmDetails algorithm = 8;
+  // Typed algorithm specification for provider dispatch.  REQUIRED — no
+  // orchestrator method or gRPC handler consumes this message yet, so there
+  // are no callers this constraint could break.
+  caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 }
 
 // DigestSignResponse contains the signature over the digest.
@@ -153,8 +155,8 @@ message DigestVerifyRequest {
   string hash_algorithm_oid = 8;
 
   // Typed algorithm specification — must match the algorithm used during
-  // DigestSign.
-  caas.crypto.v1.AlgorithmDetails algorithm = 9;
+  // DigestSign.  REQUIRED — no callers exist yet (see DigestSignRequest.algorithm).
+  caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
 
   // Provider output captured during DigestSign — carries the signature
   // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
@@ -204,7 +206,10 @@ message EncryptRequest {
   // GCM vs CBC vs CTR, the key size, the IV size, or the tag size —
   // key_material is opaque bytes and scope_params only carries caller-supplied
   // values (AAD, tweak, OAEP label), never the mechanism.
-  caas.crypto.v1.AlgorithmDetails algorithm = 8;
+  //
+  // REQUIRED — the orchestrator's Encrypt method is a CodeNotImplemented stub,
+  // so there are no callers this constraint could break.
+  caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 }
 
 // EncryptResponse returns ciphertext and system-generated output.
@@ -243,8 +248,9 @@ message DecryptRequest {
   }
 
   // Typed algorithm specification — must match the algorithm used during
-  // Encrypt.  See EncryptRequest.algorithm.
-  caas.crypto.v1.AlgorithmDetails algorithm = 9;
+  // Encrypt.  See EncryptRequest.algorithm.  REQUIRED — Decrypt is likewise
+  // a CodeNotImplemented stub today.
+  caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
 }
 
 // DecryptResponse returns plaintext and provider output.
