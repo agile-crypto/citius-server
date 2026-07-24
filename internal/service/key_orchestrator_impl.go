@@ -210,6 +210,9 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
+	if err = requireProviderOutput(ctx, op, genResp.GetOutput()); err != nil {
+		return nil, err
+	}
 
 	// 3. Build Key + initial Version, then persist.
 	//
@@ -382,11 +385,11 @@ func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpe
 	}
 
 	// Generate new key material
-	genResp, err := provider.GenerateKey(ctx, &providerpb.GenerateKeyRequest{
+	genResp, err := generateAndValidateKey(ctx, op, provider, &providerpb.GenerateKeyRequest{
 		Algorithm: template.GetAlgorithm(),
 	})
 	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
+		return nil, err
 	}
 
 	// Marshal the full GenerateKeyResponse so that both KeyMaterial (private)
@@ -418,6 +421,21 @@ func (r *keyOrchestrator) TransformKey(ctx context.Context, spec TransformKeySpe
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return metadata, nil
+}
+
+// generateAndValidateKey calls the provider's GenerateKey and enforces the
+// ProviderOutput contract (an unset algorithm_output is a provider bug, not
+// a caller error).  Extracted from TransformKey to keep cyclomatic
+// complexity within linter limits.
+func generateAndValidateKey(ctx context.Context, op errors.Op, prov provider.Backend, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
+	genResp, err := prov.GenerateKey(ctx, req)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	if err = requireProviderOutput(ctx, op, genResp.GetOutput()); err != nil {
+		return nil, err
+	}
+	return genResp, nil
 }
 
 // Validates a transform operation against the policy with given policyID. Returns an error if the operation is not permitted.
