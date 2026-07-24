@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"context"
 
-	metapb "github.com/agile-crypto/citius-server/gen/go/api/messages"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/provider"
 )
@@ -42,6 +41,7 @@ func (p *Provider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyReque
 	return &providerpb.GenerateKeyResponse{
 		PublicKeyBytes: []byte("LOOPBACK_PUB"),
 		KeyMaterial:    []byte("LOOPBACK_PRIV"),
+		Output:         provider.NoOutput("raw"),
 	}, nil
 }
 
@@ -54,31 +54,34 @@ func (p *Provider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest
 func (p *Provider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
 	return &providerpb.ExportPublicKeyResponse{
 		PublicKeyBytes: []byte("LOOPBACK_PUB"),
+		Output:         provider.NoOutput("raw"),
 	}, nil
 }
 
 // Sign echoes the input as the "signature".
 // This makes round-trip testing trivial: Verify succeeds when signature == input.
 func (p *Provider) Sign(_ context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error) {
-	return &providerpb.SignResponse{Signature: req.GetInput()}, nil
+	return &providerpb.SignResponse{Signature: req.GetInput(), Output: provider.NoOutput("raw")}, nil
 }
 
 // Verify returns valid=true when signature == input (the loopback invariant from Sign).
 func (p *Provider) Verify(_ context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	return &providerpb.VerifyResponse{
-		Valid: bytes.Equal(req.GetSignature(), req.GetInput()),
+		Valid:  bytes.Equal(req.GetSignature(), req.GetInput()),
+		Output: provider.NoOutput("raw"),
 	}, nil
 }
 
 // DigestSign echoes the digest as the "signature" (loopback invariant).
 func (p *Provider) DigestSign(_ context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	return &providerpb.DigestSignResponse{Signature: req.GetDigest()}, nil
+	return &providerpb.DigestSignResponse{Signature: req.GetDigest(), Output: provider.NoOutput("raw")}, nil
 }
 
 // DigestVerify returns valid=true when signature == digest (loopback invariant).
 func (p *Provider) DigestVerify(_ context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
 	return &providerpb.DigestVerifyResponse{
-		Valid: bytes.Equal(req.GetSignature(), req.GetDigest()),
+		Valid:  bytes.Equal(req.GetSignature(), req.GetDigest()),
+		Output: provider.NoOutput("raw"),
 	}, nil
 }
 
@@ -86,7 +89,7 @@ func (p *Provider) DigestVerify(_ context.Context, req *providerpb.DigestVerifyR
 func (p *Provider) Encrypt(_ context.Context, req *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
 	return &providerpb.EncryptResponse{
 		Ciphertext: req.GetPlaintext(),
-		Output:     &metapb.ProviderOutput{AlgorithmOutput: &metapb.ProviderOutput_NoOutput{NoOutput: &metapb.NoAlgorithmOutput{}}},
+		Output:     provider.NoOutput("raw"),
 	}, nil
 }
 
@@ -94,7 +97,7 @@ func (p *Provider) Encrypt(_ context.Context, req *providerpb.EncryptRequest) (*
 func (p *Provider) Decrypt(_ context.Context, req *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
 	return &providerpb.DecryptResponse{
 		Plaintext: req.GetCiphertext(),
-		Output:    &metapb.ProviderOutput{AlgorithmOutput: &metapb.ProviderOutput_NoOutput{NoOutput: &metapb.NoAlgorithmOutput{}}},
+		Output:    provider.NoOutput("raw"),
 	}, nil
 }
 
