@@ -41,19 +41,19 @@ func (m *mockProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*prov
 	return &providerpb.SignResponse{Output: provider.NoOutput("raw")}, nil
 }
 func (m *mockProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
-	return &providerpb.VerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return &providerpb.VerifyResponse{Output: provider.NoOutputUnencoded()}, nil
 }
 func (m *mockProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
 	return &providerpb.DigestSignResponse{Output: provider.NoOutput("raw")}, nil
 }
 func (m *mockProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	return &providerpb.DigestVerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return &providerpb.DigestVerifyResponse{Output: provider.NoOutputUnencoded()}, nil
 }
 func (m *mockProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
 	return &providerpb.EncryptResponse{Output: provider.NoOutput("raw")}, nil
 }
 func (m *mockProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
-	return &providerpb.DecryptResponse{Output: provider.NoOutput("raw")}, nil
+	return &providerpb.DecryptResponse{Output: provider.NoOutputUnencoded()}, nil
 }
 
 // Compile-time checks.
@@ -84,19 +84,19 @@ func (b *basicProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*pro
 	return &providerpb.SignResponse{Output: provider.NoOutput("raw")}, nil
 }
 func (b *basicProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
-	return &providerpb.VerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return &providerpb.VerifyResponse{Output: provider.NoOutputUnencoded()}, nil
 }
 func (b *basicProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
 	return &providerpb.DigestSignResponse{Output: provider.NoOutput("raw")}, nil
 }
 func (b *basicProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	return &providerpb.DigestVerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return &providerpb.DigestVerifyResponse{Output: provider.NoOutputUnencoded()}, nil
 }
 func (b *basicProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
 	return &providerpb.EncryptResponse{Output: provider.NoOutput("raw")}, nil
 }
 func (b *basicProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
-	return &providerpb.DecryptResponse{Output: provider.NoOutput("raw")}, nil
+	return &providerpb.DecryptResponse{Output: provider.NoOutputUnencoded()}, nil
 }
 
 var _ provider.Backend = (*basicProvider)(nil)
