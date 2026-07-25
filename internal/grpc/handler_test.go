@@ -174,6 +174,12 @@ func (m *mockCryptoOps) Verify(ctx context.Context, req crypto.VerifyRequest) (c
 }
 
 // Stub the rest of the interface.
+func (m *mockCryptoOps) DigestSign(_ context.Context, _ crypto.DigestSignRequest) (crypto.SignResult, error) {
+	panic("mockCryptoOps.DigestSign: not implemented")
+}
+func (m *mockCryptoOps) DigestVerify(_ context.Context, _ crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+	panic("mockCryptoOps.DigestVerify: not implemented")
+}
 func (m *mockCryptoOps) Encrypt(_ context.Context, _ crypto.EncryptRequest) (crypto.EncryptResult, error) {
 	panic("mockCryptoOps.Encrypt: not implemented")
 }

@@ -85,6 +85,30 @@ func applySignScopeParams(req crypto.SignRequest, provReq *providerpb.SignReques
 	}
 }
 
+// applyDigestSignScopeParams copies the caller's scope_params oneof into provReq.
+func applyDigestSignScopeParams(req crypto.DigestSignRequest, provReq *providerpb.DigestSignRequest) {
+	switch {
+	case req.NoContext != nil:
+		provReq.ScopeParams = &providerpb.DigestSignRequest_NoContext{NoContext: req.NoContext}
+	case req.DomainContext != nil:
+		provReq.ScopeParams = &providerpb.DigestSignRequest_DomainContext{DomainContext: req.DomainContext}
+	case req.VendorContext != nil:
+		provReq.ScopeParams = &providerpb.DigestSignRequest_VendorContext{VendorContext: req.VendorContext}
+	}
+}
+
+// applyDigestVerifyScopeParams copies the caller's scope_params oneof into provReq.
+func applyDigestVerifyScopeParams(req crypto.DigestVerifyRequest, provReq *providerpb.DigestVerifyRequest) {
+	switch {
+	case req.NoContext != nil:
+		provReq.ScopeParams = &providerpb.DigestVerifyRequest_NoContext{NoContext: req.NoContext}
+	case req.DomainContext != nil:
+		provReq.ScopeParams = &providerpb.DigestVerifyRequest_DomainContext{DomainContext: req.DomainContext}
+	case req.VendorContext != nil:
+		provReq.ScopeParams = &providerpb.DigestVerifyRequest_VendorContext{VendorContext: req.VendorContext}
+	}
+}
+
 func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error) {
 	const op errors.Op = "service.(cryptoOrchestrator).Sign"
 
@@ -287,6 +311,220 @@ func callVerifierAndValidate(ctx context.Context, op errors.Op, verifier provide
 		return nil, err
 	}
 	return verifyResp, nil
+}
+
+// DigestSign signs a pre-computed digest — the provider does NOT hash;
+// req.HashAlgorithm describes the digest the caller supplies (for digest-size
+// validation and, for RSA, the DigestInfo/PSS hash), never the signature
+// scheme.  AlgorithmDetails is resolved from the key's bound template,
+// exactly as Sign resolves it — no caller input selects the algorithm here
+// either (see crypto.DigestSignRequest and the north-bound DigestSignRequest,
+// neither of which carries an algorithm field).
+func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error) {
+	const op errors.Op = "service.(cryptoOrchestrator).DigestSign"
+
+	// 1. Validate request.
+	if req.KeyName == "" {
+		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"KeyPublicID must not be empty")
+	}
+	if len(req.Digest) == 0 {
+		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"Digest must not be empty")
+	}
+
+	// 2. Load the key aggregate and apply the protecting-operation lifecycle rule.
+	//    DigestSign creates new protected data, so only ACTIVE keys are permitted.
+	k, err := o.keys.GetKeyByName(ctx, req.KeyName)
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+	if encErr := k.CanPerformOriginatingCrypto(); encErr != nil {
+		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeFailedPrecondition, encErr.Error())
+	}
+
+	// 3. Fetch the current version's material.
+	kv, err := o.keys.GetCurrentVersion(ctx, k.GetPublicId())
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 4. Validate operation against the key's attached policy.
+	//    OperationDigestSign, not OperationSign — prehashed signing is a
+	//    distinct grantable capability.
+	policyID := k.GetPolicyId()
+	templateID := kv.GetTemplateId()
+	err = o.policy.ValidateOperation(ctx, policyID, core.OperationDigestSign, templateID, "")
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 5. Fetch the provider that created this key version.
+	prov, err := o.providers.Get(ctx, kv.GetProviderId())
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 6. Resolve template → *types.AlgorithmDetails for provider dispatch.
+	tmpl, err := o.templates.Get(ctx, templateID)
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 6a. Validate that the caller's scope_params match the key's declared scope.
+	if err = validateSignatureScopeParams(ctx, op, k, req.SignatureScopeFields); err != nil {
+		return crypto.SignResult{}, err
+	}
+
+	// 6b. Unmarshal stored GenerateKeyResponse to extract private key material.
+	var genResp providerpb.GenerateKeyResponse
+	if err = proto.Unmarshal(kv.GetKeyMaterial(), &genResp); err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 7. Build provider-level DigestSignRequest with scope_params oneof.
+	provReq := &providerpb.DigestSignRequest{
+		KeyMaterial:      genResp.GetKeyMaterial(),
+		Digest:           req.Digest,
+		HashAlgorithm:    req.HashAlgorithm,
+		HashAlgorithmOid: req.HashAlgorithmOID,
+		Algorithm:        tmpl.GetAlgorithm(),
+	}
+	applyDigestSignScopeParams(req, provReq)
+
+	// 8. Perform digest sign.
+	signer, ok := prov.(provider.Signer)
+	if !ok {
+		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("provider %q does not support signing", prov.Name()))
+	}
+	digestSignResp, err := signer.DigestSign(ctx, provReq)
+	if err != nil {
+		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
+	}
+	if err = requireProviderOutput(ctx, op, digestSignResp.GetOutput()); err != nil {
+		return crypto.SignResult{}, err
+	}
+
+	// 9. Return result with metadata.
+	return crypto.SignResult{
+		Signature:    digestSignResp.GetSignature(),
+		KeyName:      req.KeyName,
+		KeyVersion:   kv.GetVersion(),
+		Algorithm:    templateID,
+		ProviderName: prov.Name(),
+		Output:       digestSignResp.GetOutput(),
+	}, nil
+}
+
+// DigestVerify verifies a signature over a pre-computed digest.
+func (o *cryptoOrchestrator) DigestVerify(ctx context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+	const op errors.Op = "service.(cryptoOrchestrator).DigestVerify"
+
+	// 1. Validate request.
+	if req.KeyName == "" {
+		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"KeyPublicID must not be empty")
+	}
+	if len(req.Digest) == 0 {
+		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"Digest must not be empty")
+	}
+
+	// 2. Load the key aggregate and apply the processing-operation lifecycle rule.
+	//    DigestVerify processes existing signatures, so ACTIVE, SUSPENDED, and
+	//    DEACTIVATED ("legacy") keys are permitted.
+	k, err := o.keys.GetKeyByName(ctx, req.KeyName)
+	if err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+	if decErr := k.CanPerformReceivingCrypto(); decErr != nil {
+		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeFailedPrecondition, decErr.Error())
+	}
+
+	// 2a. Fetch the right version's material (includes public key bytes).
+	kv, err := o.keys.GetVersion(ctx, k.GetPublicId(), req.KeyVersion)
+	if err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 3. Validate operation against the key's attached policy.
+	policyID := k.GetPolicyId()
+	templateID := kv.GetTemplateId()
+	err = o.policy.ValidateOperation(ctx, policyID, core.OperationDigestVerify, templateID, "")
+	if err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 4. Fetch the provider that created this key version.
+	prov, err := o.providers.Get(ctx, kv.GetProviderId())
+	if err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 5. Resolve template => *types.AlgorithmDetails for provider dispatch.
+	tmpl, err := o.templates.Get(ctx, templateID)
+	if err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 5a. Validate that the caller's scope_params match the key's declared scope.
+	if err = validateSignatureScopeParams(ctx, op, k, req.SignatureScopeFields); err != nil {
+		return crypto.VerifyResult{}, err
+	}
+
+	// 5b. Unmarshal stored GenerateKeyResponse to extract public key bytes.
+	var genResp providerpb.GenerateKeyResponse
+	if err = proto.Unmarshal(kv.GetKeyMaterial(), &genResp); err != nil {
+		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
+	}
+
+	// 6. Build provider-level DigestVerifyRequest with scope_params oneof.
+	//    DigestVerify receives the public key bytes, not the private key material.
+	provReq := &providerpb.DigestVerifyRequest{
+		KeyMaterial:      genResp.GetPublicKeyBytes(),
+		Digest:           req.Digest,
+		Signature:        req.Signature,
+		HashAlgorithm:    req.HashAlgorithm,
+		HashAlgorithmOid: req.HashAlgorithmOID,
+		Algorithm:        tmpl.GetAlgorithm(),
+		Output:           req.Output,
+	}
+	applyDigestVerifyScopeParams(req, provReq)
+
+	// 7. Perform digest verify.
+	verifier, ok := prov.(provider.Signer)
+	if !ok {
+		return crypto.VerifyResult{}, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("provider %q does not support verification", prov.Name()))
+	}
+	digestVerifyResp, err := callDigestVerifierAndValidate(ctx, op, verifier, provReq)
+	if err != nil {
+		return crypto.VerifyResult{}, err
+	}
+
+	// 8. Return result — invalid signature is NOT an error.
+	return crypto.VerifyResult{
+		Valid:        digestVerifyResp.GetValid(),
+		KeyName:      req.KeyName,
+		Algorithm:    templateID,
+		ProviderName: prov.Name(),
+		Output:       digestVerifyResp.GetOutput(),
+	}, nil
+}
+
+// callDigestVerifierAndValidate calls the provider's DigestVerify and
+// enforces the ProviderOutput contract.  Extracted from DigestVerify to keep
+// cyclomatic complexity within linter limits (mirrors callVerifierAndValidate).
+func callDigestVerifierAndValidate(ctx context.Context, op errors.Op, verifier provider.Signer, provReq *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
+	digestVerifyResp, err := verifier.DigestVerify(ctx, provReq)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	if err = requireProviderOutput(ctx, op, digestVerifyResp.GetOutput()); err != nil {
+		return nil, err
+	}
+	return digestVerifyResp, nil
 }
 
 func (o *cryptoOrchestrator) Encrypt(ctx context.Context, _ crypto.EncryptRequest) (crypto.EncryptResult, error) {

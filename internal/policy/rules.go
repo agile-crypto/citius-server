@@ -103,17 +103,19 @@ func ParseRules(raw []byte) (*Rules, error) {
 // knownKeyOperations is the set of valid key-bound operation strings.
 // These are the exact same string values as core.Operation constants.
 var knownKeyOperations = map[string]bool{
-	string(core.OperationCreateKey): true,
-	string(core.OperationReadKey):   true,
-	string(core.OperationDeleteKey): true,
-	string(core.OperationSign):      true,
-	string(core.OperationVerify):    true,
-	string(core.OperationEncrypt):   true,
-	string(core.OperationDecrypt):   true,
-	string(core.OperationWrap):      true,
-	string(core.OperationUnwrap):    true,
-	string(core.OperationDeriveKey): true,
-	string(core.OperationRotateKey): true,
+	string(core.OperationCreateKey):    true,
+	string(core.OperationReadKey):      true,
+	string(core.OperationDeleteKey):    true,
+	string(core.OperationSign):         true,
+	string(core.OperationVerify):       true,
+	string(core.OperationDigestSign):   true,
+	string(core.OperationDigestVerify): true,
+	string(core.OperationEncrypt):      true,
+	string(core.OperationDecrypt):      true,
+	string(core.OperationWrap):         true,
+	string(core.OperationUnwrap):       true,
+	string(core.OperationDeriveKey):    true,
+	string(core.OperationRotateKey):    true,
 }
 
 // supportedVersions lists the schema versions this code understands.

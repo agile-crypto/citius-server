@@ -16,12 +16,19 @@ const (
 	OperationDeleteKey = Operation("delete_key")
 	OperationSign      = Operation("sign")
 	OperationVerify    = Operation("verify")
-	OperationEncrypt   = Operation("encrypt")
-	OperationDecrypt   = Operation("decrypt")
-	OperationWrap      = Operation("wrap")
-	OperationUnwrap    = Operation("unwrap")
-	OperationDeriveKey = Operation("derive_key")
-	OperationRotateKey = Operation("rotate_key")
+	// OperationDigestSign and OperationDigestVerify are distinct from
+	// OperationSign/OperationVerify — prehashed signing (CKM_ECDSA) is a
+	// different PKCS#11 mechanism family from hash-then-sign
+	// (CKM_ECDSA_SHA256), and a policy permitting one should not silently
+	// permit the other.
+	OperationDigestSign   = Operation("digest_sign")
+	OperationDigestVerify = Operation("digest_verify")
+	OperationEncrypt      = Operation("encrypt")
+	OperationDecrypt      = Operation("decrypt")
+	OperationWrap         = Operation("wrap")
+	OperationUnwrap       = Operation("unwrap")
+	OperationDeriveKey    = Operation("derive_key")
+	OperationRotateKey    = Operation("rotate_key")
 )
 
 // WriteOp describes the storage operation for VetForWrite.
