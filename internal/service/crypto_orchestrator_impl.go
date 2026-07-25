@@ -183,11 +183,8 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("provider %q does not support signing", prov.Name()))
 	}
-	signResp, err := signer.Sign(ctx, provReq)
+	signResp, err := callSignerAndValidate(ctx, op, signer, provReq)
 	if err != nil {
-		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
-	}
-	if err = requireProviderOutput(ctx, op, signResp.GetOutput()); err != nil {
 		return crypto.SignResult{}, err
 	}
 
@@ -200,6 +197,23 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 		ProviderName: prov.Name(),
 		Output:       signResp.GetOutput(),
 	}, nil
+}
+
+// callSignerAndValidate calls the provider's Sign and enforces the
+// ProviderOutput contract (an unset algorithm_output is a provider bug, not
+// a caller error).  Extracted for uniformity with callVerifierAndValidate,
+// callDigestSignerAndValidate, and callDigestVerifierAndValidate — all four
+// sign/verify orchestrator methods follow the same call-provider-then-validate
+// shape.
+func callSignerAndValidate(ctx context.Context, op errors.Op, signer provider.Signer, provReq *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	signResp, err := signer.Sign(ctx, provReq)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	if err = requireProviderOutput(ctx, op, signResp.GetOutput()); err != nil {
+		return nil, err
+	}
+	return signResp, nil
 }
 
 func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error) {
