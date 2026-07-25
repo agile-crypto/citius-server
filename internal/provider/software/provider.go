@@ -153,27 +153,57 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 	}
 }
 
-// DigestSign signs a pre-computed digest.
-// The software provider signs the raw digest bytes without any internal hashing.
-// Algorithm dispatch uses the key material type; currently only ECDSA-P256 is supported.
+// DigestSign signs a pre-computed digest — the provider does NOT hash.
+// Dispatches on the typed AlgorithmDetails oneof, exactly like Sign; the
+// digest and key material alone cannot select the signature scheme (a single
+// RSA key is valid under both PSS and PKCS1v15), so hash_algorithm describes
+// only the digest's origin, never the algorithm to dispatch on.
 func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
 	const op errors.Op = "software.(Provider).DigestSign"
-	sig, err := signECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest())
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only P-256 curve supported for digest sign")
+		}
+		sig, err := signECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("der")}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"DigestSign unsupported for ML-DSA: pure ML-DSA is not prehashable")
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for digest sign: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
-	return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("der")}, nil
 }
 
 // DigestVerify verifies a signature over a pre-computed digest.
-// Currently only ECDSA-P256 is supported.
+// Dispatches on the typed AlgorithmDetails oneof, exactly like Verify.
 func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
 	const op errors.Op = "software.(Provider).DigestVerify"
-	valid, err := verifyECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature())
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only P-256 curve supported for digest verify")
+		}
+		valid, err := verifyECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"DigestVerify unsupported for ML-DSA: pure ML-DSA is not prehashable")
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for digest verify: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
-	return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 }
 
 // Compile-time assertion: Provider implements provider.Backend and the Signer
