@@ -398,11 +398,8 @@ func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSi
 		return crypto.SignResult{}, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("provider %q does not support signing", prov.Name()))
 	}
-	digestSignResp, err := signer.DigestSign(ctx, provReq)
+	digestSignResp, err := callDigestSignerAndValidate(ctx, op, signer, provReq)
 	if err != nil {
-		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
-	}
-	if err = requireProviderOutput(ctx, op, digestSignResp.GetOutput()); err != nil {
 		return crypto.SignResult{}, err
 	}
 
@@ -415,6 +412,23 @@ func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSi
 		ProviderName: prov.Name(),
 		Output:       digestSignResp.GetOutput(),
 	}, nil
+}
+
+// callDigestSignerAndValidate calls the provider's DigestSign and enforces
+// the ProviderOutput contract (an unset algorithm_output is a provider bug,
+// not a caller error).  Extracted for symmetry with callDigestVerifierAndValidate
+// — DigestSign and DigestVerify are mirror-image operations, so both follow
+// the same call-provider-then-validate shape even though DigestSign alone
+// stays under the cyclomatic complexity limit inline.
+func callDigestSignerAndValidate(ctx context.Context, op errors.Op, signer provider.Signer, provReq *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
+	digestSignResp, err := signer.DigestSign(ctx, provReq)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	if err = requireProviderOutput(ctx, op, digestSignResp.GetOutput()); err != nil {
+		return nil, err
+	}
+	return digestSignResp, nil
 }
 
 // DigestVerify verifies a signature over a pre-computed digest.
