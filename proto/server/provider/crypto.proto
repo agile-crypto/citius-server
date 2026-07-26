@@ -52,6 +52,17 @@ message SignRequest {
   // The core resolves this from the template and passes it through.
   // The provider SHOULD validate it matches the key_material type.
   caas.crypto.v1.AlgorithmDetails algorithm = 6 [(buf.validate.field).required = true];
+
+  // The ProviderOutput captured on GenerateKeyResponse when this key was
+  // created — carries key_material's encoding (e.g. "pkcs8" vs "sec1") via
+  // .encoding.  Reuses the same ProviderOutput type VerifyRequest.output
+  // already uses to carry a prior operation's output forward, rather than
+  // introducing a parallel, bespoke field for the same concept.
+  //
+  // Optional: unset means the encoding was not recorded (e.g. a key created
+  // before this field existed).  The provider MUST fall back to trying its
+  // known formats in that case, not reject the request.
+  caas.crypto.v1.ProviderOutput key_output = 7;
 }
 
 // SignResponse contains the signature and provider output.
@@ -128,6 +139,11 @@ message DigestSignRequest {
   // orchestrator method or gRPC handler consumes this message yet, so there
   // are no callers this constraint could break.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
+
+  // The ProviderOutput captured on GenerateKeyResponse when this key was
+  // created — see SignRequest.key_output.  Same optional-with-fallback
+  // contract.
+  caas.crypto.v1.ProviderOutput key_output = 9;
 }
 
 // DigestSignResponse contains the signature over the digest.
