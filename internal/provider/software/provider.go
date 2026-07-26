@@ -153,6 +153,24 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 	}
 }
 
+// validateDigestLength rejects a digest whose length contradicts the
+// declared hash algorithm (e.g. a 20-byte digest claiming to be SHA-256,
+// which must be 32 bytes).  Hash algorithms with no fixed length
+// (UNSPECIFIED, OTHER, the SHAKE XOFs) are not checked — the caller declared
+// no fixed-length hash, so there is nothing to validate the digest against.
+func validateDigestLength(ctx context.Context, op errors.Op, hashAlg types.HashAlgorithm, digestLen int) error {
+	wantLen, ok := provider.DigestLengthForHash(hashAlg)
+	if !ok {
+		return nil
+	}
+	if digestLen != wantLen {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			fmt.Sprintf("digest length %d bytes does not match expected length %d bytes for %s",
+				digestLen, wantLen, hashAlg))
+	}
+	return nil
+}
+
 // DigestSign signs a pre-computed digest — the provider does NOT hash.
 // Dispatches on the typed AlgorithmDetails oneof, exactly like Sign; the
 // digest and key material alone cannot select the signature scheme (a single
@@ -160,6 +178,10 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 // only the digest's origin, never the algorithm to dispatch on.
 func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
 	const op errors.Op = "software.(Provider).DigestSign"
+
+	if err := validateDigestLength(ctx, op, req.GetHashAlgorithm(), len(req.GetDigest())); err != nil {
+		return nil, err
+	}
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
@@ -185,6 +207,10 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 // Dispatches on the typed AlgorithmDetails oneof, exactly like Verify.
 func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
 	const op errors.Op = "software.(Provider).DigestVerify"
+
+	if err := validateDigestLength(ctx, op, req.GetHashAlgorithm(), len(req.GetDigest())); err != nil {
+		return nil, err
+	}
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
