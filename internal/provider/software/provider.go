@@ -59,11 +59,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	// Dispatch on the typed AlgorithmDetails oneof.
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-				"only P-256 curve supported")
-		}
-		pubDER, privDER, err = generateECDSAP256Key(ctx)
+		pubDER, privDER, err = generateECDSAKey(ctx, alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -97,11 +93,8 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-				"only P-256 curve supported for sign")
-		}
-		sig, err := signECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyOutput().GetEncoding())
+		sig, err := signECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyOutput().GetEncoding(),
+			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -128,11 +121,8 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-				"only P-256 curve supported for verify")
-		}
-		valid, err := verifyECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
+		valid, err := verifyECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
+			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -185,11 +175,8 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-				"only P-256 curve supported for digest sign")
-		}
-		sig, err := signECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyOutput().GetEncoding())
+		sig, err := signECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyOutput().GetEncoding(),
+			alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -214,11 +201,8 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		if alg.Ecdsa.GetCurve() != types.EllipticCurve_ELLIPTIC_CURVE_P256 {
-			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-				"only P-256 curve supported for digest verify")
-		}
-		valid, err := verifyECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature())
+		valid, err := verifyECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
+			alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
