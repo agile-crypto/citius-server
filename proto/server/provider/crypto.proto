@@ -94,6 +94,19 @@ message VerifyRequest {
 
   // Provider-generated output — algorithm parameters and encoding, retuned during signing.  The core extracts this from the stored OperationMetadata and passes it through for verification.
   caas.crypto.v1.ProviderOutput output = 8;
+
+  // The GenerateKeyResponse.public_key_output captured when this key was
+  // created — describes how key_material (here the PUBLIC half) is encoded,
+  // so the provider can select the right parser instead of guessing.
+  //
+  // Distinct from `output` above: `output` carries the SIGNATURE's encoding
+  // from the Sign operation, this carries the KEY's encoding from
+  // GenerateKey.  Mirrors SignRequest.key_output, which likewise describes
+  // whichever key half that request carries.
+  //
+  // Optional: unset means the encoding was not recorded.  The provider MUST
+  // fall back to its algorithm-appropriate default, not reject the request.
+  caas.crypto.v1.ProviderOutput key_output = 9;
 }
 
 // VerifyResponse reports whether the signature is valid.
@@ -177,6 +190,11 @@ message DigestVerifyRequest {
   // Provider output captured during DigestSign — carries the signature
   // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
   caas.crypto.v1.ProviderOutput output = 10;
+
+  // The GenerateKeyResponse.public_key_output captured when this key was
+  // created — see VerifyRequest.key_output.  Same optional-with-fallback
+  // contract.
+  caas.crypto.v1.ProviderOutput key_output = 11;
 }
 
 // DigestVerifyResponse reports whether the digest signature is valid.
