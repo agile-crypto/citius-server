@@ -288,6 +288,10 @@ func TestVerify_unsupportedAlgorithm_returnsError(t *testing.T) {
 	}
 }
 
+// TestSign_ECDSA_unsupportedCurve_returnsError uses secp256k1 — valid per
+// EcdsaParams.curve's proto constraint but not implemented by this provider.
+// P-384/P-521 were the "unsupported curve" example here before ECDSA was
+// generalized to those curves; secp256k1 remains genuinely unsupported.
 func TestSign_ECDSA_unsupportedCurve_returnsError(t *testing.T) {
 	p, keyMaterial := genECDSAKey(t)
 	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
@@ -296,14 +300,16 @@ func TestSign_ECDSA_unsupportedCurve_returnsError(t *testing.T) {
 		Algorithm: &types.AlgorithmDetails{
 			Algorithm: &types.AlgorithmDetails_Ecdsa{
 				Ecdsa: &types.EcdsaParams{
-					Curve: types.EllipticCurve_ELLIPTIC_CURVE_P384,
-					Hash:  types.HashAlgorithm_HASH_ALGORITHM_SHA384,
+					Curve: types.EllipticCurve_ELLIPTIC_CURVE_SECP256K1,
 				},
 			},
 		},
 	})
 	if err == nil {
-		t.Fatal("expected error for unsupported curve P-384 on Sign")
+		t.Fatal("expected error for unsupported curve secp256k1 on Sign")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
 }
 
@@ -318,7 +324,7 @@ func TestVerify_ECDSA_unsupportedCurve_returnsError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Sign: %v", err)
 	}
-	// Verify with P-384 curve — should be rejected.
+	// Verify with secp256k1 — genuinely unsupported, should be rejected.
 	_, err = p.Verify(context.Background(), &providerpb.VerifyRequest{
 		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
 		Input:       []byte("data"),
@@ -326,14 +332,16 @@ func TestVerify_ECDSA_unsupportedCurve_returnsError(t *testing.T) {
 		Algorithm: &types.AlgorithmDetails{
 			Algorithm: &types.AlgorithmDetails_Ecdsa{
 				Ecdsa: &types.EcdsaParams{
-					Curve: types.EllipticCurve_ELLIPTIC_CURVE_P384,
-					Hash:  types.HashAlgorithm_HASH_ALGORITHM_SHA384,
+					Curve: types.EllipticCurve_ELLIPTIC_CURVE_SECP256K1,
 				},
 			},
 		},
 	})
 	if err == nil {
-		t.Fatal("expected error for unsupported curve P-384 on Verify")
+		t.Fatal("expected error for unsupported curve secp256k1 on Verify")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
 }
 

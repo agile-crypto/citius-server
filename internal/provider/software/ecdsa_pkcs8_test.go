@@ -15,10 +15,6 @@ import (
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
 
-// ============================================================================
-// ECDSA — PKCS#8 Key Material (parser fallback)
-// ============================================================================
-//
 // GenerateKey still produces SEC1-encoded private keys (see provider.go's
 // "sec1" encoding note), but the parser must also accept PKCS#8 — the format
 // used by every other key type in this provider (RSA, Ed25519, ML-DSA) — so
