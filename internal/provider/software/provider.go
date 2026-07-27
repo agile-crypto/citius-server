@@ -67,7 +67,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		encoding = "sec1" // ECDSA: x509.MarshalECPrivateKey (SEC1, RFC 5915)
+		encoding = encodingSEC1 // ECDSA: x509.MarshalECPrivateKey (SEC1, RFC 5915)
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -101,7 +101,7 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 				"only P-256 curve supported for sign")
 		}
-		sig, err := signECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput())
+		sig, err := signECDSAP256(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyOutput().GetEncoding())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -189,7 +189,7 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 				"only P-256 curve supported for digest sign")
 		}
-		sig, err := signECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest())
+		sig, err := signECDSAP256Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyOutput().GetEncoding())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
