@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package caas.provider.v1;
+option go_package = "github.com/agile-crypto/citius-server/gen/go/server/provider;provider";
+
+// ============================================================================
+// Key Material Encodings
+// ============================================================================
+//
+// How a provider serializes the key material it stores and accepts back.
+//
+// SCOPE: provider contract only.  Deliberately NOT part of the public API
+// surface — a key is never produced by a crypto operation, so this does not
+// belong on ProviderOutput (which accompanies signatures, ciphertexts, MACs
+// and other operation artifacts).  The public API expresses key encoding for
+// import/export transport with caas.crypto.v1.KeyFormat instead.
+//
+// SPLIT BY HALF: private and public encodings are separate enums rather than
+// one flat set, because the two halves of a key pair do NOT share a format —
+// an ECDSA private key is SEC1 or PKCS#8 while its public half is SPKI.  A
+// single enum makes nonsense states expressible (a public key declared SEC1,
+// which is private-only per RFC 5915); separate enums make them unpresentable.
+//
+// TYPED, not free-form strings, so independent provider implementations
+// cannot drift on spelling for what must be the same value.
+
+// PrivateKeyEncoding declares how private key material is serialized.
+enum PrivateKeyEncoding {
+  // Not recorded.  Consumers MUST fall back to their algorithm-appropriate
+  // default rather than reject — key material generated before this field
+  // existed carries no value here.
+  PRIVATE_KEY_ENCODING_UNSPECIFIED = 0;
+
+  // PKCS#8 PrivateKeyInfo DER (RFC 5958).  Self-describing via its
+  // AlgorithmIdentifier OID; the standard interoperable private key wrapper.
+  PRIVATE_KEY_ENCODING_PKCS8 = 1;
+
+  // SEC1 ECPrivateKey DER (RFC 5915).  Elliptic curve keys only.
+  PRIVATE_KEY_ENCODING_SEC1 = 2;
+
+  // Algorithm-native opaque bytes, defined by the algorithm rather than by an
+  // ASN.1 structure (e.g. ML-DSA).  Carries no embedded algorithm identifier,
+  // so parsing depends on AlgorithmDetails.
+  PRIVATE_KEY_ENCODING_RAW = 3;
+
+  // PEM-wrapped DER (RFC 7468).
+  PRIVATE_KEY_ENCODING_PEM = 4;
+}
+
+// PublicKeyEncoding declares how public key material is serialized.
+enum PublicKeyEncoding {
+  // Not recorded — same fallback contract as PRIVATE_KEY_ENCODING_UNSPECIFIED.
+  PUBLIC_KEY_ENCODING_UNSPECIFIED = 0;
+
+  // X.509 SubjectPublicKeyInfo DER (RFC 5280).  The standard public key
+  // wrapper; spelled SPKI to match caas.crypto.v1.KeyFormat.KEY_FORMAT_SPKI.
+  PUBLIC_KEY_ENCODING_SPKI = 1;
+
+  // Algorithm-native opaque bytes (e.g. ML-DSA public keys, raw EC points).
+  PUBLIC_KEY_ENCODING_RAW = 2;
+
+  // PEM-wrapped SubjectPublicKeyInfo (RFC 7468).
+  PUBLIC_KEY_ENCODING_PEM = 3;
+}
