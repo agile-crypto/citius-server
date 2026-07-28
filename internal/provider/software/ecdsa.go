@@ -11,41 +11,34 @@ import (
 	"fmt"
 
 	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/errors"
-)
-
-// ECDSA private-key material encodings, recorded in
-// GenerateKeyResponse.output.encoding at generation time and echoed back via
-// SignRequest/DigestSignRequest.key_output.encoding so the parser doesn't
-// have to guess.  Shared between generation (provider.go) and parsing
-// (below) so both sides agree on the same string values.
-const (
-	encodingPKCS8 = "pkcs8"
-	encodingSEC1  = "sec1"
 )
 
 // parseECDSAPrivateKey parses privDER as an ECDSA private key.
 //
-// When encoding is a recognized value, it selects the matching parser
-// directly — GenerateKey already recorded which format was used, so there
-// is nothing to guess.  A parse failure or a wrong key type under an
-// explicit encoding is a real bug (stored encoding disagrees with the
-// bytes) and is reported as such, not silently retried under the other
-// format.
+// When encoding names a specific format, it selects that parser directly —
+// GenerateKey recorded which format it wrote, so there is nothing to guess.
+// A parse failure or wrong key type under an explicit encoding is a real bug
+// (the recorded encoding disagrees with the stored bytes) and is reported as
+// such, not silently retried under the other format.
 //
-// When encoding is empty or unrecognized (e.g. a key created before this
-// field existed), it falls back to trying PKCS#8 then SEC1.  This is safe
-// specifically because key ENCODING is structurally self-describing
-// (PKCS#8's PrivateKeyInfo wrapper vs SEC1's bare ECPrivateKey sequence
-// parse cleanly as one or the other) — unlike signature SCHEME (PSS vs
-// PKCS1v15), which cannot be inferred from key bytes alone and must always
-// be dispatched from AlgorithmDetails.
-func parseECDSAPrivateKey(ctx context.Context, op errors.Op, privDER []byte, encoding string) (*ecdsa.PrivateKey, error) {
+// When encoding is UNSPECIFIED (a key generated before the field existed) it
+// falls back to trying PKCS#8 then SEC1.  That fallback is safe specifically
+// because key ENCODING is structurally self-describing — PKCS#8's
+// PrivateKeyInfo wrapper and SEC1's bare ECPrivateKey sequence parse cleanly
+// as one or the other — unlike signature SCHEME (PSS vs PKCS1v15), which
+// cannot be inferred from key bytes and must always come from AlgorithmDetails.
+func parseECDSAPrivateKey(ctx context.Context, op errors.Op, privDER []byte, encoding providerpb.PrivateKeyEncoding) (*ecdsa.PrivateKey, error) {
 	switch encoding {
-	case encodingPKCS8:
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8:
 		return parseECDSAPKCS8(ctx, op, privDER)
-	case encodingSEC1:
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1:
 		return parseECDSASEC1(ctx, op, privDER)
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW,
+		providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PEM:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported ECDSA private key encoding: %s", encoding))
 	default:
 		// Unknown/empty encoding: distinguish "not PKCS#8 syntax" (worth
 		// trying SEC1 next) from "valid PKCS#8, wrong key type" (decisive on
@@ -85,6 +78,35 @@ func parseECDSASEC1(ctx context.Context, op errors.Op, privDER []byte) (*ecdsa.P
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return privKey, nil
+}
+
+// parseECDSAPublicKey parses pubDER as an ECDSA public key.
+//
+// SPKI (X.509 SubjectPublicKeyInfo) is the only encoding this provider emits
+// for ECDSA public keys, and it is also the UNSPECIFIED fallback — a key
+// generated before public_key_encoding existed was written by this same
+// provider, so SPKI is the correct algorithm-appropriate default rather than
+// a guess.  Encodings a future provider might use (raw point, PEM) are
+// rejected explicitly instead of being mis-parsed as SPKI.
+func parseECDSAPublicKey(ctx context.Context, op errors.Op, pubDER []byte, encoding providerpb.PublicKeyEncoding) (*ecdsa.PublicKey, error) {
+	switch encoding {
+	case providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI,
+		providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_UNSPECIFIED:
+		// fall through to the SPKI parser below
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported ECDSA public key encoding: %s", encoding))
+	}
+
+	pubKeyAny, err := x509.ParsePKIXPublicKey(pubDER)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	pubKey, ok := pubKeyAny.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "public key is not ECDSA")
+	}
+	return pubKey, nil
 }
 
 // curveForAlgorithm maps the typed EllipticCurve enum to the stdlib curve
@@ -207,7 +229,7 @@ func generateECDSAKey(ctx context.Context, curve types.EllipticCurve) (pubDER, p
 	return pubDER, privDER, nil
 }
 
-func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding string, curve types.EllipticCurve, hash types.HashAlgorithm) ([]byte, error) {
+func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm) ([]byte, error) {
 	const op errors.Op = "software.signECDSA"
 
 	privKey, err := parseECDSAPrivateKey(ctx, op, privDER, keyEncoding)
@@ -232,7 +254,7 @@ func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding string,
 
 // signECDSADigest signs a pre-computed digest directly, without hashing.
 // Used by DigestSign where the caller has already computed the digest.
-func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding string, curve types.EllipticCurve) ([]byte, error) {
+func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve) ([]byte, error) {
 	const op errors.Op = "software.signECDSADigest"
 
 	privKey, err := parseECDSAPrivateKey(ctx, op, privDER, keyEncoding)
@@ -250,17 +272,12 @@ func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding st
 	return sig, nil
 }
 
-func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, curve types.EllipticCurve, hash types.HashAlgorithm) (bool, error) {
+func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm) (bool, error) {
 	const op errors.Op = "software.verifyECDSA"
 
-	pubKeyAny, err := x509.ParsePKIXPublicKey(pubDER)
+	pubKey, err := parseECDSAPublicKey(ctx, op, pubDER, keyEncoding)
 	if err != nil {
-		return false, errors.Wrap(ctx, op, err)
-	}
-
-	pubKey, ok := pubKeyAny.(*ecdsa.PublicKey)
-	if !ok {
-		return false, errors.New(ctx, op, errors.CodeInvalidArgument, "public key is not ECDSA")
+		return false, err
 	}
 	if err = checkCurveMatches(ctx, op, pubKey.Curve, curve); err != nil {
 		return false, err
@@ -275,17 +292,12 @@ func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, curve t
 
 // verifyECDSADigest verifies a signature over a pre-computed digest directly,
 // without hashing.  Used by DigestVerify.
-func verifyECDSADigest(ctx context.Context, pubDER, digest, signature []byte, curve types.EllipticCurve) (bool, error) {
+func verifyECDSADigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve) (bool, error) {
 	const op errors.Op = "software.verifyECDSADigest"
 
-	pubKeyAny, err := x509.ParsePKIXPublicKey(pubDER)
+	pubKey, err := parseECDSAPublicKey(ctx, op, pubDER, keyEncoding)
 	if err != nil {
-		return false, errors.Wrap(ctx, op, err)
-	}
-
-	pubKey, ok := pubKeyAny.(*ecdsa.PublicKey)
-	if !ok {
-		return false, errors.New(ctx, op, errors.CodeInvalidArgument, "public key is not ECDSA")
+		return false, err
 	}
 	if err = checkCurveMatches(ctx, op, pubKey.Curve, curve); err != nil {
 		return false, err
