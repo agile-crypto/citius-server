@@ -49,7 +49,7 @@ func TestCreateKey_generateKeyResponseOutput_survivesStorageRoundTrip(t *testing
 		t.Fatal("stored GenerateKeyResponse.output.algorithm_output is nil after the storage round-trip")
 	}
 	// ML-DSA: circl native PrivateKey.Bytes(), not yet PKCS#8 (see provider.go).
-	if got := genResp.GetOutput().GetEncoding(); got != "raw" {
+	if got := genResp.GetKeyMaterialEncoding(); got != providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW {
 		t.Errorf("stored encoding = %q, want %q", got, "raw")
 	}
 }

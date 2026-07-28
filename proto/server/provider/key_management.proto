@@ -38,22 +38,15 @@ message GenerateKeyRequest {
 // and must never be reused or renumbered.
 message GenerateKeyResponse {
   bytes  key_material     = 1 [(buf.validate.field).bytes.min_len = 1];   // opaque to core; provider-interpreted
-  bytes  public_key_bytes = 2;   // public half, asymmetric only; encoding declared by public_key_output
+  bytes  public_key_bytes = 2;   // public half, asymmetric only; encoding declared by public_key_encoding
 
-  // Declares how key_material (the PRIVATE half) is encoded — e.g. "pkcs8",
-  // "sec1", "raw".  Makes the opaque blob self-describing, which is what
-  // lets differing encodings be distinguished without guessing from length
-  // or content.
-  //
-  // Scoped to key_material only.  The public half is described separately by
-  // public_key_output: the two do not necessarily share a format (ECDSA
-  // private keys are SEC1 or PKCS#8 while the public half is PKIX
-  // SubjectPublicKeyInfo), so one field cannot honestly describe both.
+  // Provider output for the generation operation itself.  MUST be set to
+  // satisfy the algorithm_output contract; key generation produces no
+  // artifact, so this is no_output with no encoding.  Key encodings are
+  // declared by the typed fields below, not here.
   caas.crypto.v1.ProviderOutput output = 3;
 
-  // Superseded by public_key_encoding below; removed in the follow-up commit
-  // once no code references it.
-  caas.crypto.v1.ProviderOutput public_key_output = 4;
+  reserved 4;  // was public_key_output (ProviderOutput); replaced by public_key_encoding
 
   // Declares how key_material (the PRIVATE half) is serialized.
   //

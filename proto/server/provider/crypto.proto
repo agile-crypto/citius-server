@@ -54,17 +54,7 @@ message SignRequest {
   // The provider SHOULD validate it matches the key_material type.
   caas.crypto.v1.AlgorithmDetails algorithm = 6 [(buf.validate.field).required = true];
 
-  // The ProviderOutput captured on GenerateKeyResponse when this key was
-  // created — carries key_material's encoding (e.g. "pkcs8" vs "sec1") via
-  // .encoding.  Reuses the same ProviderOutput type VerifyRequest.output
-  // already uses to carry a prior operation's output forward, rather than
-  // introducing a parallel, bespoke field for the same concept.
-  //
-  // Optional: unset means the encoding was not recorded (e.g. a key created
-  // before this field existed).  The provider MUST fall back to trying its
-  // known formats in that case, not reject the request.
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
-  caas.crypto.v1.ProviderOutput key_output = 7;
+  reserved 7;  // was key_output (ProviderOutput); replaced by key_material_encoding
 
   // How key_material is serialized, from GenerateKeyResponse.
   // Lets the provider select the right parser instead of guessing.
@@ -101,19 +91,7 @@ message VerifyRequest {
   // Provider-generated output — algorithm parameters and encoding, retuned during signing.  The core extracts this from the stored OperationMetadata and passes it through for verification.
   caas.crypto.v1.ProviderOutput output = 8;
 
-  // The GenerateKeyResponse.public_key_output captured when this key was
-  // created — describes how key_material (here the PUBLIC half) is encoded,
-  // so the provider can select the right parser instead of guessing.
-  //
-  // Distinct from `output` above: `output` carries the SIGNATURE's encoding
-  // from the Sign operation, this carries the KEY's encoding from
-  // GenerateKey.  Mirrors SignRequest.key_output, which likewise describes
-  // whichever key half that request carries.
-  //
-  // Optional: unset means the encoding was not recorded.  The provider MUST
-  // fall back to its algorithm-appropriate default, not reject the request.
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
-  caas.crypto.v1.ProviderOutput key_output = 9;
+  reserved 9;  // was key_output (ProviderOutput); replaced by key_material_encoding
 
   // How key_material is serialized.  PublicKeyEncoding, not
   // PrivateKeyEncoding: VerifyRequest.key_material is the PUBLIC half, so a
@@ -165,8 +143,7 @@ message DigestSignRequest {
   // are no callers this constraint could break.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
-  caas.crypto.v1.ProviderOutput key_output = 9;
+  reserved 9;  // was key_output (ProviderOutput); replaced by key_material_encoding
 
   // How key_material is serialized — DigestSign uses the PRIVATE half, so
   // see SignRequest.key_material_encoding.
@@ -205,8 +182,7 @@ message DigestVerifyRequest {
   // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
   caas.crypto.v1.ProviderOutput output = 10;
 
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
-  caas.crypto.v1.ProviderOutput key_output = 11;
+  reserved 11;  // was key_output (ProviderOutput); replaced by key_material_encoding
 
   // How key_material is serialized — DigestVerify uses the PUBLIC half, so
   // see VerifyRequest.key_material_encoding.

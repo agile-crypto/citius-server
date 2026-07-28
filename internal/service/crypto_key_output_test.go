@@ -19,7 +19,7 @@ import (
 
 // capturingSigner wraps the real software provider, recording the last
 // SignRequest/DigestSignRequest it receives — including fields (like
-// KeyOutput) the provider doesn't act on yet — so tests can verify exactly
+// key_material_encoding) — so tests can verify exactly
 // what the orchestrator sends without depending on provider behavior that
 // hasn't been wired up.
 type capturingSigner struct {
@@ -120,7 +120,7 @@ func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator
 	return ops, keyOrch, sig
 }
 
-func TestSign_threadsKeyOutputFromStoredGenerateKeyResponse(t *testing.T) {
+func TestSign_threadsKeyEncodingFromStoredGenerateKeyResponse(t *testing.T) {
 	ops, _, sig := setupWithCapturingSigner(t)
 	ctx := context.Background()
 
@@ -136,17 +136,14 @@ func TestSign_threadsKeyOutputFromStoredGenerateKeyResponse(t *testing.T) {
 	if sig.lastSignRequest == nil {
 		t.Fatal("provider never received a SignRequest")
 	}
-	keyOutput := sig.lastSignRequest.GetKeyOutput()
-	if keyOutput.GetAlgorithmOutput() == nil {
-		t.Fatal("SignRequest.key_output.algorithm_output is nil — GenerateKeyResponse.output was not threaded through")
-	}
-	// ECDSA: x509.MarshalECPrivateKey (SEC1, RFC 5915) — see provider.go.
-	if got := keyOutput.GetEncoding(); got != "sec1" {
-		t.Errorf("SignRequest.key_output.encoding = %q, want %q", got, "sec1")
+	// ECDSA private half: x509.MarshalECPrivateKey (SEC1, RFC 5915) — see provider.go.
+	want := providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
+	if got := sig.lastSignRequest.GetKeyMaterialEncoding(); got != want {
+		t.Errorf("SignRequest.key_material_encoding = %s, want %s — GenerateKeyResponse encoding was not threaded through", got, want)
 	}
 }
 
-func TestDigestSign_threadsKeyOutputFromStoredGenerateKeyResponse(t *testing.T) {
+func TestDigestSign_threadsKeyEncodingFromStoredGenerateKeyResponse(t *testing.T) {
 	ops, _, sig := setupWithCapturingSigner(t)
 	ctx := context.Background()
 
@@ -163,11 +160,8 @@ func TestDigestSign_threadsKeyOutputFromStoredGenerateKeyResponse(t *testing.T) 
 	if sig.lastDigestSignRequest == nil {
 		t.Fatal("provider never received a DigestSignRequest")
 	}
-	keyOutput := sig.lastDigestSignRequest.GetKeyOutput()
-	if keyOutput.GetAlgorithmOutput() == nil {
-		t.Fatal("DigestSignRequest.key_output.algorithm_output is nil — GenerateKeyResponse.output was not threaded through")
-	}
-	if got := keyOutput.GetEncoding(); got != "sec1" {
-		t.Errorf("DigestSignRequest.key_output.encoding = %q, want %q", got, "sec1")
+	want := providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
+	if got := sig.lastDigestSignRequest.GetKeyMaterialEncoding(); got != want {
+		t.Errorf("DigestSignRequest.key_material_encoding = %s, want %s — GenerateKeyResponse encoding was not threaded through", got, want)
 	}
 }
