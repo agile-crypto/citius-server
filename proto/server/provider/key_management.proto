@@ -46,8 +46,6 @@ message GenerateKeyResponse {
   // declared by the typed fields below, not here.
   caas.crypto.v1.ProviderOutput output = 3;
 
-  reserved 4;  // was public_key_output (ProviderOutput); replaced by public_key_encoding
-
   // Declares how key_material (the PRIVATE half) is serialized.
   //
   // Providers legitimately differ: a software provider may emit SEC1 or
