@@ -10,7 +10,6 @@ import "api/types/templates.proto";
 import "api/messages/metadata.proto";
 import "server/provider/key_encoding.proto";
 
-
 // ============================================================================
 // Signing Operations
 // ============================================================================
@@ -54,8 +53,6 @@ message SignRequest {
   // The provider SHOULD validate it matches the key_material type.
   caas.crypto.v1.AlgorithmDetails algorithm = 6 [(buf.validate.field).required = true];
 
-  reserved 7;  // was key_output (ProviderOutput); replaced by key_material_encoding
-
   // How key_material is serialized, from GenerateKeyResponse.
   // Lets the provider select the right parser instead of guessing.
   PrivateKeyEncoding key_material_encoding = 8;
@@ -90,8 +87,6 @@ message VerifyRequest {
 
   // Provider-generated output — algorithm parameters and encoding, retuned during signing.  The core extracts this from the stored OperationMetadata and passes it through for verification.
   caas.crypto.v1.ProviderOutput output = 8;
-
-  reserved 9;  // was key_output (ProviderOutput); replaced by key_material_encoding
 
   // How key_material is serialized.  PublicKeyEncoding, not
   // PrivateKeyEncoding: VerifyRequest.key_material is the PUBLIC half, so a
@@ -143,8 +138,6 @@ message DigestSignRequest {
   // are no callers this constraint could break.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
-  reserved 9;  // was key_output (ProviderOutput); replaced by key_material_encoding
-
   // How key_material is serialized — DigestSign uses the PRIVATE half, so
   // see SignRequest.key_material_encoding.
   PrivateKeyEncoding key_material_encoding = 10;
@@ -181,8 +174,6 @@ message DigestVerifyRequest {
   // Provider output captured during DigestSign — carries the signature
   // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
   caas.crypto.v1.ProviderOutput output = 10;
-
-  reserved 11;  // was key_output (ProviderOutput); replaced by key_material_encoding
 
   // How key_material is serialized — DigestVerify uses the PUBLIC half, so
   // see VerifyRequest.key_material_encoding.
