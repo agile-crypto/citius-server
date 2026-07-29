@@ -229,7 +229,7 @@ func generateECDSAKey(ctx context.Context, curve types.EllipticCurve) (pubDER, p
 	return pubDER, privDER, nil
 }
 
-func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm) ([]byte, error) {
+func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm, format types.SignatureFormat) ([]byte, error) {
 	const op errors.Op = "software.signECDSA"
 
 	privKey, err := parseECDSAPrivateKey(ctx, op, privDER, keyEncoding)
@@ -245,16 +245,16 @@ func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding provide
 		return nil, err
 	}
 
-	sig, err := ecdsa.SignASN1(rand.Reader, privKey, digest)
+	r, s, err := ecdsa.Sign(rand.Reader, privKey, digest)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return sig, nil
+	return encodeECDSASignature(ctx, op, r, s, privKey.Curve, format)
 }
 
 // signECDSADigest signs a pre-computed digest directly, without hashing.
 // Used by DigestSign where the caller has already computed the digest.
-func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve) ([]byte, error) {
+func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve, format types.SignatureFormat) ([]byte, error) {
 	const op errors.Op = "software.signECDSADigest"
 
 	privKey, err := parseECDSAPrivateKey(ctx, op, privDER, keyEncoding)
@@ -265,14 +265,14 @@ func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding pr
 		return nil, err
 	}
 
-	sig, err := ecdsa.SignASN1(rand.Reader, privKey, digest)
+	r, s, err := ecdsa.Sign(rand.Reader, privKey, digest)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return sig, nil
+	return encodeECDSASignature(ctx, op, r, s, privKey.Curve, format)
 }
 
-func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm) (bool, error) {
+func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm, format types.SignatureFormat) (bool, error) {
 	const op errors.Op = "software.verifyECDSA"
 
 	pubKey, err := parseECDSAPublicKey(ctx, op, pubDER, keyEncoding)
@@ -287,12 +287,24 @@ func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, keyEnco
 	if err != nil {
 		return false, err
 	}
-	return ecdsa.VerifyASN1(pubKey, digest, signature), nil
+
+	r, s, err := decodeECDSASignature(ctx, op, signature, pubKey.Curve, format)
+	if err != nil {
+		// An unsupported format is a real configuration error; malformed
+		// signature bytes under a supported format are not — same
+		// "bad signature ≠ bad key/config" convention Verify already
+		// applies via VerifyASN1 (which never errors on garbage bytes).
+		if errors.IsNotImplemented(err) {
+			return false, err
+		}
+		return false, nil
+	}
+	return ecdsa.Verify(pubKey, digest, r, s), nil
 }
 
 // verifyECDSADigest verifies a signature over a pre-computed digest directly,
 // without hashing.  Used by DigestVerify.
-func verifyECDSADigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve) (bool, error) {
+func verifyECDSADigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, format types.SignatureFormat) (bool, error) {
 	const op errors.Op = "software.verifyECDSADigest"
 
 	pubKey, err := parseECDSAPublicKey(ctx, op, pubDER, keyEncoding)
@@ -303,5 +315,12 @@ func verifyECDSADigest(ctx context.Context, pubDER, digest, signature []byte, ke
 		return false, err
 	}
 
-	return ecdsa.VerifyASN1(pubKey, digest, signature), nil
+	r, s, err := decodeECDSASignature(ctx, op, signature, pubKey.Curve, format)
+	if err != nil {
+		if errors.IsNotImplemented(err) {
+			return false, err
+		}
+		return false, nil
+	}
+	return ecdsa.Verify(pubKey, digest, r, s), nil
 }
