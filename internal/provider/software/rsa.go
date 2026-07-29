@@ -1,0 +1,248 @@
+package software
+
+import (
+	"context"
+	"crypto"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/sha512"
+	"crypto/x509"
+	"fmt"
+
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
+)
+
+// generateRSAKey generates an RSA key pair of the given size, encoded as
+// PKCS#8 (private) and PKIX SubjectPublicKeyInfo (public) — the same pair of
+// standard, self-describing formats used elsewhere in this provider.
+func generateRSAKey(ctx context.Context, keySizeBits uint32) (pubDER, privDER []byte, _ error) {
+	const op errors.Op = "software.generateRSAKey"
+
+	privKey, err := rsa.GenerateKey(rand.Reader, int(keySizeBits))
+	if err != nil {
+		return nil, nil, errors.Wrap(ctx, op, err)
+	}
+
+	privDER, err = x509.MarshalPKCS8PrivateKey(privKey)
+	if err != nil {
+		return nil, nil, errors.Wrap(ctx, op, err)
+	}
+
+	pubDER, err = x509.MarshalPKIXPublicKey(&privKey.PublicKey)
+	if err != nil {
+		return nil, nil, errors.Wrap(ctx, op, err)
+	}
+
+	return pubDER, privDER, nil
+}
+
+// parseRSAPrivateKey parses privDER as an RSA private key.  Only PKCS#8 is
+// ever produced by this provider (see generateRSAKey), so — unlike ECDSA,
+// which must reconcile the legacy SEC1 format — there is no fallback format
+// to guess between; UNSPECIFIED simply means "PKCS#8, the only format this
+// provider has ever written."
+func parseRSAPrivateKey(ctx context.Context, op errors.Op, privDER []byte, encoding providerpb.PrivateKeyEncoding) (*rsa.PrivateKey, error) {
+	switch encoding {
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8,
+		providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_UNSPECIFIED:
+		key, err := x509.ParsePKCS8PrivateKey(privDER)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		rsaKey, ok := key.(*rsa.PrivateKey)
+		if !ok {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+				fmt.Sprintf("PKCS#8 key is not RSA: %T", key))
+		}
+		return rsaKey, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported RSA private key encoding: %s", encoding))
+	}
+}
+
+// parseRSAPublicKey parses pubDER as an RSA public key.  SPKI is the only
+// format this provider ever writes; see parseRSAPrivateKey.
+func parseRSAPublicKey(ctx context.Context, op errors.Op, pubDER []byte, encoding providerpb.PublicKeyEncoding) (*rsa.PublicKey, error) {
+	switch encoding {
+	case providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI,
+		providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_UNSPECIFIED:
+		key, err := x509.ParsePKIXPublicKey(pubDER)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		rsaKey, ok := key.(*rsa.PublicKey)
+		if !ok {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "public key is not RSA")
+		}
+		return rsaKey, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported RSA public key encoding: %s", encoding))
+	}
+}
+
+// checkRSAKeySize cross-checks a parsed key's actual modulus size against
+// the size AlgorithmDetails declares — the RSA analogue of checkCurveMatches
+// for ECDSA: AlgorithmDetails is authoritative for dispatch, and the parsed
+// key only validates that declaration rather than driving it.
+func checkRSAKeySize(ctx context.Context, op errors.Op, key *rsa.PublicKey, declaredBits uint32) error {
+	if actual := key.N.BitLen(); actual != int(declaredBits) {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			fmt.Sprintf("key size %d bits does not match declared algorithm key size %d bits", actual, declaredBits))
+	}
+	return nil
+}
+
+// rsaHash resolves the typed HashAlgorithm to crypto.Hash, restricted to
+// exactly what RsaPssParams.hash's proto constraint allows: UNSPECIFIED
+// (defaults to SHA-256 per the field's documented default), SHA-256,
+// SHA-384, or SHA-512.
+func rsaHash(ctx context.Context, op errors.Op, hash types.HashAlgorithm) (crypto.Hash, error) {
+	switch hash {
+	case types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED, types.HashAlgorithm_HASH_ALGORITHM_SHA256:
+		return crypto.SHA256, nil
+	case types.HashAlgorithm_HASH_ALGORITHM_SHA384:
+		return crypto.SHA384, nil
+	case types.HashAlgorithm_HASH_ALGORITHM_SHA512:
+		return crypto.SHA512, nil
+	default:
+		return 0, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported RSA hash algorithm: %s", hash))
+	}
+}
+
+// rsaDigestBytes hashes payload under hash.  Callers MUST validate hash via
+// rsaHash first; SHA-256 is the default/fallthrough case since UNSPECIFIED
+// and SHA-256 both map to it, and rsaHash has already rejected anything else.
+func rsaDigestBytes(hash types.HashAlgorithm, payload []byte) []byte {
+	switch hash {
+	case types.HashAlgorithm_HASH_ALGORITHM_SHA384:
+		d := sha512.Sum384(payload)
+		return d[:]
+	case types.HashAlgorithm_HASH_ALGORITHM_SHA512:
+		d := sha512.Sum512(payload)
+		return d[:]
+	default:
+		d := sha256.Sum256(payload)
+		return d[:]
+	}
+}
+
+// checkRSAPSSMGF validates the declared mask generation function and MGF
+// hash against what Go's crypto/rsa can actually do: SignPSS/VerifyPSS
+// always use MGF1 with the SAME hash as the message hash — there is no API
+// to specify an independent MGF hash.  A template declaring mgf_hash
+// different from hash cannot be honored and is rejected rather than
+// silently signed under the wrong MGF hash.
+func checkRSAPSSMGF(ctx context.Context, op errors.Op, mgf types.MaskGenerationFunction, hash, mgfHash types.HashAlgorithm) error {
+	if mgf != types.MaskGenerationFunction_MGF_UNSPECIFIED && mgf != types.MaskGenerationFunction_MGF_MGF1 {
+		return errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported RSA-PSS mask generation function: %s", mgf))
+	}
+	if mgfHash != types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED && mgfHash != hash {
+		return errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("RSA-PSS with mgf_hash (%s) different from hash (%s) is not supported", mgfHash, hash))
+	}
+	return nil
+}
+
+// rsaPSSSaltLength maps RsaPssParams.salt_length_mode/salt_length_bytes to
+// Go's rsa.PSSOptions.SaltLength.
+//
+// Go's two named constants are numerically counter-intuitive relative to
+// their names: PSSSaltLengthAuto = 0 (as large as possible when signing,
+// auto-detected when verifying) and PSSSaltLengthEqualsHash = -1 (salt
+// length equals the hash output length) — verified against crypto/rsa's
+// docs directly rather than assumed, since guessing here would silently
+// swap MAX and HASH_LENGTH.
+func rsaPSSSaltLength(ctx context.Context, op errors.Op, mode types.RsaPssParams_SaltLengthMode, explicitBytes uint32) (int, error) {
+	switch mode {
+	case types.RsaPssParams_SALT_LENGTH_MODE_HASH_LENGTH:
+		return rsa.PSSSaltLengthEqualsHash, nil
+	case types.RsaPssParams_SALT_LENGTH_MODE_MAX:
+		return rsa.PSSSaltLengthAuto, nil
+	case types.RsaPssParams_SALT_LENGTH_MODE_EXPLICIT:
+		if explicitBytes == 0 {
+			return 0, errors.New(ctx, op, errors.CodeInvalidArgument,
+				"SALT_LENGTH_MODE_EXPLICIT requires salt_length_bytes > 0")
+		}
+		return int(explicitBytes), nil
+	default:
+		return 0, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported RSA-PSS salt length mode: %s", mode))
+	}
+}
+
+func signRSAPSS(ctx context.Context, privDER, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, params *types.RsaPssParams) ([]byte, error) {
+	const op errors.Op = "software.signRSAPSS"
+
+	privKey, err := parseRSAPrivateKey(ctx, op, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if err = checkRSAKeySize(ctx, op, &privKey.PublicKey, params.GetKeySizeBits()); err != nil {
+		return nil, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), params.GetHash(), params.GetMgfHash()); err != nil {
+		return nil, err
+	}
+	h, err := rsaHash(ctx, op, params.GetHash())
+	if err != nil {
+		return nil, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return nil, err
+	}
+
+	digest := rsaDigestBytes(params.GetHash(), payload)
+	sig, err := rsa.SignPSS(rand.Reader, privKey, h, digest, &rsa.PSSOptions{SaltLength: saltLen})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}
+
+// verifyRSAPSS reports whether signature is a valid RSA-PSS signature over
+// payload.  A verification failure is never an error — Go's VerifyPSS
+// deliberately collapses every failure mode (wrong signature, wrong salt
+// length, malformed signature bytes) into the single ErrVerification, by
+// design, to avoid adaptive attacks — so any non-nil error here means
+// "invalid", not "the provider malfunctioned".
+func verifyRSAPSS(ctx context.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, params *types.RsaPssParams) (bool, error) {
+	const op errors.Op = "software.verifyRSAPSS"
+
+	pubKey, err := parseRSAPublicKey(ctx, op, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	if err = checkRSAKeySize(ctx, op, pubKey, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), params.GetHash(), params.GetMgfHash()); err != nil {
+		return false, err
+	}
+	h, err := rsaHash(ctx, op, params.GetHash())
+	if err != nil {
+		return false, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return false, err
+	}
+
+	digest := rsaDigestBytes(params.GetHash(), payload)
+	if err = rsa.VerifyPSS(pubKey, h, digest, signature, &rsa.PSSOptions{SaltLength: saltLen}); err != nil {
+		//nolint:nilerr // intentional: rsa.VerifyPSS collapses every failure
+		// mode (wrong signature, wrong salt length, malformed bytes) into
+		// the single ErrVerification by design ("deliberately vague to
+		// avoid adaptive attacks" — see the stdlib doc), so any error here
+		// means "invalid signature", never "provider malfunctioned".
+		return false, nil
+	}
+	return true, nil
+}
