@@ -299,3 +299,127 @@ func verifyRSAPKCS1v15(ctx context.Context, pubDER, payload, signature []byte, k
 	}
 	return true, nil
 }
+
+// signRSAPSSDigest signs a pre-computed digest directly, without hashing.
+// Used by DigestSign, where the caller has already hashed the message.
+//
+// Unlike signRSAPSS, the hash algorithm comes from hashAlg (the request's
+// declared digest origin, DigestSignRequest.hash_algorithm) rather than
+// params.GetHash(): the prehashed catalog templates (rsa-pss-*-prehashed)
+// leave RsaPssParams.hash unset, since a single prehashed template accepts
+// digests produced under any hash the caller declares — the digest bytes
+// alone cannot say which hash produced them.
+func signRSAPSSDigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPssParams) ([]byte, error) {
+	const op errors.Op = "software.signRSAPSSDigest"
+
+	privKey, err := parseRSAPrivateKey(ctx, op, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if err = checkRSAKeySize(ctx, op, &privKey.PublicKey, params.GetKeySizeBits()); err != nil {
+		return nil, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), hashAlg, params.GetMgfHash()); err != nil {
+		return nil, err
+	}
+	h, err := rsaHash(ctx, op, hashAlg)
+	if err != nil {
+		return nil, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := rsa.SignPSS(rand.Reader, privKey, h, digest, &rsa.PSSOptions{SaltLength: saltLen})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}
+
+// verifyRSAPSSDigest verifies a signature over a pre-computed digest
+// directly, without hashing.  Used by DigestVerify; see signRSAPSSDigest for
+// why hashAlg (not params.GetHash()) selects the hash algorithm.
+func verifyRSAPSSDigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPssParams) (bool, error) {
+	const op errors.Op = "software.verifyRSAPSSDigest"
+
+	pubKey, err := parseRSAPublicKey(ctx, op, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	if err = checkRSAKeySize(ctx, op, pubKey, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), hashAlg, params.GetMgfHash()); err != nil {
+		return false, err
+	}
+	h, err := rsaHash(ctx, op, hashAlg)
+	if err != nil {
+		return false, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return false, err
+	}
+
+	if err = rsa.VerifyPSS(pubKey, h, digest, signature, &rsa.PSSOptions{SaltLength: saltLen}); err != nil {
+		//nolint:nilerr // see verifyRSAPSS: rsa.VerifyPSS collapses every
+		// failure mode into one error by design, so any error here means
+		// "invalid signature", never "provider malfunctioned".
+		return false, nil
+	}
+	return true, nil
+}
+
+// signRSAPKCS1v15Digest signs a pre-computed digest directly, without
+// hashing.  See signRSAPSSDigest for why hashAlg, not params.GetHash(),
+// selects the hash algorithm for prehashed operations.
+func signRSAPKCS1v15Digest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPkcs1V15Params) ([]byte, error) {
+	const op errors.Op = "software.signRSAPKCS1v15Digest"
+
+	privKey, err := parseRSAPrivateKey(ctx, op, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	if err = checkRSAKeySize(ctx, op, &privKey.PublicKey, params.GetKeySizeBits()); err != nil {
+		return nil, err
+	}
+	h, err := rsaHash(ctx, op, hashAlg)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := rsa.SignPKCS1v15(rand.Reader, privKey, h, digest)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}
+
+// verifyRSAPKCS1v15Digest verifies a signature over a pre-computed digest
+// directly, without hashing.  See signRSAPSSDigest for why hashAlg, not
+// params.GetHash(), selects the hash algorithm for prehashed operations.
+func verifyRSAPKCS1v15Digest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPkcs1V15Params) (bool, error) {
+	const op errors.Op = "software.verifyRSAPKCS1v15Digest"
+
+	pubKey, err := parseRSAPublicKey(ctx, op, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	if err = checkRSAKeySize(ctx, op, pubKey, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	h, err := rsaHash(ctx, op, hashAlg)
+	if err != nil {
+		return false, err
+	}
+
+	if err = rsa.VerifyPKCS1v15(pubKey, h, digest, signature); err != nil {
+		//nolint:nilerr // see verifyRSAPKCS1v15: rsa.VerifyPKCS1v15 returns a
+		// single generic error for every failure mode, so any error here
+		// means "invalid signature", never "provider malfunctioned".
+		return false, nil
+	}
+	return true, nil
+}
