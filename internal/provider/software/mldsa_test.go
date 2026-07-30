@@ -45,7 +45,14 @@ func TestGenerateKey_MLDSA65_publicKeyIsCorrectSize(t *testing.T) {
 	}
 }
 
-func TestGenerateKey_MLDSA65_privateKeyIsCorrectSize(t *testing.T) {
+// TestGenerateKey_MLDSA65_privateKeyIsPKCS8SeedNotExpandedKey proves
+// GenerateKey stores the private half as a PKCS#8-wrapped seed
+// (draft-ietf-lamps-dilithium-certificates' recommended form) rather than
+// the full expanded key mldsa65.PrivateKeySize describes — the point of
+// this provider's PKCS#8 storage switch is exactly this size reduction,
+// since the expanded key and public key are both re-derivable from the
+// seed via sign.Scheme.DeriveKey.
+func TestGenerateKey_MLDSA65_privateKeyIsPKCS8SeedNotExpandedKey(t *testing.T) {
 	p := software.New()
 	resp, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
 		Algorithm: mlDSA65Details(),
@@ -53,8 +60,11 @@ func TestGenerateKey_MLDSA65_privateKeyIsCorrectSize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-	if len(resp.GetKeyMaterial()) != mldsa65.PrivateKeySize {
-		t.Errorf("private key size: got %d want %d", len(resp.GetKeyMaterial()), mldsa65.PrivateKeySize)
+	if got := len(resp.GetKeyMaterial()); got >= mldsa65.PrivateKeySize {
+		t.Errorf("private key material is %d bytes, want well under the expanded key size %d bytes", got, mldsa65.PrivateKeySize)
+	}
+	if got := resp.GetKeyMaterialEncoding(); got != providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8 {
+		t.Errorf("KeyMaterialEncoding = %s, want PKCS8", got)
 	}
 }
 
