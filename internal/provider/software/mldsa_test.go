@@ -70,40 +70,46 @@ func TestGenerateKey_MLDSA65_keysAreUnique(t *testing.T) {
 	}
 }
 
-// mlDSA44Details returns an AlgorithmDetails for ML-DSA-44 (unsupported).
-func mlDSA44Details() *types.AlgorithmDetails {
+// mlDSAUnspecifiedParameterSetDetails returns an AlgorithmDetails with the
+// ML-DSA parameter set left at its zero value. Unlike a specific-but-
+// unimplemented parameter set (ML-DSA-44 was this placeholder before ML-DSA
+// was generalized to 44/65/87 — see the analogous fix for ECDSA's
+// unsupported-curve and Ed25519's unsupported-algorithm tests), UNSPECIFIED
+// is not itself an algorithm and so can never become "supported": there is
+// no scheme to dispatch to, only ever a caller error.
+func mlDSAUnspecifiedParameterSetDetails() *types.AlgorithmDetails {
 	return &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_MlDsa{
 			MlDsa: &types.MlDsaParams{
-				ParameterSet: types.MlDsaParameterSet_ML_DSA_44,
+				ParameterSet: types.MlDsaParameterSet_ML_DSA_PARAMETER_SET_UNSPECIFIED,
 			},
 		},
 	}
 }
 
-func TestGenerateKey_MLDSA_unsupportedParameterSet_returnsError(t *testing.T) {
+func TestGenerateKey_MLDSA_unspecifiedParameterSet_returnsError(t *testing.T) {
 	p := software.New()
 	_, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
-		Algorithm: mlDSA44Details(),
+		Algorithm: mlDSAUnspecifiedParameterSetDetails(),
 	})
 	if err == nil {
-		t.Fatal("expected error for unsupported ML-DSA-44 parameter set on GenerateKey")
+		t.Fatal("expected error for unspecified ML-DSA parameter set on GenerateKey")
 	}
 }
 
-func TestSign_MLDSA_unsupportedParameterSet_returnsError(t *testing.T) {
+func TestSign_MLDSA_unspecifiedParameterSet_returnsError(t *testing.T) {
 	p, keyMaterial := genMLDSAKey(t)
 	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(),
 		Input:       []byte("data"),
-		Algorithm:   mlDSA44Details(),
+		Algorithm:   mlDSAUnspecifiedParameterSetDetails(),
 	})
 	if err == nil {
-		t.Fatal("expected error for unsupported ML-DSA-44 parameter set on Sign")
+		t.Fatal("expected error for unspecified ML-DSA parameter set on Sign")
 	}
 }
 
-func TestVerify_MLDSA_unsupportedParameterSet_returnsError(t *testing.T) {
+func TestVerify_MLDSA_unspecifiedParameterSet_returnsError(t *testing.T) {
 	p, keyMaterial := genMLDSAKey(t)
 	signResult, err := p.Sign(context.Background(), &providerpb.SignRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(),
@@ -117,9 +123,9 @@ func TestVerify_MLDSA_unsupportedParameterSet_returnsError(t *testing.T) {
 		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
 		Input:       []byte("data"),
 		Signature:   signResult.GetSignature(),
-		Algorithm:   mlDSA44Details(),
+		Algorithm:   mlDSAUnspecifiedParameterSetDetails(),
 	})
 	if err == nil {
-		t.Fatal("expected error for unsupported ML-DSA-44 parameter set on Verify")
+		t.Fatal("expected error for unspecified ML-DSA parameter set on Verify")
 	}
 }
