@@ -285,3 +285,43 @@ func TestEncrypt_AESGCM_bothNonStandardNonceAndTag_returnsError(t *testing.T) {
 		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
 }
+
+// TestEncrypt_AESGCM_tagSizeOutsideAllowedSet_returnsError proves a
+// tag_size_bits value outside AesGcmParams' declared {96,104,112,120,128}
+// set is rejected rather than silently truncated by integer division to a
+// shorter, unintended tag length
+func TestEncrypt_AESGCM_tagSizeOutsideAllowedSet_returnsError(t *testing.T) {
+	alg := aesGCMDetailsFull(256, 96, 127) // 127 is not in {96,104,112,120,128}
+	p, key := genAESGCMKey(t, aesGCMDetailsFull(256, 96, 128))
+
+	_, err := p.Encrypt(context.Background(), &providerpb.EncryptRequest{
+		KeyMaterial: key, Plaintext: []byte("payload"),
+		ScopeParams: &providerpb.EncryptRequest_AeadParams{AeadParams: &types.AeadEncryptParams{}},
+		Algorithm:   alg,
+	})
+	if err == nil {
+		t.Fatal("expected error for tag_size_bits=127, not one of the proto's allowed values")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	}
+}
+
+// TestEncrypt_AESGCM_ivSizeOutsideAllowedSet_returnsError is the
+// iv_size_bits analogue of TestEncrypt_AESGCM_tagSizeOutsideAllowedSet_returnsError.
+func TestEncrypt_AESGCM_ivSizeOutsideAllowedSet_returnsError(t *testing.T) {
+	alg := aesGCMDetailsFull(256, 100, 128) // 100 is not in {64,96,128}
+	p, key := genAESGCMKey(t, aesGCMDetailsFull(256, 96, 128))
+
+	_, err := p.Encrypt(context.Background(), &providerpb.EncryptRequest{
+		KeyMaterial: key, Plaintext: []byte("payload"),
+		ScopeParams: &providerpb.EncryptRequest_AeadParams{AeadParams: &types.AeadEncryptParams{}},
+		Algorithm:   alg,
+	})
+	if err == nil {
+		t.Fatal("expected error for iv_size_bits=100, not one of the proto's allowed values")
+	}
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	}
+}

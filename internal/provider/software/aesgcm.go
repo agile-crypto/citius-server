@@ -32,6 +32,26 @@ func checkAESKeyMatchesDeclaredSize(ctx context.Context, op errors.Op, keyMateri
 	return nil
 }
 
+// checkAESGCMSizesValid rejects any ivSizeBits/tagSizeBits value outside
+// AesGcmParams' declared proto ranges (iv_size_bits: {64, 96, 128},
+// tag_size_bits: {96, 104, 112, 120, 128} — NIST SP 800-38D §5.2.1) — the
+// same defensive-allowlist convention checkAESKeySize/rsaHash/
+// curveForAlgorithm apply elsewhere in this provider.
+
+func checkAESGCMSizesValid(ctx context.Context, op errors.Op, ivSizeBits, tagSizeBits uint32) error {
+	switch ivSizeBits {
+	case 64, 96, 128:
+	default:
+		return errors.New(ctx, op, errors.CodeNotImplemented, "unsupported AES-GCM IV size: %d bits", ivSizeBits)
+	}
+	switch tagSizeBits {
+	case 96, 104, 112, 120, 128:
+	default:
+		return errors.New(ctx, op, errors.CodeNotImplemented, "unsupported AES-GCM tag size: %d bits", tagSizeBits)
+	}
+	return nil
+}
+
 // newAESGCM builds a cipher.AEAD honoring the declared nonce and tag sizes.
 //
 // Go's crypto/cipher only exposes NewGCMWithTagSize (standard 96-bit nonce,
@@ -41,6 +61,10 @@ func checkAESKeyMatchesDeclaredSize(ctx context.Context, op errors.Op, keyMateri
 // both. A template declaring non-standard values for both is therefore
 // rejected outright rather than approximated.
 func newAESGCM(ctx context.Context, op errors.Op, key []byte, ivSizeBits, tagSizeBits uint32) (cipher.AEAD, error) {
+	if err := checkAESGCMSizesValid(ctx, op, ivSizeBits, tagSizeBits); err != nil {
+		return nil, err
+	}
+
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
