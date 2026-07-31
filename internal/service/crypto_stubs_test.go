@@ -12,28 +12,6 @@ import (
 // TODO: Stub Tests to be done after full implementation
 // ============================================================================
 
-func TestEncrypt_notImplemented(t *testing.T) {
-	ops := setupCryptoOrchestrator(t)
-	_, err := ops.Encrypt(context.Background(), crypto.EncryptRequest{})
-	if err == nil {
-		t.Fatal("Encrypt should return error")
-	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented for Encrypt, got: %v", err)
-	}
-}
-
-func TestDecrypt_notImplemented(t *testing.T) {
-	ops := setupCryptoOrchestrator(t)
-	_, err := ops.Decrypt(context.Background(), crypto.DecryptRequest{})
-	if err == nil {
-		t.Fatal("Decrypt should return error")
-	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented for Decrypt, got: %v", err)
-	}
-}
-
 func TestWrapKey_notImplemented(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
 	_, err := ops.WrapKey(context.Background(), crypto.WrapKeyRequest{})
