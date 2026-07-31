@@ -661,10 +661,12 @@ func (o *cryptoOrchestrator) Encrypt(ctx context.Context, req crypto.EncryptRequ
 	}
 
 	// 6c. Build provider-level EncryptRequest with scope_params oneof.
+	// KeyMaterialEncoding carries the key's stored encoding — see Sign.
 	provReq := &providerpb.EncryptRequest{
-		KeyMaterial: genResp.GetKeyMaterial(),
-		Plaintext:   req.Plaintext,
-		Algorithm:   tmpl.GetAlgorithm(),
+		KeyMaterial:         genResp.GetKeyMaterial(),
+		Plaintext:           req.Plaintext,
+		Algorithm:           tmpl.GetAlgorithm(),
+		KeyMaterialEncoding: genResp.GetKeyMaterialEncoding(),
 	}
 	applyEncryptScopeParams(req.EncryptionScopeFields, provReq)
 
@@ -703,6 +705,10 @@ func (o *cryptoOrchestrator) Decrypt(ctx context.Context, req crypto.DecryptRequ
 	if len(req.Ciphertext) == 0 {
 		return crypto.DecryptResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"Ciphertext must not be empty")
+	}
+	if req.Output == nil {
+		return crypto.DecryptResult{}, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"Output must not be nil")
 	}
 
 	// 2. Load the key aggregate and apply the processing-operation lifecycle
@@ -758,11 +764,13 @@ func (o *cryptoOrchestrator) Decrypt(ctx context.Context, req crypto.DecryptRequ
 	//    req.Output — the ProviderOutput the core extracted from the stored
 	//    OperationMetadata that Encrypt originally produced — carries the
 	//    nonce/IV; the provider never regenerates it for Decrypt.
+	//    KeyMaterialEncoding carries the key's stored encoding — see Sign.
 	provReq := &providerpb.DecryptRequest{
-		KeyMaterial: genResp.GetKeyMaterial(),
-		Ciphertext:  req.Ciphertext,
-		Output:      req.Output,
-		Algorithm:   tmpl.GetAlgorithm(),
+		KeyMaterial:         genResp.GetKeyMaterial(),
+		Ciphertext:          req.Ciphertext,
+		Output:              req.Output,
+		Algorithm:           tmpl.GetAlgorithm(),
+		KeyMaterialEncoding: genResp.GetKeyMaterialEncoding(),
 	}
 	applyDecryptScopeParams(req.EncryptionScopeFields, provReq)
 
