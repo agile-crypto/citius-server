@@ -26,8 +26,18 @@ func (p *Provider) Type() string { return "software" }
 
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
 // These IDs must exactly match the TemplateID values in the template catalog JSON.
+//
+// This list is intentionally NOT yet exhaustive over every algorithm this
+// package implements — advertising the full expanded set (every ECDSA
+// curve, RSA size, Ed25519 variant, ML-DSA parameter set, and cipher mode)
+// plus a test asserting every advertised algorithm has a dispatch arm are
+// separate items to be fixed later. "aes-256-gcm-128-96" is added here now purely
+// because provider.Registry.MatchForTemplate requires a template ID to
+// appear in this list before CreateKey can reach this provider at all — the
+// Encrypt/Decrypt orchestration round-trip this commit adds has no other
+// way to exercise the real provider.
 func (p *Provider) SupportedAlgorithms() []string {
-	return []string{"ecdsa-p256-sha256-der", "ml-dsa-65"}
+	return []string{"ecdsa-p256-sha256-der", "ml-dsa-65", "aes-256-gcm-128-96"}
 }
 
 // DestroyKey is a no-op for the stateless software provider.

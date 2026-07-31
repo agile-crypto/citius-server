@@ -95,17 +95,27 @@ type DigestVerifyRequest struct {
 	SignatureScopeFields
 }
 
+// EncryptionScopeFields groups the scope_params for encryption operations.
+// Embedded in EncryptRequest and DecryptRequest so callers and validation
+// helpers can pass them as a single value, mirroring SignatureScopeFields.
+//
+// Exactly one field should be non-nil, mirroring the scope_params oneof in
+// caas.crypto.v1.EncryptRequest / DecryptRequest.
+type EncryptionScopeFields struct {
+	NoParams         *types.NoParams                // AES-CBC, AES-CTR, ChaCha20, 3DES
+	AeadParams       *types.AeadEncryptParams       // AES-GCM, AES-CCM, ChaCha20-Poly1305 (carries AAD)
+	XtsParams        *types.XtsEncryptParams        // AES-XTS (carries tweak)
+	AsymmetricParams *types.AsymmetricEncryptParams // RSA-OAEP (carries label)
+	VendorParams     *types.VendorEncryptionParams  // vendor/custom scope
+}
+
 type EncryptRequest struct {
 	KeyName   string
 	Plaintext []byte
 
 	// Scope-based operation parameters — exactly one must be non-nil.
 	// Maps to the scope_params oneof in caas.crypto.v1.EncryptRequest.
-	NoParams         *types.NoParams                // AES-CBC, AES-CTR, ChaCha20, 3DES
-	AeadParams       *types.AeadEncryptParams       // AES-GCM, AES-CCM, ChaCha20-Poly1305 (carries AAD)
-	XtsParams        *types.XtsEncryptParams        // AES-XTS (carries tweak)
-	AsymmetricParams *types.AsymmetricEncryptParams // RSA-OAEP (carries label)
-	VendorParams     *types.VendorEncryptionParams  // vendor/custom scope
+	EncryptionScopeFields
 }
 
 type EncryptResult struct {
@@ -123,11 +133,7 @@ type DecryptRequest struct {
 	Output     *messages.ProviderOutput // stored ProviderOutput from EncryptResult (carries IV/nonce)
 
 	// Scope-based operation parameters — must match encryption.
-	NoParams         *types.NoParams
-	AeadParams       *types.AeadEncryptParams       // AAD must match for AEAD authentication
-	XtsParams        *types.XtsEncryptParams        // tweak must match
-	AsymmetricParams *types.AsymmetricEncryptParams // label must match for OAEP
-	VendorParams     *types.VendorEncryptionParams
+	EncryptionScopeFields
 }
 
 type DecryptResult struct {
