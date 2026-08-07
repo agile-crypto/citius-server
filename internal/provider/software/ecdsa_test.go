@@ -186,6 +186,37 @@ func TestSign_emptyPayload_succeeds(t *testing.T) {
 	}
 }
 
+// TestSignVerify_emptyPayload_roundTrips proves Verify accepts an empty
+// input just as Sign does — it must be able to verify whatever Sign
+// produced, and Sign supports signing an empty message (see
+// TestSign_emptyPayload_succeeds).
+func TestSignVerify_emptyPayload_roundTrips(t *testing.T) {
+	p, keyMaterial := genECDSAKey(t)
+	ctx := context.Background()
+
+	signResult, err := p.Sign(ctx, &providerpb.SignRequest{
+		KeyMaterial: keyMaterial.GetKeyMaterial(),
+		Input:       []byte{},
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Sign(empty): %v", err)
+	}
+
+	verifyResult, err := p.Verify(ctx, &providerpb.VerifyRequest{
+		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
+		Input:       []byte{},
+		Signature:   signResult.GetSignature(),
+		Algorithm:   ecdsaP256Details(),
+	})
+	if err != nil {
+		t.Fatalf("Verify(empty): %v", err)
+	}
+	if !verifyResult.GetValid() {
+		t.Error("Verify(empty): expected valid=true for a signature over an empty message")
+	}
+}
+
 func TestVerify_ECDSA_P256_happyPath_validSignature(t *testing.T) {
 	p, keyMaterial := genECDSAKey(t)
 	ctx := context.Background()

@@ -1,0 +1,69 @@
+package software_test
+
+import (
+	"context"
+	"testing"
+
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-server/internal/provider/software"
+)
+
+// TestProviderMethods_rejectRequestsViolatingCELConstraints proves every
+// software.Provider RPC method enforces the buf.validate CEL constraints
+// declared on its request message (e.g. key_material's bytes.min_len = 1)
+// before running any dispatch logic — this is the provider's own trust
+// boundary, distinct from and in addition to the orchestrator's caller-facing
+// validation (see internal/service/crypto_orchestrator_impl.go).
+func TestProviderMethods_rejectRequestsViolatingCELConstraints(t *testing.T) {
+	p := software.New()
+	ctx := context.Background()
+
+	// key_material carries bytes.min_len = 1 on every request below; leaving
+	// it empty is the one violation every method's request shape shares.
+	tests := []struct {
+		name string
+		call func() error
+	}{
+		{"GenerateKey", func() error {
+			_, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{})
+			return err
+		}},
+		{"Sign", func() error {
+			_, err := p.Sign(ctx, &providerpb.SignRequest{Input: []byte("payload")})
+			return err
+		}},
+		{"Verify", func() error {
+			_, err := p.Verify(ctx, &providerpb.VerifyRequest{Input: []byte("payload"), Signature: []byte("sig")})
+			return err
+		}},
+		{"DigestSign", func() error {
+			_, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{Digest: []byte("digest")})
+			return err
+		}},
+		{"DigestVerify", func() error {
+			_, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{Digest: []byte("digest"), Signature: []byte("sig")})
+			return err
+		}},
+		{"Encrypt", func() error {
+			_, err := p.Encrypt(ctx, &providerpb.EncryptRequest{Plaintext: []byte("payload")})
+			return err
+		}},
+		{"Decrypt", func() error {
+			_, err := p.Decrypt(ctx, &providerpb.DecryptRequest{Ciphertext: []byte("ciphertext")})
+			return err
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			err := tc.call()
+			if err == nil {
+				t.Fatal("expected error for empty key_material")
+			}
+			if !errors.IsInvalidArgument(err) {
+				t.Errorf("expected CodeInvalidArgument, got: %v", err)
+			}
+		})
+	}
+}

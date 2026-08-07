@@ -218,11 +218,15 @@ func TestSignVerify_RSAPSS_saltLengthExplicit_roundTrip(t *testing.T) {
 }
 
 // TestSign_RSAPSS_explicitSaltZero_returnsError matches the proto's own CEL
-// rule: "SALT_LENGTH_MODE_EXPLICIT requires salt_length_bytes > 0".
+// rule: "SALT_LENGTH_MODE_EXPLICIT requires salt_length_bytes > 0". The key
+// is generated under a plain, CEL-valid algorithm — GenerateKey validates
+// the whole request including this cross-field rule even though it never
+// reads salt_length_bytes, so generating under the bad alg itself would fail
+// before Sign ever ran.
 func TestSign_RSAPSS_explicitSaltZero_returnsError(t *testing.T) {
 	alg := rsaPSSDetailsWithSalt(2048, types.HashAlgorithm_HASH_ALGORITHM_SHA256,
 		types.RsaPssParams_SALT_LENGTH_MODE_EXPLICIT, 0)
-	p, keyMaterial := genRSAPSSKey(t, alg)
+	p, keyMaterial := genRSAPSSKey(t, rsaPSSDetails(2048, types.HashAlgorithm_HASH_ALGORITHM_SHA256))
 
 	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(), Input: []byte("payload"), Algorithm: alg,
@@ -335,9 +339,11 @@ func TestSign_RSAPSS_mgfHashDiffersFromHash_returnsError(t *testing.T) {
 
 // TestSign_RSAPSS_unsupportedHash_returnsError proves a hash outside the
 // {UNSPECIFIED, SHA-256, SHA-384, SHA-512} set RsaPssParams.hash's proto
-// constraint allows is rejected defensively — buf.validate does not run at
-// this in-process layer, so the provider must not trust an out-of-range
-// value reaching it.
+// constraint allows is rejected. protovalidate (wired into every
+// software.Provider method) now catches this via that constraint before
+// dispatch reaches rsaHash's own defensive check, so the error is
+// CodeInvalidArgument rather than the CodeNotImplemented rsaHash itself
+// would return.
 func TestSign_RSAPSS_unsupportedHash_returnsError(t *testing.T) {
 	alg := rsaPSSDetails(2048, types.HashAlgorithm_HASH_ALGORITHM_SHA3_256)
 	p, keyMaterial := genRSAPSSKey(t, rsaPSSDetails(2048, types.HashAlgorithm_HASH_ALGORITHM_SHA256))
@@ -348,7 +354,7 @@ func TestSign_RSAPSS_unsupportedHash_returnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unsupported hash SHA3-256")
 	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }
