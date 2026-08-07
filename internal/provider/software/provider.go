@@ -368,6 +368,15 @@ func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) 
 			Ciphertext: ciphertext,
 			Output:     provider.AeadOutput(nonce, alg.AesGcm.GetTagSizeBits()/8, "raw"),
 		}, nil
+	case *types.AlgorithmDetails_AesCbc:
+		ciphertext, iv, err := encryptAESCBC(ctx, req.GetKeyMaterial(), req.GetPlaintext(), alg.AesCbc)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.EncryptResponse{
+			Ciphertext: ciphertext,
+			Output:     provider.BlockCipherOutput(iv, "raw"),
+		}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for encrypt: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -385,6 +394,13 @@ func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) 
 	case *types.AlgorithmDetails_AesGcm:
 		plaintext, err := decryptAESGCM(ctx, req.GetKeyMaterial(), req.GetCiphertext(),
 			req.GetOutput().GetAeadOutput().GetNonce(), req.GetAeadParams().GetAad(), alg.AesGcm)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_AesCbc:
+		plaintext, err := decryptAESCBC(ctx, req.GetKeyMaterial(), req.GetCiphertext(),
+			req.GetOutput().GetBlockCipherOutput().GetIv(), alg.AesCbc)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
