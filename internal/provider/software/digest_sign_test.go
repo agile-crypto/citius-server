@@ -91,7 +91,13 @@ func TestDigestVerify_MLDSA_returnsInvalidArgument(t *testing.T) {
 	}
 }
 
-func TestDigestSign_unsetAlgorithm_returnsNotImplemented(t *testing.T) {
+// TestDigestSign_unsetAlgorithm_returnsInvalidArgument proves an unset
+// algorithm is rejected. protovalidate (wired into every software.Provider
+// method) now catches this via AlgorithmDetails' required=true constraint
+// before dispatch reaches the switch's default case, so the error is
+// CodeInvalidArgument rather than the CodeNotImplemented the default case
+// itself would return.
+func TestDigestSign_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
 	_, err := software.New().DigestSign(context.Background(), &providerpb.DigestSignRequest{
 		KeyMaterial: []byte("fake-key"),
 		Digest:      []byte("fake-digest"),
@@ -99,12 +105,14 @@ func TestDigestSign_unsetAlgorithm_returnsNotImplemented(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unset algorithm")
 	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }
 
-func TestDigestVerify_unsetAlgorithm_returnsNotImplemented(t *testing.T) {
+// TestDigestVerify_unsetAlgorithm_returnsInvalidArgument is the DigestVerify
+// analogue of TestDigestSign_unsetAlgorithm_returnsInvalidArgument.
+func TestDigestVerify_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
 	_, err := software.New().DigestVerify(context.Background(), &providerpb.DigestVerifyRequest{
 		KeyMaterial: []byte("fake-key"),
 		Digest:      []byte("fake-digest"),
@@ -113,7 +121,7 @@ func TestDigestVerify_unsetAlgorithm_returnsNotImplemented(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unset algorithm")
 	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }

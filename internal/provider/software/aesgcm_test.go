@@ -289,7 +289,10 @@ func TestEncrypt_AESGCM_bothNonStandardNonceAndTag_returnsError(t *testing.T) {
 // TestEncrypt_AESGCM_tagSizeOutsideAllowedSet_returnsError proves a
 // tag_size_bits value outside AesGcmParams' declared {96,104,112,120,128}
 // set is rejected rather than silently truncated by integer division to a
-// shorter, unintended tag length
+// shorter, unintended tag length. protovalidate (wired into every
+// software.Provider method) now catches this before dispatch reaches
+// checkAESGCMSizesValid, so the error is CodeInvalidArgument rather than the
+// CodeNotImplemented checkAESGCMSizesValid itself would return.
 func TestEncrypt_AESGCM_tagSizeOutsideAllowedSet_returnsError(t *testing.T) {
 	alg := aesGCMDetailsFull(256, 96, 127) // 127 is not in {96,104,112,120,128}
 	p, key := genAESGCMKey(t, aesGCMDetailsFull(256, 96, 128))
@@ -302,8 +305,8 @@ func TestEncrypt_AESGCM_tagSizeOutsideAllowedSet_returnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for tag_size_bits=127, not one of the proto's allowed values")
 	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }
 
@@ -321,7 +324,7 @@ func TestEncrypt_AESGCM_ivSizeOutsideAllowedSet_returnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for iv_size_bits=100, not one of the proto's allowed values")
 	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }

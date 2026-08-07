@@ -68,6 +68,10 @@ func (p *Provider) ExportPublicKey(ctx context.Context, _ *providerpb.ExportPubl
 func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	const op errors.Op = "software.(Provider).GenerateKey"
 
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
 	var (
 		pubDER  []byte
 		privDER []byte
@@ -146,6 +150,10 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error) {
 	const op errors.Op = "software.(Provider).Sign"
 
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		sig, err := signECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(),
@@ -188,6 +196,10 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 // Verify dispatches to the algorithm-specific verify implementation.
 func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	const op errors.Op = "software.(Provider).Verify"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
@@ -256,6 +268,9 @@ func validateDigestLength(ctx context.Context, op errors.Op, hashAlg types.HashA
 func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
 	const op errors.Op = "software.(Provider).DigestSign"
 
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
 	if err := validateDigestLength(ctx, op, req.GetHashAlgorithm(), len(req.GetDigest())); err != nil {
 		return nil, err
 	}
@@ -307,6 +322,9 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
 	const op errors.Op = "software.(Provider).DigestVerify"
 
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
 	if err := validateDigestLength(ctx, op, req.GetHashAlgorithm(), len(req.GetDigest())); err != nil {
 		return nil, err
 	}
@@ -358,6 +376,10 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
 	const op errors.Op = "software.(Provider).Encrypt"
 
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_AesGcm:
 		ciphertext, nonce, err := encryptAESGCM(ctx, req.GetKeyMaterial(), req.GetPlaintext(), req.GetAeadParams().GetAad(), alg.AesGcm)
@@ -389,6 +411,10 @@ func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) 
 // produced
 func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
 	const op errors.Op = "software.(Provider).Decrypt"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_AesGcm:

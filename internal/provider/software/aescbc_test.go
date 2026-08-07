@@ -221,6 +221,10 @@ func TestEncrypt_AESCBC_unsupportedPadding_returnsError(t *testing.T) {
 
 // TestEncrypt_AESCBC_ivSizeOutsideAllowedValue_returnsError is the AES-CBC
 // analogue of TestEncrypt_AESGCM_ivSizeOutsideAllowedSet_returnsError.
+// protovalidate (wired into every software.Provider method) now catches this
+// before dispatch reaches checkAESCBCParamsValid, so the error is
+// CodeInvalidArgument rather than the CodeNotImplemented
+// checkAESCBCParamsValid itself would return.
 func TestEncrypt_AESCBC_ivSizeOutsideAllowedValue_returnsError(t *testing.T) {
 	alg := &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_AesCbc{
@@ -237,7 +241,7 @@ func TestEncrypt_AESCBC_ivSizeOutsideAllowedValue_returnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for iv_size_bits=64, the only valid value for AES-CBC is 128")
 	}
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }
