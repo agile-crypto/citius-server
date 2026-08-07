@@ -58,3 +58,19 @@ func AeadOutput(nonce []byte, tagLengthBytes uint32, encoding string) *metapb.Pr
 		Encoding: encoding,
 	}
 }
+
+// BlockCipherOutput builds a ProviderOutput with the block_cipher_output arm
+// set, carrying the system-generated IV — the parameter block cipher modes
+// (CBC, OFB, CFB) must record at encryption time for decryption to succeed
+// later. Use this from Encrypt; Decrypt has nothing new to report and should
+// use NoOutputUnencoded.
+func BlockCipherOutput(iv []byte, encoding string) *metapb.ProviderOutput {
+	return &metapb.ProviderOutput{
+		AlgorithmOutput: &metapb.ProviderOutput_BlockCipherOutput{
+			BlockCipherOutput: &metapb.BlockCipherOutput{
+				Iv: iv,
+			},
+		},
+		Encoding: encoding,
+	}
+}
