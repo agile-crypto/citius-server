@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/core"
@@ -895,13 +896,17 @@ func validateSignatureScopeParams(
 // compatible with the key's declared ScopeSpecification — the encryption
 // analogue of validateSignatureScopeParams.
 //
-// Only AeadParams is mapped today: this provider currently only implements
-// AES-GCM (core.ScopeAeadStandard — a random-nonce AEAD, as opposed to
-// core.ScopeAeadDeterministic algorithms like AES-SIV, which this scope
-// mapping does not yet distinguish since no such algorithm is implemented).
-// NoParams/XtsParams/AsymmetricParams have no provider implementation yet
-// either, so mapping them to a scope now would be guessing; they are
-// rejected here rather than silently accepted with a wrong scope.
+// AeadParams maps to the single core.ScopeAeadStandard scope (a random-nonce
+// AEAD, as opposed to core.ScopeAeadDeterministic algorithms like AES-SIV,
+// which this provider does not implement, so that distinction isn't made
+// here). NoParams maps to a SET of two scopes — core.ScopeSymmetricCipherBlock
+// (AES-CBC) and core.ScopeSymmetricCipherStream (AES-CTR) — because NoParams
+// itself carries no information distinguishing block from stream cipher
+// mode; the key's own ScopeSpecification, fixed at CreateKey time from the
+// template, is what actually pins that down. XtsParams/AsymmetricParams have
+// no provider implementation yet, so mapping them to a scope now would be
+// guessing; they are rejected here rather than silently accepted with a
+// wrong scope.
 func validateEncryptionScopeParams(
 	ctx context.Context,
 	op errors.Op,
@@ -913,11 +918,13 @@ func validateEncryptionScopeParams(
 		return nil
 	}
 
-	// 2. Map proto oneof arm => core.Scope.
-	var callerScope core.Scope
+	// 2. Map proto oneof arm => the set of core.Scope values it's valid for.
+	var allowedScopes []core.Scope
 	switch {
 	case sf.AeadParams != nil:
-		callerScope = core.ScopeAeadStandard
+		allowedScopes = []core.Scope{core.ScopeAeadStandard}
+	case sf.NoParams != nil:
+		allowedScopes = []core.Scope{core.ScopeSymmetricCipherBlock, core.ScopeSymmetricCipherStream}
 	default:
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "encryption scope field is required")
 	}
@@ -928,9 +935,9 @@ func validateEncryptionScopeParams(
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	if keyScopeSpec.Scope != callerScope {
+	if !slices.Contains(allowedScopes, keyScopeSpec.Scope) {
 		return errors.New(ctx, op, errors.CodeInvalidArgument,
-			"caller scope %q does not match key scope %q", callerScope, keyScopeSpec.Scope)
+			"caller scope_params do not match key scope %q", keyScopeSpec.Scope)
 	}
 	return nil
 }
