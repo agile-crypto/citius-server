@@ -135,6 +135,121 @@ func TestEncryptDecrypt_AESGCM_withAAD_roundTrip(t *testing.T) {
 	}
 }
 
+// setupCryptoWithKeyForBlockCipherEncrypt mirrors setupCryptoWithKeyForEncrypt
+// for the non-AEAD cipher families (AES-CBC, AES-CTR), which use NoParams
+// instead of AeadParams and a block/stream scope instead of AEAD scope.
+func setupCryptoWithKeyForBlockCipherEncrypt(t *testing.T, templateID string, scope core.Scope) (CryptoOrchestrator, string) {
+	t.Helper()
+	ctx := context.Background()
+	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
+
+	rules := &policy.Rules{
+		Version:          "1",
+		AllowedTemplates: []string{templateID},
+		AllowedOperations: &policy.OperationRule{
+			KeyOperations: []string{
+				string(core.OperationCreateKey),
+				string(core.OperationEncrypt),
+				string(core.OperationDecrypt),
+			},
+		},
+	}
+	rulesJSON, err := json.Marshal(rules)
+	if err != nil {
+		t.Fatalf("marshal rules: %v", err)
+	}
+	const policyName = "test-blockcipher-allow"
+	p := policy.NewPolicy("pol_testblockcipher", policyName, rulesJSON)
+	if _, err = pol.CreatePolicy(ctx, p); err != nil {
+		t.Fatalf("seed policy: %v", err)
+	}
+
+	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:               "blockcipher-test-key",
+		TemplateID:         templateID,
+		PolicyID:           policyName,
+		ScopeSpecification: scopeSpecWithScope(t, scope),
+	})
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	return ops, created.Name
+}
+
+// TestEncryptDecrypt_AESCBC_roundTrip and TestEncryptDecrypt_AESCTR_roundTrip
+// are regression guards for validateEncryptionScopeParams: before it learned
+// to map NoParams to ScopeSymmetricCipherBlock/ScopeSymmetricCipherStream,
+// Encrypt with NoParams against any AES-CBC or AES-CTR key failed
+// unconditionally with "encryption scope field is required" — these ciphers
+// were unreachable at the orchestrator layer despite the provider dispatch
+// (added in C36/C37) working correctly underneath.
+func TestEncryptDecrypt_AESCBC_roundTrip(t *testing.T) {
+	ops, keyName := setupCryptoWithKeyForBlockCipherEncrypt(t, "aes-256-cbc-pkcs7-128", core.ScopeSymmetricCipherBlock)
+	ctx := context.Background()
+	plaintext := []byte("orchestrated AES-256-CBC round trip")
+
+	encResult, err := ops.Encrypt(ctx, crypto.EncryptRequest{
+		KeyName:               keyName,
+		Plaintext:             plaintext,
+		EncryptionScopeFields: crypto.EncryptionScopeFields{NoParams: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	if len(encResult.Ciphertext) == 0 {
+		t.Fatal("expected non-empty ciphertext")
+	}
+	if encResult.Output.GetBlockCipherOutput().GetIv() == nil {
+		t.Fatal("expected a system-generated IV in Output")
+	}
+
+	decResult, err := ops.Decrypt(ctx, crypto.DecryptRequest{
+		KeyName:               keyName,
+		KeyVersion:            encResult.KeyVersion,
+		Ciphertext:            encResult.Ciphertext,
+		Output:                encResult.Output,
+		EncryptionScopeFields: crypto.EncryptionScopeFields{NoParams: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if string(decResult.Plaintext) != string(plaintext) {
+		t.Errorf("round-trip mismatch: got %q, want %q", decResult.Plaintext, plaintext)
+	}
+}
+
+func TestEncryptDecrypt_AESCTR_roundTrip(t *testing.T) {
+	ops, keyName := setupCryptoWithKeyForBlockCipherEncrypt(t, "aes-256-ctr", core.ScopeSymmetricCipherStream)
+	ctx := context.Background()
+	plaintext := []byte("orchestrated AES-256-CTR round trip")
+
+	encResult, err := ops.Encrypt(ctx, crypto.EncryptRequest{
+		KeyName:               keyName,
+		Plaintext:             plaintext,
+		EncryptionScopeFields: crypto.EncryptionScopeFields{NoParams: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+	if len(encResult.Ciphertext) == 0 {
+		t.Fatal("expected non-empty ciphertext")
+	}
+
+	decResult, err := ops.Decrypt(ctx, crypto.DecryptRequest{
+		KeyName:               keyName,
+		KeyVersion:            encResult.KeyVersion,
+		Ciphertext:            encResult.Ciphertext,
+		Output:                encResult.Output,
+		EncryptionScopeFields: crypto.EncryptionScopeFields{NoParams: &types.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if string(decResult.Plaintext) != string(plaintext) {
+		t.Errorf("round-trip mismatch: got %q, want %q", decResult.Plaintext, plaintext)
+	}
+}
+
 func TestDecrypt_AESGCM_wrongAAD_returnsError(t *testing.T) {
 	ops, keyName := setupCryptoWithKeyForEncrypt(t)
 	ctx := context.Background()
