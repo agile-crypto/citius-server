@@ -121,7 +121,57 @@ func parseMLDSAPKCS8PrivateKey(ctx context.Context, op errors.Op, privBytes []by
 	return privKey, nil
 }
 
+// mldsaMaxContextLen is the longest domain separation context FIPS 204
+// permits, and the same bound SignatureDomainContext.context declares.
+const mldsaMaxContextLen = 255
+
+// checkMLDSAContextLength rejects an over-long domain separation context,
+// following the same defensive-check convention as checkAESKeyMatchesDeclaredSize
+// and checkCurveMatches: AlgorithmDetails and the request are validated here
+// rather than assumed well-formed.
+//
+// This is not redundant with the max_len constraint the request message
+// declares. CIRCL's two signing paths disagree on how they report an
+// over-long context — the package-level SignTo returns an error, while
+// sign.Scheme.Sign panics on it — so without this check the deterministic
+// path would crash the process rather than reject the request, on an input
+// only a constraint declared in a different layer keeps out. Verify has no
+// such cliff (CIRCL returns false), but is checked here too so an invalid
+// request is reported as one instead of masquerading as a bad signature.
+func checkMLDSAContextLength(ctx context.Context, op errors.Op, domainContext []byte) error {
+	if len(domainContext) > mldsaMaxContextLen {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			"domain separation context is %d bytes, exceeds the %d-byte maximum",
+			len(domainContext), mldsaMaxContextLen)
+	}
+	return nil
+}
+
+// mldsaSignatureOpts wraps a domain separation context in the options type
+// CIRCL's generic sign.Scheme takes.
+//
+// sign.SignatureOpts.Context is a string while FIPS 204 and this server's API
+// both treat the context as arbitrary bytes; Go strings hold arbitrary bytes,
+// so the conversion is lossless — CIRCL converts straight back with
+// []byte(opts.Context) before hashing it in.
+//
+// A nil or empty domainContext yields Context: "", which produces the same
+// signature as passing no context at all: FIPS 204 defines the empty context
+// and the absent context to be the same value, so the two cannot be — and do
+// not need to be — distinguished here.
+func mldsaSignatureOpts(domainContext []byte) *sign.SignatureOpts {
+	return &sign.SignatureOpts{Context: string(domainContext)}
+}
+
 // signMLDSA signs payload with the ML-DSA private key encoded in privBytes.
+//
+// domainContext is the FIPS 204 context string used for domain separation:
+// a signature made under one context does not verify under another, which is
+// what makes it safe to reuse one key across protocols. It arrives from
+// SignRequest's domain_context scope arm and must be threaded into whichever
+// of the two signing paths below runs — a dropped context yields a signature
+// with no domain separation at all while the caller believes they asked for
+// one, which verifies against anything and is strictly weaker than intended.
 //
 // sign.Scheme.Sign is deterministic-only — every CIRCL ML-DSA scheme wrapper
 // hardcodes randomized=false internally — so honoring
@@ -132,9 +182,12 @@ func parseMLDSAPKCS8PrivateKey(ctx context.Context, op errors.Op, privBytes []by
 // mldsa65.SignTo vs mldsa87.SignTo), unlike everything else in this file
 // that stays generic over sign.Scheme, so it needs its own per-parameter-set
 // dispatch — see signMLDSARandomized.
-func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, parameterSet types.MlDsaParameterSet, deterministic bool) ([]byte, error) {
+func signMLDSA(ctx context.Context, privBytes, payload, domainContext []byte, keyEncoding providerpb.PrivateKeyEncoding, parameterSet types.MlDsaParameterSet, deterministic bool) ([]byte, error) {
 	const op errors.Op = "software.signMLDSA"
 
+	if err := checkMLDSAContextLength(ctx, op, domainContext); err != nil {
+		return nil, err
+	}
 	scheme, err := mldsaScheme(ctx, op, parameterSet)
 	if err != nil {
 		return nil, err
@@ -144,9 +197,9 @@ func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding provi
 		return nil, err
 	}
 	if deterministic {
-		return scheme.Sign(privKey, payload, nil), nil
+		return scheme.Sign(privKey, payload, mldsaSignatureOpts(domainContext)), nil
 	}
-	return signMLDSARandomized(ctx, op, privKey, payload, parameterSet)
+	return signMLDSARandomized(ctx, op, privKey, payload, domainContext, parameterSet)
 }
 
 // signMLDSARandomized performs hedged (randomized) ML-DSA signing via the
@@ -156,14 +209,14 @@ func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding provi
 // exactly that type for a given parameterSet, since it derives from
 // mldsaScheme(parameterSet) itself, so the type assertions inside
 // signMLDSARandomizedWith cannot fail in practice.
-func signMLDSARandomized(ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload []byte, parameterSet types.MlDsaParameterSet) ([]byte, error) {
+func signMLDSARandomized(ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload, domainContext []byte, parameterSet types.MlDsaParameterSet) ([]byte, error) {
 	switch parameterSet {
 	case types.MlDsaParameterSet_ML_DSA_44:
-		return signMLDSARandomizedWith(ctx, op, privKey, payload, mldsa44.SignatureSize, mldsa44.SignTo, "ML-DSA-44")
+		return signMLDSARandomizedWith(ctx, op, privKey, payload, domainContext, mldsa44.SignatureSize, mldsa44.SignTo, "ML-DSA-44")
 	case types.MlDsaParameterSet_ML_DSA_65:
-		return signMLDSARandomizedWith(ctx, op, privKey, payload, mldsa65.SignatureSize, mldsa65.SignTo, "ML-DSA-65")
+		return signMLDSARandomizedWith(ctx, op, privKey, payload, domainContext, mldsa65.SignatureSize, mldsa65.SignTo, "ML-DSA-65")
 	case types.MlDsaParameterSet_ML_DSA_87:
-		return signMLDSARandomizedWith(ctx, op, privKey, payload, mldsa87.SignatureSize, mldsa87.SignTo, "ML-DSA-87")
+		return signMLDSARandomizedWith(ctx, op, privKey, payload, domainContext, mldsa87.SignatureSize, mldsa87.SignTo, "ML-DSA-87")
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			"unsupported ML-DSA parameter set: %s", parameterSet)
@@ -176,21 +229,28 @@ func signMLDSARandomized(ctx context.Context, op errors.Op, privKey sign.Private
 // mldsa44/mldsa65/mldsa87 have identical SignTo signatures but each takes
 // its own concrete *PrivateKey type, so they cannot share one non-generic
 // function value.
-func signMLDSARandomizedWith[SK any](ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload []byte, sigSize int, signTo func(sk SK, msg, ctx []byte, randomized bool, sig []byte) error, paramSetName string) ([]byte, error) {
+func signMLDSARandomizedWith[SK any](ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload, domainContext []byte, sigSize int, signTo func(sk SK, msg, sigCtx []byte, randomized bool, sig []byte) error, paramSetName string) ([]byte, error) {
 	sk, ok := privKey.(SK)
 	if !ok {
 		return nil, errors.New(ctx, op, errors.CodeInternal, "%s private key has unexpected type %T", paramSetName, privKey)
 	}
 	sig := make([]byte, sigSize)
-	if err := signTo(sk, payload, nil, true, sig); err != nil {
+	if err := signTo(sk, payload, domainContext, true, sig); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 	return sig, nil
 }
 
-func verifyMLDSA(ctx context.Context, pubBytes, payload, signature []byte, parameterSet types.MlDsaParameterSet) (bool, error) {
+// verifyMLDSA reports whether signature is valid for payload under the given
+// domainContext. The context must match the one used at signing byte for
+// byte — that mismatch returning false, rather than being ignored, is the
+// whole point of domain separation.
+func verifyMLDSA(ctx context.Context, pubBytes, payload, signature, domainContext []byte, parameterSet types.MlDsaParameterSet) (bool, error) {
 	const op errors.Op = "software.verifyMLDSA"
 
+	if err := checkMLDSAContextLength(ctx, op, domainContext); err != nil {
+		return false, err
+	}
 	scheme, err := mldsaScheme(ctx, op, parameterSet)
 	if err != nil {
 		return false, err
@@ -202,5 +262,5 @@ func verifyMLDSA(ctx context.Context, pubBytes, payload, signature []byte, param
 	}
 
 	// scheme.Verify returns false for any invalid signature; it never errors.
-	return scheme.Verify(pubKey, payload, signature, nil), nil
+	return scheme.Verify(pubKey, payload, signature, mldsaSignatureOpts(domainContext)), nil
 }
