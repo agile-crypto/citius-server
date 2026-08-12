@@ -8,7 +8,6 @@ import "api/types/operation_params.proto";
 import "api/types/algorithm_params.proto";
 import "api/types/templates.proto";
 import "api/messages/metadata.proto";
-import "server/provider/key_encoding.proto";
 
 
 // ============================================================================
@@ -63,12 +62,7 @@ message SignRequest {
   // Optional: unset means the encoding was not recorded (e.g. a key created
   // before this field existed).  The provider MUST fall back to trying its
   // known formats in that case, not reject the request.
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
   caas.crypto.v1.ProviderOutput key_output = 7;
-
-  // How key_material is serialized, from GenerateKeyResponse.
-  // Lets the provider select the right parser instead of guessing.
-  PrivateKeyEncoding key_material_encoding = 8;
 }
 
 // SignResponse contains the signature and provider output.
@@ -112,13 +106,7 @@ message VerifyRequest {
   //
   // Optional: unset means the encoding was not recorded.  The provider MUST
   // fall back to its algorithm-appropriate default, not reject the request.
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
   caas.crypto.v1.ProviderOutput key_output = 9;
-
-  // How key_material is serialized.  PublicKeyEncoding, not
-  // PrivateKeyEncoding: VerifyRequest.key_material is the PUBLIC half, so a
-  // private-only format such as SEC1 is not expressible here by construction.
-  PublicKeyEncoding key_material_encoding = 10;
 }
 
 // VerifyResponse reports whether the signature is valid.
@@ -165,12 +153,10 @@ message DigestSignRequest {
   // are no callers this constraint could break.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
+  // The ProviderOutput captured on GenerateKeyResponse when this key was
+  // created — see SignRequest.key_output.  Same optional-with-fallback
+  // contract.
   caas.crypto.v1.ProviderOutput key_output = 9;
-
-  // How key_material is serialized — DigestSign uses the PRIVATE half, so
-  // see SignRequest.key_material_encoding.
-  PrivateKeyEncoding key_material_encoding = 10;
 }
 
 // DigestSignResponse contains the signature over the digest.
@@ -205,12 +191,10 @@ message DigestVerifyRequest {
   // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
   caas.crypto.v1.ProviderOutput output = 10;
 
-  // Superseded by key_material_encoding below; removed in the follow-up commit.
+  // The GenerateKeyResponse.public_key_output captured when this key was
+  // created — see VerifyRequest.key_output.  Same optional-with-fallback
+  // contract.
   caas.crypto.v1.ProviderOutput key_output = 11;
-
-  // How key_material is serialized — DigestVerify uses the PUBLIC half, so
-  // see VerifyRequest.key_material_encoding.
-  PublicKeyEncoding key_material_encoding = 12;
 }
 
 // DigestVerifyResponse reports whether the digest signature is valid.

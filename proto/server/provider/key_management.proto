@@ -6,7 +6,6 @@ option go_package = "github.com/agile-crypto/citius-server/gen/go/server/provide
 import "buf/validate/validate.proto";
 import "api/types/templates.proto";
 import "api/messages/metadata.proto";
-import "server/provider/key_encoding.proto";
 
 // GenerateKeyRequest asks the provider to produce new key material.
 //
@@ -51,22 +50,19 @@ message GenerateKeyResponse {
   // SubjectPublicKeyInfo), so one field cannot honestly describe both.
   caas.crypto.v1.ProviderOutput output = 3;
 
-  // Superseded by public_key_encoding below; removed in the follow-up commit
-  // once no code references it.
-  caas.crypto.v1.ProviderOutput public_key_output = 4;
-
-  // Declares how key_material (the PRIVATE half) is serialized.
+  // Declares how public_key_bytes is encoded — e.g. "pkix" (X.509
+  // SubjectPublicKeyInfo, RFC 5280), "raw", "pem".
   //
-  // Providers legitimately differ: a software provider may emit SEC1 or
-  // PKCS#8 where an HSM emits an opaque handle.  Recording it at generation
-  // time is what lets Sign select the right parser rather than guessing —
-  // and because stored keys outlive the code that wrote them, a format never
-  // recorded cannot be recovered retroactively.
-  PrivateKeyEncoding key_material_encoding = 5;
-
-  // Declares how public_key_bytes is serialized.  Separate from
-  // key_material_encoding because the two halves do not share a format.
-  PublicKeyEncoding public_key_encoding = 6;
+  // Providers legitimately differ here: a software provider may emit PKIX
+  // DER where an HSM or remote provider emits a raw point or PEM.  Recording
+  // it at generation time is what lets Verify select the right parser rather
+  // than guessing — and, because stored keys outlive code, a format that was
+  // never recorded cannot be recovered retroactively.
+  //
+  // Optional: unset means the encoding was not recorded (e.g. a key created
+  // before this field existed).  The provider MUST fall back to its
+  // algorithm-appropriate default in that case, not reject the request.
+  caas.crypto.v1.ProviderOutput public_key_output = 4;
 }
 
 // DestroyKeyRequest asks the provider to zeroize key material.
