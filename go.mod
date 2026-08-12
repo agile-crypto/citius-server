@@ -5,7 +5,7 @@ go 1.25.7
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	buf.build/go/protovalidate v1.1.3
-	github.com/cloudflare/circl v1.6.4
+	github.com/cloudflare/circl v1.6.3
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	github.com/hashicorp/vault/sdk v0.25.1
 	github.com/oklog/ulid/v2 v2.1.1
