@@ -170,13 +170,13 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	}
 
 	// 6. Build provider-level SignRequest with scope_params oneof.
-	// KeyMaterialEncoding carries the private key's stored encoding so the
-	// provider selects the correct parser instead of guessing.
+	// KeyOutput carries the key's stored encoding (e.g. "pkcs8" vs "sec1")
+	// so the provider can select the correct parser instead of guessing.
 	provReq := &providerpb.SignRequest{
-		KeyMaterial:         genResp.GetKeyMaterial(),
-		Input:               req.Payload,
-		Algorithm:           tmpl.GetAlgorithm(),
-		KeyMaterialEncoding: genResp.GetKeyMaterialEncoding(),
+		KeyMaterial: genResp.GetKeyMaterial(),
+		Input:       req.Payload,
+		Algorithm:   tmpl.GetAlgorithm(),
+		KeyOutput:   genResp.GetOutput(),
 	}
 	applySignScopeParams(req, provReq)
 
@@ -278,15 +278,12 @@ func (o *cryptoOrchestrator) Verify(ctx context.Context, req crypto.VerifyReques
 
 	// 6. Build provider-level VerifyRequest with scope_params oneof.
 	//    Verify receives the public key bytes, not the private key material.
-	// KeyMaterialEncoding here is the PUBLIC key's encoding — VerifyRequest
-	// carries the public half.
 	provReq := &providerpb.VerifyRequest{
-		KeyMaterial:         genResp.GetPublicKeyBytes(),
-		Input:               req.Payload,
-		Signature:           req.Signature,
-		Algorithm:           tmpl.GetAlgorithm(),
-		Output:              req.Output,
-		KeyMaterialEncoding: genResp.GetPublicKeyEncoding(),
+		KeyMaterial: genResp.GetPublicKeyBytes(),
+		Input:       req.Payload,
+		Signature:   req.Signature,
+		Algorithm:   tmpl.GetAlgorithm(),
+		Output:      req.Output,
 	}
 	switch {
 	case req.NoContext != nil:
@@ -403,14 +400,14 @@ func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSi
 	}
 
 	// 7. Build provider-level DigestSignRequest with scope_params oneof.
-	// KeyMaterialEncoding carries the private key's stored encoding — see Sign.
+	// KeyOutput carries the key's stored encoding — see Sign's provReq.
 	provReq := &providerpb.DigestSignRequest{
-		KeyMaterial:         genResp.GetKeyMaterial(),
-		Digest:              req.Digest,
-		HashAlgorithm:       req.HashAlgorithm,
-		HashAlgorithmOid:    req.HashAlgorithmOID,
-		Algorithm:           tmpl.GetAlgorithm(),
-		KeyMaterialEncoding: genResp.GetKeyMaterialEncoding(),
+		KeyMaterial:      genResp.GetKeyMaterial(),
+		Digest:           req.Digest,
+		HashAlgorithm:    req.HashAlgorithm,
+		HashAlgorithmOid: req.HashAlgorithmOID,
+		Algorithm:        tmpl.GetAlgorithm(),
+		KeyOutput:        genResp.GetOutput(),
 	}
 	applyDigestSignScopeParams(req, provReq)
 
@@ -517,16 +514,14 @@ func (o *cryptoOrchestrator) DigestVerify(ctx context.Context, req crypto.Digest
 
 	// 6. Build provider-level DigestVerifyRequest with scope_params oneof.
 	//    DigestVerify receives the public key bytes, not the private key material.
-	// KeyMaterialEncoding here is the PUBLIC key's encoding — see Verify.
 	provReq := &providerpb.DigestVerifyRequest{
-		KeyMaterial:         genResp.GetPublicKeyBytes(),
-		Digest:              req.Digest,
-		Signature:           req.Signature,
-		HashAlgorithm:       req.HashAlgorithm,
-		HashAlgorithmOid:    req.HashAlgorithmOID,
-		Algorithm:           tmpl.GetAlgorithm(),
-		Output:              req.Output,
-		KeyMaterialEncoding: genResp.GetPublicKeyEncoding(),
+		KeyMaterial:      genResp.GetPublicKeyBytes(),
+		Digest:           req.Digest,
+		Signature:        req.Signature,
+		HashAlgorithm:    req.HashAlgorithm,
+		HashAlgorithmOid: req.HashAlgorithmOID,
+		Algorithm:        tmpl.GetAlgorithm(),
+		Output:           req.Output,
 	}
 	applyDigestVerifyScopeParams(req, provReq)
 

@@ -50,11 +50,10 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	const op errors.Op = "software.(Provider).GenerateKey"
 
 	var (
-		pubDER  []byte
-		privDER []byte
-		privEnc providerpb.PrivateKeyEncoding
-		pubEnc  providerpb.PublicKeyEncoding
-		err     error
+		pubDER   []byte
+		privDER  []byte
+		encoding string
+		err      error
 	)
 
 	// Dispatch on the typed AlgorithmDetails oneof.
@@ -64,10 +63,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		// The two halves differ: x509.MarshalECPrivateKey writes SEC1
-		// (RFC 5915) while x509.MarshalPKIXPublicKey writes SPKI (RFC 5280).
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
-		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
+		encoding = encodingSEC1 // ECDSA: x509.MarshalECPrivateKey (SEC1, RFC 5915)
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -77,23 +73,17 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		// ML-DSA: circl native Bytes() for both halves, not yet PKCS#8/SPKI.
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
-		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
+		encoding = "raw" // ML-DSA: circl native PrivateKey.Bytes(), not yet PKCS#8
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
 
 	// Return key material to caller — provider is stateless, orchestrator stores the bytes.
-	// Output carries no encoding: key generation produces no operation artifact,
-	// and the key encodings are declared by the typed fields below.
 	return &providerpb.GenerateKeyResponse{
-		PublicKeyBytes:      pubDER,
-		KeyMaterial:         privDER,
-		Output:              provider.NoOutputUnencoded(),
-		KeyMaterialEncoding: privEnc,
-		PublicKeyEncoding:   pubEnc,
+		PublicKeyBytes: pubDER,
+		KeyMaterial:    privDER,
+		Output:         provider.NoOutput(encoding),
 	}, nil
 }
 
@@ -103,7 +93,7 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		sig, err := signECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(),
+		sig, err := signECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyOutput().GetEncoding(),
 			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
@@ -132,7 +122,7 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		valid, err := verifyECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
+			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -185,7 +175,7 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		sig, err := signECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
+		sig, err := signECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyOutput().GetEncoding(),
 			alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
@@ -212,7 +202,7 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		valid, err := verifyECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve())
+			alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
