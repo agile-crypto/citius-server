@@ -5,7 +5,6 @@ option go_package = "github.com/agile-crypto/citius-server/gen/go/server/provide
 
 import "buf/validate/validate.proto";
 import "api/types/operation_params.proto";
-import "api/types/templates.proto";
 import "api/messages/metadata.proto";
 
 // ============================================================================
@@ -24,11 +23,6 @@ message StreamingSignInitRequest {
     caas.crypto.v1.SignatureDomainContext   domain_context = 4;
     caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
   }
-
-  // Typed algorithm specification for provider dispatch.  Mirrors
-  // SignRequest.algorithm — a multi-part sign session needs the same
-  // dispatch information as a single-shot sign.
-  caas.crypto.v1.AlgorithmDetails algorithm = 6;
 }
 
 // StreamingSignChunk is one chunk of data in a multi-part sign operation.
@@ -54,10 +48,6 @@ message StreamingVerifyInitRequest {
     caas.crypto.v1.SignatureDomainContext   domain_context = 4;
     caas.crypto.v1.VendorSignatureContext   vendor_context = 5;
   }
-
-  // Typed algorithm specification for provider dispatch.  Must match the
-  // algorithm used to initialize signing.
-  caas.crypto.v1.AlgorithmDetails algorithm = 6;
 }
 
 // StreamingVerifyChunk is one chunk in a multi-part verify operation.
@@ -70,12 +60,6 @@ message StreamingVerifyChunk {
 message StreamingVerifyFinalRequest {
   string session_id = 1 [(buf.validate.field).string.min_len = 1];
   bytes  signature  = 2 [(buf.validate.field).bytes.min_len = 1];
-
-  // Provider output captured during the corresponding streaming sign —
-  // carries the signature encoding (e.g. "der" vs "p1363").  Mirrors
-  // VerifyRequest.output; without it multi-part verify cannot know how the
-  // signature it is checking was serialized.
-  caas.crypto.v1.ProviderOutput output = 3;
 }
 
 // StreamingVerifyResult is returned when the multi-part verify is finalized.
