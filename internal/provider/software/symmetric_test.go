@@ -13,7 +13,7 @@ import (
 func aesGCMDetails(keySizeBits uint32) *types.AlgorithmDetails {
 	return &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_AesGcm{
-			AesGcm: &types.AesGcmParams{KeySizeBits: keySizeBits, IvSizeBits: 96, TagSizeBits: 128},
+			AesGcm: &types.AesGcmParams{KeySizeBits: keySizeBits},
 		},
 	}
 }
@@ -33,7 +33,7 @@ func aesCBCDetails(keySizeBits uint32) *types.AlgorithmDetails {
 func aesCTRDetails(keySizeBits uint32) *types.AlgorithmDetails {
 	return &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_AesCtr{
-			AesCtr: &types.AesCtrParams{KeySizeBits: keySizeBits, NonceSizeBits: 96, CounterBits: 32},
+			AesCtr: &types.AesCtrParams{KeySizeBits: keySizeBits},
 		},
 	}
 }
@@ -93,11 +93,6 @@ func TestGenerateKey_AESGCM_keysAreUnique(t *testing.T) {
 	}
 }
 
-// TestGenerateKey_AESGCM_unsupportedKeySize_returnsError proves an
-// out-of-range key_size_bits is rejected. It's now caught by protovalidate's
-// CEL constraint (key_size_bits: in [128,192,256]) before dispatch ever
-// runs, so it surfaces as CodeInvalidArgument rather than the
-// CodeNotImplemented generateSymmetricKey itself would have returned.
 func TestGenerateKey_AESGCM_unsupportedKeySize_returnsError(t *testing.T) {
 	p := software.New()
 	_, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{
@@ -106,8 +101,8 @@ func TestGenerateKey_AESGCM_unsupportedKeySize_returnsError(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for unsupported AES key size")
 	}
-	if !errors.IsInvalidArgument(err) {
-		t.Errorf("expected CodeInvalidArgument, got: %v", err)
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
 }
 

@@ -124,23 +124,11 @@ func TestSignRequest_validate_emptyKeyMaterial(t *testing.T) {
 	}, "key_material")
 }
 
-// TestSignRequest_validate_emptyInput proves empty input passes validation —
-// signing an empty message is a legitimate, well-defined operation, so
-// SignRequest.input intentionally carries no min_len constraint.
 func TestSignRequest_validate_emptyInput(t *testing.T) {
 	v := validator(t)
-	mustPass(t, v, &providerpb.SignRequest{
+	mustFailField(t, v, &providerpb.SignRequest{
 		KeyMaterial: []byte("opaque-key"),
-		Input:       []byte{},
-		Algorithm: &typespb.AlgorithmDetails{
-			Algorithm: &typespb.AlgorithmDetails_Ecdsa{
-				Ecdsa: &typespb.EcdsaParams{
-					Curve: typespb.EllipticCurve_ELLIPTIC_CURVE_P256,
-					Hash:  typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
-				},
-			},
-		},
-	})
+	}, "input")
 }
 
 // --- SignResponse ---

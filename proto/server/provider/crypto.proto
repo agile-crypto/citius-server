@@ -31,10 +31,7 @@ message SignRequest {
   // The message to sign — full, unhashed data.
   // The provider applies the template-configured hash internally
   // (e.g., CKM_ECDSA_SHA256 hashes before signing).
-  //
-  // No min_len constraint: signing an empty message is a legitimate,
-  // well-defined operation (e.g. the hash step still runs over zero bytes).
-  bytes input = 2;
+  bytes input = 2 [(buf.validate.field).bytes.min_len = 1];
 
   // Scope-based context parameters for domain separation.
   // REQUIRED: always set one option to make intent explicit.
@@ -75,7 +72,7 @@ message SignResponse {
 // PKCS #11 equivalent: C_Verify (single-part)
 message VerifyRequest {
   bytes  key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque; same bytes returned from GenerateKey
-  bytes  input        = 2;  // original message (unhashed); no min_len — must accept whatever Sign accepted, including empty
+  bytes  input        = 2 [(buf.validate.field).bytes.min_len = 1];  // original message (unhashed)
   bytes  signature = 3 [(buf.validate.field).bytes.min_len = 1];
 
   // Must match the scope used during signing.
