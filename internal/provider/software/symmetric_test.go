@@ -49,18 +49,6 @@ func chacha20Poly1305Details() *types.AlgorithmDetails {
 	}
 }
 
-func xChaCha20Poly1305Details() *types.AlgorithmDetails {
-	return &types.AlgorithmDetails{
-		Algorithm: &types.AlgorithmDetails_Chacha20Poly1305{
-			Chacha20Poly1305: &types.ChaCha20Poly1305Params{
-				NonceSizeBits:    192,
-				BlockCounterBits: 32,
-				ExtendedNonce:    true,
-			},
-		},
-	}
-}
-
 func genSymmetricKey(t *testing.T, alg *types.AlgorithmDetails) *providerpb.GenerateKeyResponse {
 	t.Helper()
 	p := software.New()

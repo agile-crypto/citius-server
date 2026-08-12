@@ -31,8 +31,11 @@ func (p *Provider) Type() string { return "software" }
 // template whose algorithm this provider's dispatch switches fully support
 //
 // Not supported at the moment: ecdsa-secp256k1-* (curve not implemented),
-// ed25519ctx/ed448 (not implemented), and slh-dsa-*/hash-*-dsa-* (not
-// implemented).
+// ed25519ctx/ed448 (not implemented), slh-dsa-*/hash-*-dsa-* (not
+// implemented), and chacha20-poly1305/xchacha20-poly1305 (GenerateKey
+// accepts these via generateSymmetricKey, but Encrypt/Decrypt do not yet
+// dispatch them — advertising them would let CreateKey succeed for a key
+// that can never be used).
 func (p *Provider) SupportedAlgorithms() []string {
 	return []string{
 		"ecdsa-p256-sha256-der", "ecdsa-p384-sha384-der", "ecdsa-p521-sha512-der",
@@ -45,7 +48,6 @@ func (p *Provider) SupportedAlgorithms() []string {
 		"aes-128-gcm-128-96", "aes-192-gcm-128-96", "aes-256-gcm-128-96",
 		"aes-128-cbc-pkcs7-128", "aes-192-cbc-pkcs7-128", "aes-256-cbc-pkcs7-128",
 		"aes-128-ctr", "aes-192-ctr", "aes-256-ctr",
-		"chacha20-poly1305", "xchacha20-poly1305",
 	}
 }
 
@@ -408,15 +410,6 @@ func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) 
 			Ciphertext: ciphertext,
 			Output:     provider.BlockCipherOutput(iv, "raw"),
 		}, nil
-	case *types.AlgorithmDetails_Chacha20Poly1305:
-		ciphertext, nonce, err := encryptChaCha20Poly1305(ctx, req.GetKeyMaterial(), req.GetPlaintext(), req.GetAeadParams().GetAad(), alg.Chacha20Poly1305)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.EncryptResponse{
-			Ciphertext: ciphertext,
-			Output:     provider.AeadOutput(nonce, ChaCha20Poly1305TagSizeBytes, "raw"),
-		}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for encrypt: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -452,13 +445,6 @@ func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) 
 	case *types.AlgorithmDetails_AesCtr:
 		plaintext, err := decryptAESCTR(ctx, req.GetKeyMaterial(), req.GetCiphertext(),
 			req.GetOutput().GetBlockCipherOutput().GetIv(), alg.AesCtr)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
-	case *types.AlgorithmDetails_Chacha20Poly1305:
-		plaintext, err := decryptChaCha20Poly1305(ctx, req.GetKeyMaterial(), req.GetCiphertext(),
-			req.GetOutput().GetAeadOutput().GetNonce(), req.GetAeadParams().GetAad(), alg.Chacha20Poly1305)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
