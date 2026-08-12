@@ -13,8 +13,6 @@ import (
 type CryptoOrchestrator interface {
 	Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
 	Verify(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
-	DigestSign(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error)
-	DigestVerify(ctx context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error)
 	Encrypt(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
 	Decrypt(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
 	WrapKey(ctx context.Context, req crypto.WrapKeyRequest) (crypto.WrapKeyResult, error)

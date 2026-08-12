@@ -34,8 +34,6 @@ func TestOperation_stringConstants(t *testing.T) {
 	}{
 		{"sign", core.OperationSign, "sign"},
 		{"verify", core.OperationVerify, "verify"},
-		{"digest_sign", core.OperationDigestSign, "digest_sign"},
-		{"digest_verify", core.OperationDigestVerify, "digest_verify"},
 		{"create_key", core.OperationCreateKey, "create_key"},
 	}
 	for _, tt := range tests {
