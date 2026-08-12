@@ -170,13 +170,10 @@ func (o *cryptoOrchestrator) Sign(ctx context.Context, req crypto.SignRequest) (
 	}
 
 	// 6. Build provider-level SignRequest with scope_params oneof.
-	// KeyOutput carries the key's stored encoding (e.g. "pkcs8" vs "sec1")
-	// so the provider can select the correct parser instead of guessing.
 	provReq := &providerpb.SignRequest{
 		KeyMaterial: genResp.GetKeyMaterial(),
 		Input:       req.Payload,
 		Algorithm:   tmpl.GetAlgorithm(),
-		KeyOutput:   genResp.GetOutput(),
 	}
 	applySignScopeParams(req, provReq)
 
@@ -400,14 +397,12 @@ func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSi
 	}
 
 	// 7. Build provider-level DigestSignRequest with scope_params oneof.
-	// KeyOutput carries the key's stored encoding — see Sign's provReq.
 	provReq := &providerpb.DigestSignRequest{
 		KeyMaterial:      genResp.GetKeyMaterial(),
 		Digest:           req.Digest,
 		HashAlgorithm:    req.HashAlgorithm,
 		HashAlgorithmOid: req.HashAlgorithmOID,
 		Algorithm:        tmpl.GetAlgorithm(),
-		KeyOutput:        genResp.GetOutput(),
 	}
 	applyDigestSignScopeParams(req, provReq)
 
