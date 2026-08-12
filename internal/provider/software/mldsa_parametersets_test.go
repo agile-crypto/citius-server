@@ -35,9 +35,6 @@ func mlDSA87Details() *types.AlgorithmDetails {
 	}
 }
 
-// TestGenerateKey_MLDSA44_correctKeySizes proves the public key stays in
-// CIRCL's native packed (expanded) form while the private key is a much
-// smaller PKCS#8-wrapped seed — see the ML-DSA-65 analogue for why.
 func TestGenerateKey_MLDSA44_correctKeySizes(t *testing.T) {
 	p := software.New()
 	resp, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{Algorithm: mlDSA44Details()})
@@ -47,8 +44,8 @@ func TestGenerateKey_MLDSA44_correctKeySizes(t *testing.T) {
 	if got := len(resp.GetPublicKeyBytes()); got != mldsa44.PublicKeySize {
 		t.Errorf("public key size: got %d want %d", got, mldsa44.PublicKeySize)
 	}
-	if got := len(resp.GetKeyMaterial()); got >= mldsa44.PrivateKeySize {
-		t.Errorf("private key material is %d bytes, want well under the expanded key size %d bytes", got, mldsa44.PrivateKeySize)
+	if got := len(resp.GetKeyMaterial()); got != mldsa44.PrivateKeySize {
+		t.Errorf("private key size: got %d want %d", got, mldsa44.PrivateKeySize)
 	}
 }
 
@@ -111,9 +108,6 @@ func TestVerify_MLDSA44_tamperedPayload_returnsFalse(t *testing.T) {
 	}
 }
 
-// TestGenerateKey_MLDSA87_correctKeySizes proves the public key stays in
-// CIRCL's native packed (expanded) form while the private key is a much
-// smaller PKCS#8-wrapped seed — see the ML-DSA-65 analogue for why.
 func TestGenerateKey_MLDSA87_correctKeySizes(t *testing.T) {
 	p := software.New()
 	resp, err := p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{Algorithm: mlDSA87Details()})
@@ -123,8 +117,8 @@ func TestGenerateKey_MLDSA87_correctKeySizes(t *testing.T) {
 	if got := len(resp.GetPublicKeyBytes()); got != mldsa87.PublicKeySize {
 		t.Errorf("public key size: got %d want %d", got, mldsa87.PublicKeySize)
 	}
-	if got := len(resp.GetKeyMaterial()); got >= mldsa87.PrivateKeySize {
-		t.Errorf("private key material is %d bytes, want well under the expanded key size %d bytes", got, mldsa87.PrivateKeySize)
+	if got := len(resp.GetKeyMaterial()); got != mldsa87.PrivateKeySize {
+		t.Errorf("private key size: got %d want %d", got, mldsa87.PrivateKeySize)
 	}
 }
 
@@ -221,31 +215,5 @@ func TestVerify_MLDSA44_wrongParameterSetKey_returnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for ML-DSA-44 public key bytes verified under ML-DSA-87 dispatch")
-	}
-}
-
-// TestSign_MLDSA44_PKCS8KeyWrongDeclaredParameterSet_returnsError proves the
-// same cross-check on the PRIVATE key side: a PKCS#8 blob's embedded OID
-// self-describes a scheme (circl/pki.UnmarshalPKIXPrivateKey looks it up
-// directly), but that parsed scheme must still match what AlgorithmDetails
-// declares — parseMLDSAPKCS8PrivateKey rejects a mismatch rather than
-// trusting the OID as authoritative on its own.
-func TestSign_MLDSA44_PKCS8KeyWrongDeclaredParameterSet_returnsError(t *testing.T) {
-	p := software.New()
-	ctx := context.Background()
-
-	keyMaterial, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: mlDSA44Details()})
-	if err != nil {
-		t.Fatalf("GenerateKey: %v", err)
-	}
-
-	_, err = p.Sign(ctx, &providerpb.SignRequest{
-		KeyMaterial:         keyMaterial.GetKeyMaterial(),
-		Input:               []byte("payload"),
-		KeyMaterialEncoding: providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8,
-		Algorithm:           mlDSA87Details(),
-	})
-	if err == nil {
-		t.Fatal("expected error for an ML-DSA-44 PKCS#8 key signed under ML-DSA-87 dispatch")
 	}
 }

@@ -73,10 +73,8 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		// Private half: PKCS#8 wrapping the seed (see generateMLDSAKey).
-		// Public half: no seed-vs-expanded distinction exists for it, so it
-		// stays in CIRCL's native packed form — not yet SPKI.
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
+		// ML-DSA: circl native MarshalBinary() for both halves, not yet PKCS#8/SPKI.
+		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
 	case *types.AlgorithmDetails_RsaPss:
 		pubDER, privDER, err = generateRSAKey(ctx, alg.RsaPss.GetKeySizeBits())
@@ -129,7 +127,7 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 		}
 		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
 	case *types.AlgorithmDetails_MlDsa:
-		sig, err := signMLDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.MlDsa.GetParameterSet())
+		sig, err := signMLDSA(ctx, req.GetKeyMaterial(), req.GetInput(), alg.MlDsa.GetParameterSet())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
