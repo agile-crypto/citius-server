@@ -2,92 +2,49 @@ package software
 
 import (
 	"context"
-	"fmt"
+	"crypto/rand"
 
-	"github.com/cloudflare/circl/sign"
-	"github.com/cloudflare/circl/sign/mldsa/mldsa44"
 	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
-	"github.com/cloudflare/circl/sign/mldsa/mldsa87"
 
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
-// mldsaScheme resolves the CIRCL generic sign.Scheme for a declared ML-DSA
-// parameter set. AlgorithmDetails is authoritative for dispatch, the same
-// convention checkCurveMatches/checkRSAKeySize apply elsewhere — a parameter
-// set the caller declares but this provider does not implement is rejected
-// outright rather than guessed at.
-func mldsaScheme(ctx context.Context, op errors.Op, parameterSet types.MlDsaParameterSet) (sign.Scheme, error) {
-	switch parameterSet {
-	case types.MlDsaParameterSet_ML_DSA_44:
-		return mldsa44.Scheme(), nil
-	case types.MlDsaParameterSet_ML_DSA_65:
-		return mldsa65.Scheme(), nil
-	case types.MlDsaParameterSet_ML_DSA_87:
-		return mldsa87.Scheme(), nil
-	default:
-		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-			fmt.Sprintf("unsupported ML-DSA parameter set: %s", parameterSet))
+func generateMLDSA65Key(ctx context.Context) (pubBytes, privBytes []byte, _ error) {
+	const op errors.Op = "software.generateMLDSA65Key"
+
+	pub, priv, err := mldsa65.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, errors.Wrap(ctx, op, err)
 	}
+
+	return pub.Bytes(), priv.Bytes(), nil
 }
 
-func generateMLDSAKey(ctx context.Context, parameterSet types.MlDsaParameterSet) (pubBytes, privBytes []byte, _ error) {
-	const op errors.Op = "software.generateMLDSAKey"
+func signMLDSA65(ctx context.Context, privBytes, payload []byte) ([]byte, error) {
+	const op errors.Op = "software.signMLDSA65"
 
-	scheme, err := mldsaScheme(ctx, op, parameterSet)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pub, priv, err := scheme.GenerateKey()
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-	pubBytes, err = pub.MarshalBinary()
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-	privBytes, err = priv.MarshalBinary()
-	if err != nil {
-		return nil, nil, errors.Wrap(ctx, op, err)
-	}
-	return pubBytes, privBytes, nil
-}
-
-// signMLDSA signs payload with the ML-DSA private key encoded in privBytes.
-//
-// sign.Scheme.Sign is deterministic-only — every CIRCL ML-DSA scheme wrapper
-// hardcodes randomized=false internally — so MlDsaParams.deterministic is
-// not honored yet; a later commit adds the package-level SignTo dispatch
-// needed for the hedged (randomized) case FIPS 204 recommends by default.
-func signMLDSA(ctx context.Context, privBytes, payload []byte, parameterSet types.MlDsaParameterSet) ([]byte, error) {
-	const op errors.Op = "software.signMLDSA"
-
-	scheme, err := mldsaScheme(ctx, op, parameterSet)
-	if err != nil {
-		return nil, err
-	}
-	privKey, err := scheme.UnmarshalBinaryPrivateKey(privBytes)
-	if err != nil {
+	var privKey mldsa65.PrivateKey
+	if err := privKey.UnmarshalBinary(privBytes); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return scheme.Sign(privKey, payload, nil), nil
+
+	// Deterministic ML-DSA-65: randomized=false, empty domain-separation context.
+	sig := make([]byte, mldsa65.SignatureSize)
+	if err := mldsa65.SignTo(&privKey, payload, nil, false, sig); err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
 }
 
-func verifyMLDSA(ctx context.Context, pubBytes, payload, signature []byte, parameterSet types.MlDsaParameterSet) (bool, error) {
-	const op errors.Op = "software.verifyMLDSA"
+func verifyMLDSA65(ctx context.Context, pubBytes, payload, signature []byte) (bool, error) {
+	const op errors.Op = "software.verifyMLDSA65"
 
-	scheme, err := mldsaScheme(ctx, op, parameterSet)
-	if err != nil {
-		return false, err
-	}
-	pubKey, err := scheme.UnmarshalBinaryPublicKey(pubBytes)
-	if err != nil {
+	var pubKey mldsa65.PublicKey
+	if err := pubKey.UnmarshalBinary(pubBytes); err != nil {
 		// Malformed stored public key — internal consistency error, not a sig failure.
 		return false, errors.Wrap(ctx, op, err)
 	}
 
-	// scheme.Verify returns false for any invalid signature; it never errors.
-	return scheme.Verify(pubKey, payload, signature, nil), nil
+	// mldsa65.Verify returns false for any invalid signature; it never errors.
+	return mldsa65.Verify(&pubKey, payload, nil, signature), nil
 }

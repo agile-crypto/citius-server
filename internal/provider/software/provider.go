@@ -69,11 +69,15 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_MlDsa:
-		pubDER, privDER, err = generateMLDSAKey(ctx, alg.MlDsa.GetParameterSet())
+		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only ML-DSA-65 parameter set supported")
+		}
+		pubDER, privDER, err = generateMLDSA65Key(ctx)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		// ML-DSA: circl native MarshalBinary() for both halves, not yet PKCS#8/SPKI.
+		// ML-DSA: circl native Bytes() for both halves, not yet PKCS#8/SPKI.
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
 	case *types.AlgorithmDetails_RsaPss:
@@ -127,7 +131,11 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 		}
 		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
 	case *types.AlgorithmDetails_MlDsa:
-		sig, err := signMLDSA(ctx, req.GetKeyMaterial(), req.GetInput(), alg.MlDsa.GetParameterSet())
+		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only ML-DSA-65 parameter set supported for sign")
+		}
+		sig, err := signMLDSA65(ctx, req.GetKeyMaterial(), req.GetInput())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -169,7 +177,11 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 		}
 		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 	case *types.AlgorithmDetails_MlDsa:
-		valid, err := verifyMLDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(), alg.MlDsa.GetParameterSet())
+		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
+			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+				"only ML-DSA-65 parameter set supported for verify")
+		}
+		valid, err := verifyMLDSA65(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
