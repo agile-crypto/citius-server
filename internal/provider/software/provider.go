@@ -234,20 +234,6 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 	case *types.AlgorithmDetails_MlDsa:
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"DigestSign unsupported for ML-DSA: pure ML-DSA is not prehashable")
-	case *types.AlgorithmDetails_RsaPss:
-		sig, err := signRSAPSSDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
-			req.GetHashAlgorithm(), alg.RsaPss)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
-	case *types.AlgorithmDetails_RsaPkcs1V15:
-		sig, err := signRSAPKCS1v15Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
-			req.GetHashAlgorithm(), alg.RsaPkcs1V15)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for digest sign: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -274,20 +260,6 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	case *types.AlgorithmDetails_MlDsa:
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"DigestVerify unsupported for ML-DSA: pure ML-DSA is not prehashable")
-	case *types.AlgorithmDetails_RsaPss:
-		valid, err := verifyRSAPSSDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPss)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
-	case *types.AlgorithmDetails_RsaPkcs1V15:
-		valid, err := verifyRSAPKCS1v15Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPkcs1V15)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for digest verify: %T", req.GetAlgorithm().GetAlgorithm()))
