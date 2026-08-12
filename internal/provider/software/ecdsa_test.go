@@ -150,19 +150,19 @@ func TestSign_ECDSA_P256_happyPath(t *testing.T) {
 	}
 }
 
-// TestSign_unsupportedAlgorithm_returnsError uses Ed448 — a valid
-// AlgorithmDetails arm this provider does not implement.  Ed25519 was the
-// "unsupported algorithm" example here before Ed25519 was implemented; Ed448
-// is not on the near-term roadmap and so is less likely to go stale the same
-// way (see the analogous fix for ECDSA's unsupported-curve tests).
+// TestSign_unsupportedAlgorithm_returnsError uses Ed25519 — a valid
+// AlgorithmDetails arm this provider does not implement.  RsaPssParams was
+// the "unsupported algorithm" example here before RSA-PSS was implemented;
+// Ed25519 is not on the near-term roadmap and so is less likely to go stale
+// the same way (see the analogous fix for ECDSA's unsupported-curve tests).
 func TestSign_unsupportedAlgorithm_returnsError(t *testing.T) {
 	p := software.New()
 	_, err := p.Sign(context.Background(), &providerpb.SignRequest{
 		KeyMaterial: []byte("fake-key"),
 		Input:       []byte("data"),
 		Algorithm: &types.AlgorithmDetails{
-			Algorithm: &types.AlgorithmDetails_Ed448{
-				Ed448: &types.Ed448Params{},
+			Algorithm: &types.AlgorithmDetails_Ed25519{
+				Ed25519: &types.Ed25519Params{},
 			},
 		},
 	})
@@ -273,8 +273,6 @@ func TestVerify_ECDSA_P256_tamperedSignature_returnsFalse(t *testing.T) {
 	}
 }
 
-// TestVerify_unsupportedAlgorithm_returnsError uses Ed448 — see
-// TestSign_unsupportedAlgorithm_returnsError for why.
 func TestVerify_unsupportedAlgorithm_returnsError(t *testing.T) {
 	p := software.New()
 	_, err := p.Verify(context.Background(), &providerpb.VerifyRequest{
@@ -282,8 +280,8 @@ func TestVerify_unsupportedAlgorithm_returnsError(t *testing.T) {
 		Input:       []byte("x"),
 		Signature:   []byte("y"),
 		Algorithm: &types.AlgorithmDetails{
-			Algorithm: &types.AlgorithmDetails_Ed448{
-				Ed448: &types.Ed448Params{},
+			Algorithm: &types.AlgorithmDetails_Ed25519{
+				Ed25519: &types.Ed25519Params{},
 			},
 		},
 	})

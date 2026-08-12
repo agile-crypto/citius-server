@@ -94,13 +94,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		}
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
-	case *types.AlgorithmDetails_Ed25519:
-		pubDER, privDER, err = generateEd25519Key(ctx)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
-		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -152,12 +145,6 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
-	case *types.AlgorithmDetails_Ed25519:
-		sig, err := signEd25519(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.Ed25519.GetVariant())
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for sign: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -196,13 +183,6 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 	case *types.AlgorithmDetails_RsaPkcs1V15:
 		valid, err := verifyRSAPKCS1v15(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
 			req.GetKeyMaterialEncoding(), alg.RsaPkcs1V15)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
-	case *types.AlgorithmDetails_Ed25519:
-		valid, err := verifyEd25519(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), alg.Ed25519.GetVariant())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
