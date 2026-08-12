@@ -80,13 +80,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		// ML-DSA: circl native Bytes() for both halves, not yet PKCS#8/SPKI.
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
-	case *types.AlgorithmDetails_RsaPss:
-		pubDER, privDER, err = generateRSAKey(ctx, alg.RsaPss.GetKeySizeBits())
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
-		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -126,12 +119,6 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
-	case *types.AlgorithmDetails_RsaPss:
-		sig, err := signRSAPSS(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.RsaPss)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for sign: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -156,13 +143,6 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 				"only ML-DSA-65 parameter set supported for verify")
 		}
 		valid, err := verifyMLDSA65(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature())
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
-	case *types.AlgorithmDetails_RsaPss:
-		valid, err := verifyRSAPSS(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), alg.RsaPss)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
