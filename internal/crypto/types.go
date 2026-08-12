@@ -60,41 +60,6 @@ type VerifyResult struct {
 	Output       *messages.ProviderOutput // from provider
 }
 
-// DigestSignRequest carries the inputs for a DigestSign operation — signing a
-// pre-computed digest rather than the full message (proto: DigestSignRequest).
-//
-// The provider does NOT hash; HashAlgorithm describes the hash that produced
-// Digest, used for digest-size validation and (for RSA) the DigestInfo/PSS
-// hash — it does NOT select the signature scheme.  Neither the digest nor the
-// key material determines PSS vs PKCS1v15, curve, or output encoding; the
-// orchestrator resolves AlgorithmDetails from the template and passes it to
-// the provider, exactly as Sign does.
-type DigestSignRequest struct {
-	KeyName          string              // identifies which key to use
-	Digest           []byte              // pre-computed digest — the provider signs this raw
-	HashAlgorithm    types.HashAlgorithm // hash that produced Digest
-	HashAlgorithmOID string              // optional OID when HashAlgorithm is HASH_ALGORITHM_OTHER
-
-	// Scope-based context for domain separation — exactly one must be non-nil.
-	// Maps to the scope_params oneof in caas.crypto.v1.DigestSignRequest.
-	SignatureScopeFields
-}
-
-// DigestVerifyRequest carries the inputs for a DigestVerify operation —
-// verifying a signature over a pre-computed digest (proto: DigestVerifyRequest).
-type DigestVerifyRequest struct {
-	KeyName          string
-	KeyVersion       uint32 // version that was used
-	Digest           []byte // pre-computed digest that was signed
-	Signature        []byte
-	HashAlgorithm    types.HashAlgorithm // must match the hash used for the corresponding DigestSign
-	HashAlgorithmOID string
-	Output           *messages.ProviderOutput // from DigestSign (carries signature encoding)
-
-	// Scope must match the scope used during DigestSign.
-	SignatureScopeFields
-}
-
 type EncryptRequest struct {
 	KeyName   string
 	Plaintext []byte
