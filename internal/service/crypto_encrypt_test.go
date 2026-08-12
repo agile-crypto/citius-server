@@ -63,49 +63,8 @@ func setupCryptoWithKeyForEncrypt(t *testing.T) (CryptoOrchestrator, string) {
 	return ops, created.Name
 }
 
-// setupCryptoWithKeyForBlockCipherEncrypt mirrors setupCryptoWithKeyForEncrypt
-// for the non-AEAD cipher families (AES-CBC, AES-CTR), which use NoParams
-// instead of AeadParams and a block/stream scope instead of AEAD scope.
-func setupCryptoWithKeyForBlockCipherEncrypt(t *testing.T, templateID string, scope core.Scope) (CryptoOrchestrator, string) {
-	t.Helper()
-	ctx := context.Background()
-	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
-
-	rules := &policy.Rules{
-		Version:          "1",
-		AllowedTemplates: []string{templateID},
-		AllowedOperations: &policy.OperationRule{
-			KeyOperations: []string{
-				string(core.OperationCreateKey),
-				string(core.OperationEncrypt),
-				string(core.OperationDecrypt),
-			},
-		},
-	}
-	rulesJSON, err := json.Marshal(rules)
-	if err != nil {
-		t.Fatalf("marshal rules: %v", err)
-	}
-	const policyName = "test-blockcipher-allow"
-	p := policy.NewPolicy("pol_testblockcipher", policyName, rulesJSON)
-	if _, err = pol.CreatePolicy(ctx, p); err != nil {
-		t.Fatalf("seed policy: %v", err)
-	}
-
-	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:               "blockcipher-test-key",
-		TemplateID:         templateID,
-		PolicyID:           policyName,
-		ScopeSpecification: scopeSpecWithScope(t, scope),
-	})
-	if err != nil {
-		t.Fatalf("CreateKey: %v", err)
-	}
-	return ops, created.Name
-}
-
 // ============================================================================
-// AES-GCM (AEAD) Tests
+// Encrypt / Decrypt Tests
 // ============================================================================
 
 func TestEncryptDecrypt_AESGCM_roundTrip(t *testing.T) {
@@ -176,62 +135,54 @@ func TestEncryptDecrypt_AESGCM_withAAD_roundTrip(t *testing.T) {
 	}
 }
 
-func TestDecrypt_AESGCM_wrongAAD_returnsError(t *testing.T) {
-	ops, keyName := setupCryptoWithKeyForEncrypt(t)
+// setupCryptoWithKeyForBlockCipherEncrypt mirrors setupCryptoWithKeyForEncrypt
+// for the non-AEAD cipher families (AES-CBC, AES-CTR), which use NoParams
+// instead of AeadParams and a block/stream scope instead of AEAD scope.
+func setupCryptoWithKeyForBlockCipherEncrypt(t *testing.T, templateID string, scope core.Scope) (CryptoOrchestrator, string) {
+	t.Helper()
 	ctx := context.Background()
+	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
 
-	encResult, err := ops.Encrypt(ctx, crypto.EncryptRequest{
-		KeyName:               keyName,
-		Plaintext:             []byte("payload"),
-		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{Aad: []byte("original")}},
+	rules := &policy.Rules{
+		Version:          "1",
+		AllowedTemplates: []string{templateID},
+		AllowedOperations: &policy.OperationRule{
+			KeyOperations: []string{
+				string(core.OperationCreateKey),
+				string(core.OperationEncrypt),
+				string(core.OperationDecrypt),
+			},
+		},
+	}
+	rulesJSON, err := json.Marshal(rules)
+	if err != nil {
+		t.Fatalf("marshal rules: %v", err)
+	}
+	const policyName = "test-blockcipher-allow"
+	p := policy.NewPolicy("pol_testblockcipher", policyName, rulesJSON)
+	if _, err = pol.CreatePolicy(ctx, p); err != nil {
+		t.Fatalf("seed policy: %v", err)
+	}
+
+	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:               "blockcipher-test-key",
+		TemplateID:         templateID,
+		PolicyID:           policyName,
+		ScopeSpecification: scopeSpecWithScope(t, scope),
 	})
 	if err != nil {
-		t.Fatalf("Encrypt: %v", err)
+		t.Fatalf("CreateKey: %v", err)
 	}
-
-	_, err = ops.Decrypt(ctx, crypto.DecryptRequest{
-		KeyName:               keyName,
-		KeyVersion:            encResult.KeyVersion,
-		Ciphertext:            encResult.Ciphertext,
-		Output:                encResult.Output,
-		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{Aad: []byte("wrong")}},
-	})
-	if err == nil {
-		t.Fatal("expected error for mismatched AAD")
-	}
+	return ops, created.Name
 }
 
-// TestEncrypt_AESGCM_scopeParamsMismatch_returnsError proves the encryption
-// analogue of validateSignatureScopeParams: a caller declaring NoParams
-// against a key provisioned with ScopeAeadStandard is rejected — mirroring
-// how a signature call with the wrong SignatureScopeFields variant is
-// rejected.
-func TestEncrypt_AESGCM_scopeParamsMismatch_returnsError(t *testing.T) {
-	ops, keyName := setupCryptoWithKeyForEncrypt(t)
-	_, err := ops.Encrypt(context.Background(), crypto.EncryptRequest{
-		KeyName:               keyName,
-		Plaintext:             []byte("payload"),
-		EncryptionScopeFields: crypto.EncryptionScopeFields{NoParams: &types.NoParams{}},
-	})
-	if err == nil {
-		t.Fatal("expected error for NoParams scope against an AEAD-scoped key")
-	}
-	if !errors.IsInvalidArgument(err) {
-		t.Errorf("expected CodeInvalidArgument, got: %v", err)
-	}
-}
-
-// ============================================================================
-// AES-CBC (Block Cipher) Tests
-// ============================================================================
-
-// TestEncryptDecrypt_AESCBC_roundTrip is a regression guard for
-// validateEncryptionScopeParams: before it learned to map NoParams to
-// ScopeSymmetricCipherBlock/ScopeSymmetricCipherStream, Encrypt with
-// NoParams against any AES-CBC or AES-CTR key failed unconditionally with
-// "encryption scope field is required" — these ciphers were unreachable at
-// the orchestrator layer despite the provider dispatch working correctly
-// underneath.
+// TestEncryptDecrypt_AESCBC_roundTrip and TestEncryptDecrypt_AESCTR_roundTrip
+// are regression guards for validateEncryptionScopeParams: before it learned
+// to map NoParams to ScopeSymmetricCipherBlock/ScopeSymmetricCipherStream,
+// Encrypt with NoParams against any AES-CBC or AES-CTR key failed
+// unconditionally with "encryption scope field is required" — these ciphers
+// were unreachable at the orchestrator layer despite the provider dispatch
+// (added in C36/C37) working correctly underneath.
 func TestEncryptDecrypt_AESCBC_roundTrip(t *testing.T) {
 	ops, keyName := setupCryptoWithKeyForBlockCipherEncrypt(t, "aes-256-cbc-pkcs7-128", core.ScopeSymmetricCipherBlock)
 	ctx := context.Background()
@@ -267,29 +218,6 @@ func TestEncryptDecrypt_AESCBC_roundTrip(t *testing.T) {
 	}
 }
 
-// TestEncrypt_AESCBC_scopeParamsMismatch_returnsError is the AES-CBC
-// analogue of TestEncrypt_AESGCM_scopeParamsMismatch_returnsError, from the
-// opposite direction: a caller declaring AeadParams against a key
-// provisioned with ScopeSymmetricCipherBlock is rejected.
-func TestEncrypt_AESCBC_scopeParamsMismatch_returnsError(t *testing.T) {
-	ops, keyName := setupCryptoWithKeyForBlockCipherEncrypt(t, "aes-256-cbc-pkcs7-128", core.ScopeSymmetricCipherBlock)
-	_, err := ops.Encrypt(context.Background(), crypto.EncryptRequest{
-		KeyName:               keyName,
-		Plaintext:             []byte("payload"),
-		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{}},
-	})
-	if err == nil {
-		t.Fatal("expected error for AeadParams scope against a block-cipher-scoped key")
-	}
-	if !errors.IsInvalidArgument(err) {
-		t.Errorf("expected CodeInvalidArgument, got: %v", err)
-	}
-}
-
-// ============================================================================
-// AES-CTR (Stream Cipher) Tests
-// ============================================================================
-
 func TestEncryptDecrypt_AESCTR_roundTrip(t *testing.T) {
 	ops, keyName := setupCryptoWithKeyForBlockCipherEncrypt(t, "aes-256-ctr", core.ScopeSymmetricCipherStream)
 	ctx := context.Background()
@@ -322,28 +250,30 @@ func TestEncryptDecrypt_AESCTR_roundTrip(t *testing.T) {
 	}
 }
 
-// TestEncrypt_AESCTR_scopeParamsMismatch_returnsError is the AES-CTR
-// analogue of TestEncrypt_AESCBC_scopeParamsMismatch_returnsError: a caller
-// declaring AeadParams against a key provisioned with
-// ScopeSymmetricCipherStream is rejected.
-func TestEncrypt_AESCTR_scopeParamsMismatch_returnsError(t *testing.T) {
-	ops, keyName := setupCryptoWithKeyForBlockCipherEncrypt(t, "aes-256-ctr", core.ScopeSymmetricCipherStream)
-	_, err := ops.Encrypt(context.Background(), crypto.EncryptRequest{
+func TestDecrypt_AESGCM_wrongAAD_returnsError(t *testing.T) {
+	ops, keyName := setupCryptoWithKeyForEncrypt(t)
+	ctx := context.Background()
+
+	encResult, err := ops.Encrypt(ctx, crypto.EncryptRequest{
 		KeyName:               keyName,
 		Plaintext:             []byte("payload"),
-		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{}},
+		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{Aad: []byte("original")}},
+	})
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	_, err = ops.Decrypt(ctx, crypto.DecryptRequest{
+		KeyName:               keyName,
+		KeyVersion:            encResult.KeyVersion,
+		Ciphertext:            encResult.Ciphertext,
+		Output:                encResult.Output,
+		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{Aad: []byte("wrong")}},
 	})
 	if err == nil {
-		t.Fatal("expected error for AeadParams scope against a stream-cipher-scoped key")
-	}
-	if !errors.IsInvalidArgument(err) {
-		t.Errorf("expected CodeInvalidArgument, got: %v", err)
+		t.Fatal("expected error for mismatched AAD")
 	}
 }
-
-// ============================================================================
-// General Request Validation Tests
-// ============================================================================
 
 func TestEncrypt_emptyKeyName_returnsError(t *testing.T) {
 	ops := setupCryptoOrchestrator(t)
@@ -400,6 +330,25 @@ func TestDecrypt_nilOutput_returnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for nil Output")
+	}
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
+	}
+}
+
+// TestEncrypt_scopeParamsMismatch_returnsError proves the encryption analogue
+// of validateSignatureScopeParams: a caller declaring NoParams against a key
+// provisioned with ScopeAeadStandard is rejected — mirroring how a signature
+// call with the wrong SignatureScopeFields variant is rejected.
+func TestEncrypt_scopeParamsMismatch_returnsError(t *testing.T) {
+	ops, keyName := setupCryptoWithKeyForEncrypt(t)
+	_, err := ops.Encrypt(context.Background(), crypto.EncryptRequest{
+		KeyName:               keyName,
+		Plaintext:             []byte("payload"),
+		EncryptionScopeFields: crypto.EncryptionScopeFields{NoParams: &types.NoParams{}},
+	})
+	if err == nil {
+		t.Fatal("expected error for NoParams scope against an AEAD-scoped key")
 	}
 	if !errors.IsInvalidArgument(err) {
 		t.Errorf("expected CodeInvalidArgument, got: %v", err)
