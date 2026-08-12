@@ -68,7 +68,7 @@ func (p *Provider) Sign(_ context.Context, req *providerpb.SignRequest) (*provid
 func (p *Provider) Verify(_ context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	return &providerpb.VerifyResponse{
 		Valid:  bytes.Equal(req.GetSignature(), req.GetInput()),
-		Output: provider.NoOutputUnencoded(),
+		Output: provider.NoOutput("raw"),
 	}, nil
 }
 
@@ -81,7 +81,7 @@ func (p *Provider) DigestSign(_ context.Context, req *providerpb.DigestSignReque
 func (p *Provider) DigestVerify(_ context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
 	return &providerpb.DigestVerifyResponse{
 		Valid:  bytes.Equal(req.GetSignature(), req.GetDigest()),
-		Output: provider.NoOutputUnencoded(),
+		Output: provider.NoOutput("raw"),
 	}, nil
 }
 
@@ -97,7 +97,7 @@ func (p *Provider) Encrypt(_ context.Context, req *providerpb.EncryptRequest) (*
 func (p *Provider) Decrypt(_ context.Context, req *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
 	return &providerpb.DecryptResponse{
 		Plaintext: req.GetCiphertext(),
-		Output:    provider.NoOutputUnencoded(),
+		Output:    provider.NoOutput("raw"),
 	}, nil
 }
 

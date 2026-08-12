@@ -136,7 +136,7 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutput("der")}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -146,7 +146,7 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for verify: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -173,7 +173,7 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutput("der")}, nil
 }
 
 // Compile-time assertion: Provider implements provider.Backend and the Signer
