@@ -106,14 +106,6 @@ func TestSignRequest_validate_valid(t *testing.T) {
 	mustPass(t, v, &providerpb.SignRequest{
 		KeyMaterial: []byte("opaque-key"),
 		Input:       []byte("message"),
-		Algorithm: &typespb.AlgorithmDetails{
-			Algorithm: &typespb.AlgorithmDetails_Ecdsa{
-				Ecdsa: &typespb.EcdsaParams{
-					Curve: typespb.EllipticCurve_ELLIPTIC_CURVE_P256,
-					Hash:  typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
-				},
-			},
-		},
 	})
 }
 
