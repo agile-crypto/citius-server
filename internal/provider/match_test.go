@@ -17,31 +17,31 @@ type capableProvider struct {
 func (c *capableProvider) Name() string { return c.name }
 func (c *capableProvider) Type() string { return "stub" }
 func (c *capableProvider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
-	return &providerpb.GenerateKeyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
-	return &providerpb.DestroyKeyResponse{}, nil
+	return nil, nil
 }
 func (c *capableProvider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
-	return &providerpb.ExportPublicKeyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*providerpb.SignResponse, error) {
-	return &providerpb.SignResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
-	return &providerpb.VerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	return &providerpb.DigestSignResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	return &providerpb.DigestVerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
-	return &providerpb.EncryptResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (c *capableProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
-	return &providerpb.DecryptResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
@@ -152,31 +152,31 @@ type minimalProvider struct{ provName string }
 func (m *minimalProvider) Name() string { return m.provName }
 func (m *minimalProvider) Type() string { return "minimal" }
 func (m *minimalProvider) GenerateKey(_ context.Context, _ *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
-	return &providerpb.GenerateKeyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
-	return &providerpb.DestroyKeyResponse{}, nil
+	return nil, nil
 }
 func (m *minimalProvider) ExportPublicKey(_ context.Context, _ *providerpb.ExportPublicKeyRequest) (*providerpb.ExportPublicKeyResponse, error) {
-	return &providerpb.ExportPublicKeyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*providerpb.SignResponse, error) {
-	return &providerpb.SignResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
-	return &providerpb.VerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	return &providerpb.DigestSignResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	return &providerpb.DigestVerifyResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
-	return &providerpb.EncryptResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 func (m *minimalProvider) Decrypt(_ context.Context, _ *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
-	return &providerpb.DecryptResponse{Output: provider.NoOutput("raw")}, nil
+	return nil, nil
 }
 
 var _ provider.Backend = (*minimalProvider)(nil)
