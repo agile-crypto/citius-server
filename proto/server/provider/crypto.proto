@@ -196,15 +196,6 @@ message EncryptRequest {
     caas.crypto.v1.AsymmetricEncryptParams asymmetric_params = 6;
     caas.crypto.v1.VendorEncryptionParams  vendor_params     = 7;
   }
-
-  // Typed algorithm specification for provider dispatch.
-  // The core resolves this from the template and passes it through.
-  //
-  // Mirrors SignRequest.algorithm.  Without it a cipher provider cannot know
-  // GCM vs CBC vs CTR, the key size, the IV size, or the tag size —
-  // key_material is opaque bytes and scope_params only carries caller-supplied
-  // values (AAD, tweak, OAEP label), never the mechanism.
-  caas.crypto.v1.AlgorithmDetails algorithm = 8;
 }
 
 // EncryptResponse returns ciphertext and system-generated output.
@@ -241,10 +232,6 @@ message DecryptRequest {
     caas.crypto.v1.AsymmetricEncryptParams asymmetric_params = 7;
     caas.crypto.v1.VendorEncryptionParams  vendor_params     = 8;
   }
-
-  // Typed algorithm specification — must match the algorithm used during
-  // Encrypt.  See EncryptRequest.algorithm.
-  caas.crypto.v1.AlgorithmDetails algorithm = 9;
 }
 
 // DecryptResponse returns plaintext and provider output.
