@@ -2,7 +2,6 @@ package provider_test
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	metapb "github.com/agile-crypto/citius-server/gen/go/api/messages"
@@ -41,12 +40,7 @@ func assertBackendAlwaysSetsOutput(t *testing.T, backend provider.Backend) {
 	t.Helper()
 	ctx := context.Background()
 
-	// ECDSA-P256 is supported by every registered provider today, and
-	// supports all four Signer methods uniformly (unlike ML-DSA and pure
-	// Ed25519, which reject DigestSign/DigestVerify outright since they are
-	// not prehashable — see additionalSignVerifyOnlyAlgorithms below), so it
-	// is the one algorithm exercised through the full Sign/Verify/
-	// DigestSign/DigestVerify surface.
+	// ECDSA-P256 is supported by every registered provider today.
 	algo := &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_Ecdsa{
 			Ecdsa: &types.EcdsaParams{
@@ -65,23 +59,6 @@ func assertBackendAlwaysSetsOutput(t *testing.T, backend provider.Backend) {
 	signer, ok := backend.(provider.Signer)
 	if ok {
 		assertSignerAlwaysSetsOutput(t, ctx, signer, algo, genResp)
-
-		// Beyond ECDSA: cover the other algorithm families this provider
-		// implements (RSA-PSS, RSA-PKCS1v15, Ed25519, ML-DSA-44/65/87) via
-		// Sign/Verify — the two methods every signature algorithm supports
-		// uniformly — so a future algorithm branch that forgets to call
-		// NoOutput/NoOutputUnencoded is caught regardless of which family it
-		// belongs to, not just for ECDSA-P256.
-		for _, sampleAlgo := range additionalSignVerifyOnlyAlgorithms() {
-			t.Run(algorithmLabel(sampleAlgo), func(t *testing.T) {
-				sampleGenResp, genErr := backend.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: sampleAlgo})
-				if genErr != nil {
-					t.Fatalf("GenerateKey: %v", genErr)
-				}
-				requireAlgorithmOutput(t, "GenerateKey", sampleGenResp.GetOutput())
-				assertSignVerifyAlwaysSetsOutput(t, ctx, signer, sampleAlgo, sampleGenResp)
-			})
-		}
 	}
 
 	cipher, ok := backend.(provider.Cipher)
@@ -107,13 +84,7 @@ func assertBackendAlwaysSetsOutput(t *testing.T, backend provider.Backend) {
 	assertCipherAlwaysSetsOutput(t, ctx, cipher, cipherAlgo, cipherGenResp)
 }
 
-// assertSignVerifyAlwaysSetsOutput checks only Sign/Verify — the two
-// methods every signature algorithm in this provider supports, unlike
-// DigestSign/DigestVerify which ML-DSA and pure Ed25519 reject outright
-// (not prehashable). Extracted from assertSignerAlwaysSetsOutput so the
-// additional-algorithm loop in assertBackendAlwaysSetsOutput can reuse it
-// without needing to know which algorithms support prehashing.
-func assertSignVerifyAlwaysSetsOutput(t *testing.T, ctx context.Context, signer provider.Signer, algo *types.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {
+func assertSignerAlwaysSetsOutput(t *testing.T, ctx context.Context, signer provider.Signer, algo *types.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {
 	t.Helper()
 
 	signResp, err := signer.Sign(ctx, &providerpb.SignRequest{
@@ -136,48 +107,6 @@ func assertSignVerifyAlwaysSetsOutput(t *testing.T, ctx context.Context, signer 
 		t.Fatalf("Verify: %v", err)
 	}
 	requireAlgorithmOutput(t, "Verify", verifyResp.GetOutput())
-}
-
-// additionalSignVerifyOnlyAlgorithms returns one representative
-// AlgorithmDetails per signature family beyond ECDSA (RSA-PSS,
-// RSA-PKCS1v15, Ed25519, ML-DSA-44/65/87) — enough to catch a missing
-// NoOutput/NoOutputUnencoded call in any family's Sign/Verify dispatch arm,
-// without needing every parameter-set variant.
-func additionalSignVerifyOnlyAlgorithms() []*types.AlgorithmDetails {
-	return []*types.AlgorithmDetails{
-		{Algorithm: &types.AlgorithmDetails_RsaPss{
-			RsaPss: &types.RsaPssParams{KeySizeBits: 2048, Hash: types.HashAlgorithm_HASH_ALGORITHM_SHA256},
-		}},
-		{Algorithm: &types.AlgorithmDetails_RsaPkcs1V15{
-			RsaPkcs1V15: &types.RsaPkcs1V15Params{KeySizeBits: 2048, Hash: types.HashAlgorithm_HASH_ALGORITHM_SHA256},
-		}},
-		{Algorithm: &types.AlgorithmDetails_Ed25519{
-			Ed25519: &types.Ed25519Params{Variant: types.Ed25519Variant_ED25519_VARIANT_PURE},
-		}},
-		{Algorithm: &types.AlgorithmDetails_MlDsa{
-			MlDsa: &types.MlDsaParams{ParameterSet: types.MlDsaParameterSet_ML_DSA_44},
-		}},
-		{Algorithm: &types.AlgorithmDetails_MlDsa{
-			MlDsa: &types.MlDsaParams{ParameterSet: types.MlDsaParameterSet_ML_DSA_65},
-		}},
-		{Algorithm: &types.AlgorithmDetails_MlDsa{
-			MlDsa: &types.MlDsaParams{ParameterSet: types.MlDsaParameterSet_ML_DSA_87},
-		}},
-	}
-}
-
-// algorithmLabel names a subtest after the AlgorithmDetails oneof arm's
-// concrete type, so a failure points at exactly which algorithm family
-// regressed (e.g. "*types.AlgorithmDetails_RsaPss") without needing a
-// separate label per entry in additionalSignVerifyOnlyAlgorithms.
-func algorithmLabel(algo *types.AlgorithmDetails) string {
-	return fmt.Sprintf("%T", algo.GetAlgorithm())
-}
-
-func assertSignerAlwaysSetsOutput(t *testing.T, ctx context.Context, signer provider.Signer, algo *types.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {
-	t.Helper()
-
-	assertSignVerifyAlwaysSetsOutput(t, ctx, signer, algo, genResp)
 
 	// hash_algorithm is left unset — this test exercises the ProviderOutput
 	// contract, not digest-length validation, so any digest length works.

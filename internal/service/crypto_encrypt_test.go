@@ -202,25 +202,6 @@ func TestDecrypt_emptyCiphertext_returnsError(t *testing.T) {
 	}
 }
 
-// TestDecrypt_nilOutput_returnsError proves a nil Output is rejected by the
-// orchestrator's own request validation, matching how KeyName/Ciphertext are
-// validated up front, rather than only surfacing as an error much later from
-// deep inside the provider's own nonce-length check.
-func TestDecrypt_nilOutput_returnsError(t *testing.T) {
-	ops, keyName := setupCryptoWithKeyForEncrypt(t)
-	_, err := ops.Decrypt(context.Background(), crypto.DecryptRequest{
-		KeyName:               keyName,
-		Ciphertext:            []byte("ciphertext"),
-		EncryptionScopeFields: crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{}},
-	})
-	if err == nil {
-		t.Fatal("expected error for nil Output")
-	}
-	if !errors.IsInvalidArgument(err) {
-		t.Errorf("expected CodeInvalidArgument, got: %v", err)
-	}
-}
-
 // TestEncrypt_scopeParamsMismatch_returnsError proves the encryption analogue
 // of validateSignatureScopeParams: a caller declaring NoParams against a key
 // provisioned with ScopeAeadStandard is rejected — mirroring how a signature

@@ -154,38 +154,44 @@ func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding provi
 // sign.Scheme.Sign cannot do this. privKey must be the concrete private key
 // type SignTo for parameterSet expects; parseMLDSAPrivateKey always returns
 // exactly that type for a given parameterSet, since it derives from
-// mldsaScheme(parameterSet) itself, so the type assertions inside
-// signMLDSARandomizedWith cannot fail in practice.
+// mldsaScheme(parameterSet) itself, so the type assertions below cannot fail
+// in practice.
 func signMLDSARandomized(ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload []byte, parameterSet types.MlDsaParameterSet) ([]byte, error) {
 	switch parameterSet {
 	case types.MlDsaParameterSet_ML_DSA_44:
-		return signMLDSARandomizedWith(ctx, op, privKey, payload, mldsa44.SignatureSize, mldsa44.SignTo, "ML-DSA-44")
+		sk, ok := privKey.(*mldsa44.PrivateKey)
+		if !ok {
+			return nil, errors.New(ctx, op, errors.CodeInternal, "ML-DSA-44 private key has unexpected type %T", privKey)
+		}
+		sig := make([]byte, mldsa44.SignatureSize)
+		if err := mldsa44.SignTo(sk, payload, nil, true, sig); err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return sig, nil
 	case types.MlDsaParameterSet_ML_DSA_65:
-		return signMLDSARandomizedWith(ctx, op, privKey, payload, mldsa65.SignatureSize, mldsa65.SignTo, "ML-DSA-65")
+		sk, ok := privKey.(*mldsa65.PrivateKey)
+		if !ok {
+			return nil, errors.New(ctx, op, errors.CodeInternal, "ML-DSA-65 private key has unexpected type %T", privKey)
+		}
+		sig := make([]byte, mldsa65.SignatureSize)
+		if err := mldsa65.SignTo(sk, payload, nil, true, sig); err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return sig, nil
 	case types.MlDsaParameterSet_ML_DSA_87:
-		return signMLDSARandomizedWith(ctx, op, privKey, payload, mldsa87.SignatureSize, mldsa87.SignTo, "ML-DSA-87")
+		sk, ok := privKey.(*mldsa87.PrivateKey)
+		if !ok {
+			return nil, errors.New(ctx, op, errors.CodeInternal, "ML-DSA-87 private key has unexpected type %T", privKey)
+		}
+		sig := make([]byte, mldsa87.SignatureSize)
+		if err := mldsa87.SignTo(sk, payload, nil, true, sig); err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return sig, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			"unsupported ML-DSA parameter set: %s", parameterSet)
 	}
-}
-
-// signMLDSARandomizedWith is the single generic implementation
-// signMLDSARandomized's three parameter-set cases each instantiate with
-// their own concrete private key type and package-level SignTo function —
-// mldsa44/mldsa65/mldsa87 have identical SignTo signatures but each takes
-// its own concrete *PrivateKey type, so they cannot share one non-generic
-// function value.
-func signMLDSARandomizedWith[SK any](ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload []byte, sigSize int, signTo func(sk SK, msg, ctx []byte, randomized bool, sig []byte) error, paramSetName string) ([]byte, error) {
-	sk, ok := privKey.(SK)
-	if !ok {
-		return nil, errors.New(ctx, op, errors.CodeInternal, "%s private key has unexpected type %T", paramSetName, privKey)
-	}
-	sig := make([]byte, sigSize)
-	if err := signTo(sk, payload, nil, true, sig); err != nil {
-		return nil, errors.Wrap(ctx, op, err)
-	}
-	return sig, nil
 }
 
 func verifyMLDSA(ctx context.Context, pubBytes, payload, signature []byte, parameterSet types.MlDsaParameterSet) (bool, error) {

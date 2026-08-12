@@ -27,26 +27,17 @@ func (p *Provider) Type() string { return "software" }
 // SupportedAlgorithms returns the algorithm IDs this provider handles.
 // These IDs must exactly match the TemplateID values in the template catalog JSON.
 //
-// provider.Registry.MatchForTemplate gates CreateKey on this list: a
-// template whose algorithm this provider's dispatch switches fully support
-//
-// Not supported at the moment: ecdsa-secp256k1-* (curve not implemented),
-// ed25519ctx/ed448 (not implemented), slh-dsa-*/hash-*-dsa-* (not
-// implemented), and aes-*-cbc/aes-*-ctr/chacha20-poly1305/xchacha20-poly1305
-// (GenerateKey accepts these via generateSymmetricKey, but Encrypt/Decrypt
-// only dispatch AesGcm — advertising these would let CreateKey succeed for a
-// key that can never be used).
+// This list is intentionally NOT yet exhaustive over every algorithm this
+// package implements — advertising the full expanded set (every ECDSA
+// curve, RSA size, Ed25519 variant, ML-DSA parameter set, and cipher mode)
+// plus a test asserting every advertised algorithm has a dispatch arm are
+// separate items to be fixed later. "aes-256-gcm-128-96" is added here now purely
+// because provider.Registry.MatchForTemplate requires a template ID to
+// appear in this list before CreateKey can reach this provider at all — the
+// Encrypt/Decrypt orchestration round-trip this commit adds has no other
+// way to exercise the real provider.
 func (p *Provider) SupportedAlgorithms() []string {
-	return []string{
-		"ecdsa-p256-sha256-der", "ecdsa-p384-sha384-der", "ecdsa-p521-sha512-der",
-		"ecdsa-p256-prehashed-der", "ecdsa-p384-prehashed-der", "ecdsa-p521-prehashed-der",
-		"rsa-pss-sha256-mgf1-32-2048", "rsa-pss-sha256-mgf1-32-3072", "rsa-pss-sha384-mgf1-48-4096",
-		"rsa-pss-2048-prehashed", "rsa-pss-3072-prehashed", "rsa-pss-4096-prehashed",
-		"rsa-pkcs1v15-sha256-2048", "rsa-pkcs1v15-2048-prehashed",
-		"ed25519", "ed25519ph",
-		"ml-dsa-44", "ml-dsa-65", "ml-dsa-87",
-		"aes-128-gcm-128-96", "aes-192-gcm-128-96", "aes-256-gcm-128-96",
-	}
+	return []string{"ecdsa-p256-sha256-der", "ml-dsa-65", "aes-256-gcm-128-96"}
 }
 
 // DestroyKey is a no-op for the stateless software provider.

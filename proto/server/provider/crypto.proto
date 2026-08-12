@@ -133,9 +133,9 @@ message DigestSignRequest {
   // Example: "2.16.840.1.101.3.4.2.1" for SHA-256
   string hash_algorithm_oid = 7;
 
-  // Typed algorithm specification for provider dispatch.  REQUIRED —
-  // consumed by service.(cryptoOrchestrator).DigestSign, which resolves this
-  // from the key's bound template and always sets it.
+  // Typed algorithm specification for provider dispatch.  REQUIRED — no
+  // orchestrator method or gRPC handler consumes this message yet, so there
+  // are no callers this constraint could break.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
   // How key_material is serialized — DigestSign uses the PRIVATE half, so
@@ -168,9 +168,7 @@ message DigestVerifyRequest {
   string hash_algorithm_oid = 8;
 
   // Typed algorithm specification — must match the algorithm used during
-  // DigestSign.  REQUIRED — consumed by
-  // service.(cryptoOrchestrator).DigestVerify, which resolves this from the
-  // key's bound template and always sets it (see DigestSignRequest.algorithm).
+  // DigestSign.  REQUIRED — no callers exist yet (see DigestSignRequest.algorithm).
   caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
 
   // Provider output captured during DigestSign — carries the signature
@@ -226,19 +224,9 @@ message EncryptRequest {
   // key_material is opaque bytes and scope_params only carries caller-supplied
   // values (AAD, tweak, OAEP label), never the mechanism.
   //
-  // REQUIRED — consumed by service.(cryptoOrchestrator).Encrypt, which
-  // resolves this from the key's bound template and always sets it.
+  // REQUIRED — the orchestrator's Encrypt method is a CodeNotImplemented stub,
+  // so there are no callers this constraint could break.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
-
-  // Declares how key_material is serialized. Symmetric ciphers have no
-  // public/private split, so this uses PrivateKeyEncoding (the same type
-  // SignRequest.key_material_encoding uses for its private half) rather
-  // than a separate symmetric-specific enum. Currently always RAW — no
-  // symmetric key format this provider writes needs anything else — but
-  // recording it here mirrors the pattern every other RPC in this file
-  // already follows, rather than leaving Encrypt/Decrypt as the one
-  // exception with no field to carry a future non-RAW encoding through.
-  PrivateKeyEncoding key_material_encoding = 9;
 }
 
 // EncryptResponse returns ciphertext and system-generated output.
@@ -277,14 +265,9 @@ message DecryptRequest {
   }
 
   // Typed algorithm specification — must match the algorithm used during
-  // Encrypt.  See EncryptRequest.algorithm.  REQUIRED — consumed by
-  // service.(cryptoOrchestrator).Decrypt, which resolves this from the key's
-  // bound template and always sets it.
+  // Encrypt.  See EncryptRequest.algorithm.  REQUIRED — Decrypt is likewise
+  // a CodeNotImplemented stub today.
   caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
-
-  // Declares how key_material is serialized — must match the encoding used
-  // during Encrypt. See EncryptRequest.key_material_encoding.
-  PrivateKeyEncoding key_material_encoding = 10;
 }
 
 // DecryptResponse returns plaintext and provider output.
