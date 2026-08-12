@@ -5,7 +5,6 @@ option go_package = "github.com/agile-crypto/citius-server/gen/go/server/provide
 
 import "buf/validate/validate.proto";
 import "api/types/templates.proto";
-import "api/messages/metadata.proto";
 
 // GenerateKeyRequest asks the provider to produce new key material.
 //
@@ -30,20 +29,9 @@ message GenerateKeyRequest {
 // StoredKeyVersion.plaintext_material.  For software providers this is
 // raw key bytes; for HSM providers it may be a serialized handle.
 // The same provider that generated the material knows how to interpret it.
-//
-// NOTE: the core persists this ENTIRE message (proto.Marshal) as the stored
-// key version's key_material — not just the key_material field above.  Field
-// numbers here are therefore load-bearing for every previously generated key
-// and must never be reused or renumbered.
 message GenerateKeyResponse {
   bytes  key_material     = 1 [(buf.validate.field).bytes.min_len = 1];   // opaque to core; provider-interpreted
   bytes  public_key_bytes = 2;   // DER-encoded SubjectPublicKeyInfo (asymmetric only)
-
-  // Declares how key_material / public_key_bytes are encoded
-  // ("pkcs8", "sec1", "raw").  Makes the opaque blob self-describing, which
-  // is what lets legacy-format keys be distinguished from newer encodings
-  // without guessing from length or content.
-  caas.crypto.v1.ProviderOutput output = 3;
 }
 
 // DestroyKeyRequest asks the provider to zeroize key material.
@@ -61,24 +49,11 @@ message DestroyKeyResponse {}
 // The provider interprets key_material to locate/derive the public key.
 message ExportPublicKeyRequest {
   bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];
-
-  // Optional cross-check, not a dispatch requirement.  Export is a
-  // structural operation (decode key, re-encode public half) with no scheme
-  // ambiguity — unlike Sign/Encrypt, there is no PSS-vs-PKCS1v15 or
-  // der-vs-p1363 choice to resolve, and key material is self-describing
-  // (PKCS#8 OID, or SEC1/legacy-format fallback).
-  //
-  // When set, the provider SHOULD verify it matches the parsed key type and
-  // reject a mismatch.  When unset, parsing alone is authoritative.
-  caas.crypto.v1.AlgorithmDetails algorithm = 2;
 }
 
 // ExportPublicKeyResponse returns the DER-encoded SubjectPublicKeyInfo.
 message ExportPublicKeyResponse {
   bytes public_key_bytes = 1 [(buf.validate.field).bytes.min_len = 1];
-
-  // Carries encoding ("der" = SubjectPublicKeyInfo, "pem", "raw").
-  caas.crypto.v1.ProviderOutput output = 2;
 }
 
 // KeyOrchestrationService — provider-side key lifecycle.
