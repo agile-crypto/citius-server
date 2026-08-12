@@ -37,32 +37,13 @@ message GenerateKeyRequest {
 // and must never be reused or renumbered.
 message GenerateKeyResponse {
   bytes  key_material     = 1 [(buf.validate.field).bytes.min_len = 1];   // opaque to core; provider-interpreted
-  bytes  public_key_bytes = 2;   // public half, asymmetric only; encoding declared by public_key_output
+  bytes  public_key_bytes = 2;   // DER-encoded SubjectPublicKeyInfo (asymmetric only)
 
-  // Declares how key_material (the PRIVATE half) is encoded — e.g. "pkcs8",
-  // "sec1", "raw".  Makes the opaque blob self-describing, which is what
-  // lets differing encodings be distinguished without guessing from length
-  // or content.
-  //
-  // Scoped to key_material only.  The public half is described separately by
-  // public_key_output: the two do not necessarily share a format (ECDSA
-  // private keys are SEC1 or PKCS#8 while the public half is PKIX
-  // SubjectPublicKeyInfo), so one field cannot honestly describe both.
+  // Declares how key_material / public_key_bytes are encoded
+  // ("pkcs8", "sec1", "raw").  Makes the opaque blob self-describing, which
+  // is what lets legacy-format keys be distinguished from newer encodings
+  // without guessing from length or content.
   caas.crypto.v1.ProviderOutput output = 3;
-
-  // Declares how public_key_bytes is encoded — e.g. "pkix" (X.509
-  // SubjectPublicKeyInfo, RFC 5280), "raw", "pem".
-  //
-  // Providers legitimately differ here: a software provider may emit PKIX
-  // DER where an HSM or remote provider emits a raw point or PEM.  Recording
-  // it at generation time is what lets Verify select the right parser rather
-  // than guessing — and, because stored keys outlive code, a format that was
-  // never recorded cannot be recovered retroactively.
-  //
-  // Optional: unset means the encoding was not recorded (e.g. a key created
-  // before this field existed).  The provider MUST fall back to its
-  // algorithm-appropriate default in that case, not reject the request.
-  caas.crypto.v1.ProviderOutput public_key_output = 4;
 }
 
 // DestroyKeyRequest asks the provider to zeroize key material.
