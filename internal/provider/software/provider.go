@@ -268,17 +268,6 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
-	case *types.AlgorithmDetails_Ed25519:
-		if alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_UNSPECIFIED &&
-			alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_PH {
-			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-				"DigestSign requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
-		}
-		sig, err := signEd25519PHDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(), req.GetHashAlgorithm())
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for digest sign: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -315,18 +304,6 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	case *types.AlgorithmDetails_RsaPkcs1V15:
 		valid, err := verifyRSAPKCS1v15Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
 			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPkcs1V15)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
-	case *types.AlgorithmDetails_Ed25519:
-		if alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_UNSPECIFIED &&
-			alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_PH {
-			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-				"DigestVerify requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
-		}
-		valid, err := verifyEd25519PHDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}

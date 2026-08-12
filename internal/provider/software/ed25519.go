@@ -2,7 +2,6 @@ package software
 
 import (
 	"context"
-	"crypto"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -128,63 +127,4 @@ func verifyEd25519(ctx context.Context, pubDER, payload, signature []byte, keyEn
 		return false, err
 	}
 	return ed25519.Verify(pubKey, payload, signature), nil
-}
-
-// checkEd25519PHHash validates that a DigestSign/DigestVerify call declares
-// SHA-512 as the digest's origin hash. Unlike RSA's prehashed variants,
-// Ed25519ph is not generic over hash algorithm — RFC 8032 §5.1 defines
-// PH(x) = SHA-512(x), full stop, so there is no "Ed25519ph with SHA-384" or
-// similar. Digest-length validation alone cannot catch a wrong hash here:
-// SHA3-512, BLAKE2b-512, and others also produce 64-byte digests, so a
-// caller declaring one of those would otherwise slip through unnoticed.
-func checkEd25519PHHash(ctx context.Context, op errors.Op, hashAlg types.HashAlgorithm) error {
-	switch hashAlg {
-	case types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED, types.HashAlgorithm_HASH_ALGORITHM_SHA512:
-		return nil
-	default:
-		return errors.New(ctx, op, errors.CodeNotImplemented,
-			fmt.Sprintf("Ed25519ph requires a SHA-512 digest, got hash_algorithm=%s", hashAlg))
-	}
-}
-
-// signEd25519PHDigest signs a pre-computed SHA-512 digest with Ed25519ph
-// (RFC 8032). Used by DigestSign, where the caller has already hashed the
-// message with SHA-512 — the mandatory hash for this variant.
-func signEd25519PHDigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm) ([]byte, error) {
-	const op errors.Op = "software.signEd25519PHDigest"
-
-	if err := checkEd25519PHHash(ctx, op, hashAlg); err != nil {
-		return nil, err
-	}
-	privKey, err := parseEd25519PrivateKey(ctx, op, privDER, keyEncoding)
-	if err != nil {
-		return nil, err
-	}
-	sig, err := privKey.Sign(nil, digest, crypto.SHA512)
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
-	}
-	return sig, nil
-}
-
-// verifyEd25519PHDigest verifies a signature over a pre-computed SHA-512
-// digest using Ed25519ph. Used by DigestVerify; see signEd25519PHDigest.
-func verifyEd25519PHDigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm) (bool, error) {
-	const op errors.Op = "software.verifyEd25519PHDigest"
-
-	if err := checkEd25519PHHash(ctx, op, hashAlg); err != nil {
-		return false, err
-	}
-	pubKey, err := parseEd25519PublicKey(ctx, op, pubDER, keyEncoding)
-	if err != nil {
-		return false, err
-	}
-	if err = ed25519.VerifyWithOptions(pubKey, digest, signature, &ed25519.Options{Hash: crypto.SHA512}); err != nil {
-		//nolint:nilerr // intentional: VerifyWithOptions returns a single
-		// generic error for every failure mode, so any error here means
-		// "invalid signature", never "provider malfunctioned" — the same
-		// convention verifyEd25519 gets from ed25519.Verify's bool return.
-		return false, nil
-	}
-	return true, nil
 }
