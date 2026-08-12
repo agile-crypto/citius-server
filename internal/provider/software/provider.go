@@ -335,54 +335,12 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	}
 }
 
-// Encrypt dispatches to the algorithm-specific encrypt implementation.
-func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
-	const op errors.Op = "software.(Provider).Encrypt"
-
-	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
-	case *types.AlgorithmDetails_AesGcm:
-		ciphertext, nonce, err := encryptAESGCM(ctx, req.GetKeyMaterial(), req.GetPlaintext(), req.GetAeadParams().GetAad(), alg.AesGcm)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.EncryptResponse{
-			Ciphertext: ciphertext,
-			Output:     provider.AeadOutput(nonce, alg.AesGcm.GetTagSizeBits()/8, "raw"),
-		}, nil
-	default:
-		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-			fmt.Sprintf("unsupported algorithm for encrypt: %T", req.GetAlgorithm().GetAlgorithm()))
-	}
-}
-
-// Decrypt dispatches to the algorithm-specific decrypt implementation.
-// The nonce comes from req.GetOutput() — the ProviderOutput the core
-// extracted from the stored OperationMetadata that Encrypt originally
-// produced
-func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
-	const op errors.Op = "software.(Provider).Decrypt"
-
-	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
-	case *types.AlgorithmDetails_AesGcm:
-		plaintext, err := decryptAESGCM(ctx, req.GetKeyMaterial(), req.GetCiphertext(),
-			req.GetOutput().GetAeadOutput().GetNonce(), req.GetAeadParams().GetAad(), alg.AesGcm)
-		if err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
-	default:
-		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-			fmt.Sprintf("unsupported algorithm for decrypt: %T", req.GetAlgorithm().GetAlgorithm()))
-	}
-}
-
-// Compile-time assertion: Provider implements provider.Backend, Signer, and
-// Cipher. The software provider does not (yet) implement Macer, Hasher,
-// Randomizer, or KeyEstablisher.
+// Compile-time assertion: Provider implements provider.Backend and the Signer
+// capability. The software provider does not (yet) implement Cipher, Macer,
+// Hasher, Randomizer, or KeyEstablisher.
 var (
 	_ provider.Backend = (*Provider)(nil)
 	_ provider.Signer  = (*Provider)(nil)
-	_ provider.Cipher  = (*Provider)(nil)
 )
 
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.

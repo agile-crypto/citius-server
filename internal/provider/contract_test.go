@@ -57,31 +57,16 @@ func assertBackendAlwaysSetsOutput(t *testing.T, backend provider.Backend) {
 	requireAlgorithmOutput(t, "GenerateKey", genResp.GetOutput())
 
 	signer, ok := backend.(provider.Signer)
-	if ok {
-		assertSignerAlwaysSetsOutput(t, ctx, signer, algo, genResp)
+	if !ok {
+		return
 	}
+	assertSignerAlwaysSetsOutput(t, ctx, signer, algo, genResp)
 
 	cipher, ok := backend.(provider.Cipher)
 	if !ok {
 		return
 	}
-
-	// Cipher needs its own algorithm-appropriate key: ECDSA is a signature
-	// algorithm, and a real Cipher implementation correctly rejects it for
-	// Encrypt/Decrypt — unlike loopback's algorithm-agnostic echo, which
-	// never validated this and let ECDSA slip through unnoticed here.
-	cipherAlgo := &types.AlgorithmDetails{
-		Algorithm: &types.AlgorithmDetails_AesGcm{
-			AesGcm: &types.AesGcmParams{KeySizeBits: 256, IvSizeBits: 96, TagSizeBits: 128},
-		},
-	}
-	cipherGenResp, err := backend.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: cipherAlgo})
-	if err != nil {
-		t.Fatalf("GenerateKey (cipher): %v", err)
-	}
-	requireAlgorithmOutput(t, "GenerateKey (cipher)", cipherGenResp.GetOutput())
-
-	assertCipherAlwaysSetsOutput(t, ctx, cipher, cipherAlgo, cipherGenResp)
+	assertCipherAlwaysSetsOutput(t, ctx, cipher, algo, genResp)
 }
 
 func assertSignerAlwaysSetsOutput(t *testing.T, ctx context.Context, signer provider.Signer, algo *types.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {

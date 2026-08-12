@@ -41,20 +41,3 @@ func NoOutput(encoding string) *metapb.ProviderOutput {
 func NoOutputUnencoded() *metapb.ProviderOutput {
 	return NoOutput("")
 }
-
-// AeadOutput builds a ProviderOutput with the aead_output arm set, carrying
-// the system-generated nonce and the authentication tag length — the
-// parameters an AEAD cipher (GCM, CCM, ChaCha20-Poly1305) must record at
-// encryption time for decryption to succeed later. Use this from Encrypt;
-// Decrypt has nothing new to report and should use NoOutputUnencoded.
-func AeadOutput(nonce []byte, tagLengthBytes uint32, encoding string) *metapb.ProviderOutput {
-	return &metapb.ProviderOutput{
-		AlgorithmOutput: &metapb.ProviderOutput_AeadOutput{
-			AeadOutput: &metapb.AeadOutput{
-				Nonce:          nonce,
-				TagLengthBytes: tagLengthBytes,
-			},
-		},
-		Encoding: encoding,
-	}
-}
