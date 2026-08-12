@@ -23,7 +23,6 @@ func aesCBCDetails(keySizeBits uint32) *types.AlgorithmDetails {
 		Algorithm: &types.AlgorithmDetails_AesCbc{
 			AesCbc: &types.AesCbcParams{
 				KeySizeBits: keySizeBits,
-				IvSizeBits:  128,
 				Padding:     types.PaddingScheme_PADDING_SCHEME_PKCS7,
 			},
 		},
