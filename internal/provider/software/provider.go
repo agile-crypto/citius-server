@@ -104,11 +104,11 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		sig, err := signECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(),
-			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash(), alg.Ecdsa.GetSignatureFormat())
+			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("der")}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		if alg.MlDsa.GetParameterSet() != types.MlDsaParameterSet_ML_DSA_65 {
 			return nil, errors.New(ctx, op, errors.CodeNotImplemented,
@@ -132,7 +132,7 @@ func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		valid, err := verifyECDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash(), alg.Ecdsa.GetSignatureFormat())
+			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -186,11 +186,11 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		sig, err := signECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
-			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetSignatureFormat())
+			alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
+		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("der")}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"DigestSign unsupported for ML-DSA: pure ML-DSA is not prehashable")
@@ -212,7 +212,7 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
 		valid, err := verifyECDSADigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
-			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve(), alg.Ecdsa.GetSignatureFormat())
+			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
