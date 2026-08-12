@@ -129,8 +129,7 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 		}
 		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
 	case *types.AlgorithmDetails_MlDsa:
-		sig, err := signMLDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(),
-			alg.MlDsa.GetParameterSet(), alg.MlDsa.GetDeterministic())
+		sig, err := signMLDSA(ctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.MlDsa.GetParameterSet())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}

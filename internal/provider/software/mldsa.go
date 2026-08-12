@@ -124,15 +124,10 @@ func parseMLDSAPKCS8PrivateKey(ctx context.Context, op errors.Op, privBytes []by
 // signMLDSA signs payload with the ML-DSA private key encoded in privBytes.
 //
 // sign.Scheme.Sign is deterministic-only — every CIRCL ML-DSA scheme wrapper
-// hardcodes randomized=false internally — so honoring
-// MlDsaParams.deterministic=false (proto3's zero value, matching FIPS 204
-// -3.6's recommendation to prefer hedged/randomized signing) requires
-// dropping to the package-level SignTo function instead, which does accept
-// a randomized flag. That function is scheme-specific (mldsa44.SignTo vs
-// mldsa65.SignTo vs mldsa87.SignTo), unlike everything else in this file
-// that stays generic over sign.Scheme, so it needs its own per-parameter-set
-// dispatch — see signMLDSARandomized.
-func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, parameterSet types.MlDsaParameterSet, deterministic bool) ([]byte, error) {
+// hardcodes randomized=false internally — so MlDsaParams.deterministic is
+// not honored yet; a later commit adds the package-level SignTo dispatch
+// needed for the hedged (randomized) case FIPS 204 recommends by default.
+func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding providerpb.PrivateKeyEncoding, parameterSet types.MlDsaParameterSet) ([]byte, error) {
 	const op errors.Op = "software.signMLDSA"
 
 	scheme, err := mldsaScheme(ctx, op, parameterSet)
@@ -143,55 +138,7 @@ func signMLDSA(ctx context.Context, privBytes, payload []byte, keyEncoding provi
 	if err != nil {
 		return nil, err
 	}
-	if deterministic {
-		return scheme.Sign(privKey, payload, nil), nil
-	}
-	return signMLDSARandomized(ctx, op, privKey, payload, parameterSet)
-}
-
-// signMLDSARandomized performs hedged (randomized) ML-DSA signing via the
-// scheme-specific package-level SignTo function — see signMLDSA for why
-// sign.Scheme.Sign cannot do this. privKey must be the concrete private key
-// type SignTo for parameterSet expects; parseMLDSAPrivateKey always returns
-// exactly that type for a given parameterSet, since it derives from
-// mldsaScheme(parameterSet) itself, so the type assertions below cannot fail
-// in practice.
-func signMLDSARandomized(ctx context.Context, op errors.Op, privKey sign.PrivateKey, payload []byte, parameterSet types.MlDsaParameterSet) ([]byte, error) {
-	switch parameterSet {
-	case types.MlDsaParameterSet_ML_DSA_44:
-		sk, ok := privKey.(*mldsa44.PrivateKey)
-		if !ok {
-			return nil, errors.New(ctx, op, errors.CodeInternal, "ML-DSA-44 private key has unexpected type %T", privKey)
-		}
-		sig := make([]byte, mldsa44.SignatureSize)
-		if err := mldsa44.SignTo(sk, payload, nil, true, sig); err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return sig, nil
-	case types.MlDsaParameterSet_ML_DSA_65:
-		sk, ok := privKey.(*mldsa65.PrivateKey)
-		if !ok {
-			return nil, errors.New(ctx, op, errors.CodeInternal, "ML-DSA-65 private key has unexpected type %T", privKey)
-		}
-		sig := make([]byte, mldsa65.SignatureSize)
-		if err := mldsa65.SignTo(sk, payload, nil, true, sig); err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return sig, nil
-	case types.MlDsaParameterSet_ML_DSA_87:
-		sk, ok := privKey.(*mldsa87.PrivateKey)
-		if !ok {
-			return nil, errors.New(ctx, op, errors.CodeInternal, "ML-DSA-87 private key has unexpected type %T", privKey)
-		}
-		sig := make([]byte, mldsa87.SignatureSize)
-		if err := mldsa87.SignTo(sk, payload, nil, true, sig); err != nil {
-			return nil, errors.Wrap(ctx, op, err)
-		}
-		return sig, nil
-	default:
-		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
-			"unsupported ML-DSA parameter set: %s", parameterSet)
-	}
+	return scheme.Sign(privKey, payload, nil), nil
 }
 
 func verifyMLDSA(ctx context.Context, pubBytes, payload, signature []byte, parameterSet types.MlDsaParameterSet) (bool, error) {
