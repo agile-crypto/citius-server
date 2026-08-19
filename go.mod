@@ -16,6 +16,7 @@ require (
 )
 
 require (
+	github.com/agile-crypto/ossl-go v0.1.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/go-chi/chi/v5 v5.2.5 // indirect

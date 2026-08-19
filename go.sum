@@ -8,6 +8,8 @@ cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
+github.com/agile-crypto/ossl-go v0.1.0 h1:C+it3Z9uLb4HjsdGIVENgm1zGd04A/lRO3+UebflTN8=
+github.com/agile-crypto/ossl-go v0.1.0/go.mod h1:KHpxTLbOHWwTg+EO7wGN02ito3byHbxjLU17b4q+4dM=
 github.com/agile-crypto/zitadel-grpc-auth v0.1.0 h1:G43avm3gx55WZVVAiSEiSXgcu0N44WkHS1jhPj+b8V8=
 github.com/agile-crypto/zitadel-grpc-auth v0.1.0/go.mod h1:APcuKmEB/FCfIRrIEKgRtcnf0OU0NWbotpyIDsMySgo=
 github.com/alecthomas/template v0.0.0-20160405071501-a0175ee3bccc/go.mod h1:LOuyumcjzFXgccqObfd/Ljyb9UuFJ6TxHnclSeseNhc=
