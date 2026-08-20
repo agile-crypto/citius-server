@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.11-20260209202127-80ab13bee0bf.1
 	buf.build/go/protovalidate v1.1.3
+	github.com/agile-crypto/ossl-go v0.1.0
 	github.com/cloudflare/circl v1.6.4
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.28.0
 	github.com/hashicorp/vault/sdk v0.25.1
@@ -16,7 +17,6 @@ require (
 )
 
 require (
-	github.com/agile-crypto/ossl-go v0.1.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/go-chi/chi/v5 v5.2.5 // indirect
