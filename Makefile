@@ -41,6 +41,7 @@ help: ## Show this help (list all available targets)
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "ADDR"     "gRPC listen address"   "$(ADDR)"
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "CATALOG"  "algorithm catalog path" "$(CATALOG)"
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "BIN_DIR"  "build output directory" "$(BIN_DIR)"
+	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "OPENSSL_PREFIX" "OpenSSL 3.5+ install used for cgo" "$(OPENSSL_PREFIX)"
 	@printf "  \033[33m%-14s\033[0m %s (e.g. PKG=internal/core)\n" "PKG" "package for test-pkg"
 	@printf "\n\033[1mExamples:\033[0m\n"
 	@printf "  make run ADDR=:9000\n"
@@ -57,6 +58,19 @@ SERVER_BIN := $(BIN_DIR)/caas-server
 SERVER_PKG := ./internal/cmd/server/main
 
 MODULE := github.com/agile-crypto/citius-server
+
+# ---------------------------------------------------------------------------
+# OpenSSL 3.5+ toolchain (required by github.com/agile-crypto/ossl-go, a cgo
+# dependency of internal/provider/openssl).
+#
+# A typical system OpenSSL (3.0.x / 1.1.1 are both common) predates what
+# ossl-go's cgo preamble requires and fails to compile against it. Every
+# recipe below is built and linked against OPENSSL_PREFIX instead; override
+# it for a different install location, e.g. `make test OPENSSL_PREFIX=/usr`.
+# ---------------------------------------------------------------------------
+OPENSSL_PREFIX ?= /opt/openssl3.5.2
+export PKG_CONFIG_PATH := $(OPENSSL_PREFIX)/lib64/pkgconfig:$(PKG_CONFIG_PATH)
+export CGO_LDFLAGS := -Wl,-rpath,$(OPENSSL_PREFIX)/lib64 $(CGO_LDFLAGS)
 
 # ---------------------------------------------------------------------------
 # CI gate — MUST pass before merge
