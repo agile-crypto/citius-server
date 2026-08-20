@@ -47,6 +47,16 @@ var catalog = map[string]ossl.Capability{
 	"rsa-pss-sha256-mgf1-32-3072": ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA256},
 	"rsa-pss-sha384-mgf1-48-4096": ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA384},
 	"rsa-pkcs1v15-sha256-2048":    ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA256},
+
+	// Ed25519 hashes internally, so Digest stays empty (a non-empty Digest
+	// on a key that hashes internally is itself a check() error — see
+	// hashesInternally in ossl-go). ed25519 and ed25519ph generate an
+	// identical key (see generateEd25519Key's doc); Prehash is what
+	// distinguishes the two capabilities, and both are verified directly to
+	// work end-to-end via ctx.VerifyCapability, independent of this
+	// package's own Sign not existing yet.
+	"ed25519":   ossl.SignatureCapability{Key: ossl.Ed25519},
+	"ed25519ph": ossl.SignatureCapability{Key: ossl.Ed25519, Prehash: true},
 }
 
 // deriveAlgorithms filters table down to the entries libctx can actually
