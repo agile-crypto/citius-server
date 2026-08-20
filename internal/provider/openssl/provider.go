@@ -173,6 +173,18 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		}
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
+	case *types.AlgorithmDetails_MlDsa:
+		pubDER, privDER, err = generateMLDSAKey(ctx, p.libctx, alg.MlDsa.GetParameterSet())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		// Public half is RAW here, not SPKI like every other case in this
+		// switch -- see generateMLDSAKey's doc comment: software has no
+		// SPKI parser for ML-DSA, only CIRCL's raw packed format, so RAW is
+		// what makes this genuinely interoperate rather than what would be
+		// the more obvious choice by analogy with ECDSA/RSA/Ed25519.
+		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
+		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))

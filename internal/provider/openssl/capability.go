@@ -57,6 +57,15 @@ var catalog = map[string]ossl.Capability{
 	// package's own Sign not existing yet.
 	"ed25519":   ossl.SignatureCapability{Key: ossl.Ed25519},
 	"ed25519ph": ossl.SignatureCapability{Key: ossl.Ed25519, Prehash: true},
+
+	// ML-DSA also hashes internally, so Digest stays empty, same as Ed25519
+	// above. See generateMLDSAKey's doc comment for the encoding this
+	// algorithm needs to interoperate with software (RAW public key, not
+	// SPKI) — Supports/VerifyCapability here only check that this context
+	// can generate and use its own ML-DSA key, independent of that.
+	"ml-dsa-44": ossl.SignatureCapability{Key: ossl.MLDSA44},
+	"ml-dsa-65": ossl.SignatureCapability{Key: ossl.MLDSA65},
+	"ml-dsa-87": ossl.SignatureCapability{Key: ossl.MLDSA87},
 }
 
 // deriveAlgorithms filters table down to the entries libctx can actually

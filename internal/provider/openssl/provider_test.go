@@ -182,13 +182,13 @@ func TestProvider_ExportPublicKey_notImplemented(t *testing.T) {
 // Capability tests
 // ============================================================================
 
-// TestProvider_SupportedAlgorithms_includesECDSARSAAndEd25519 documents the
-// current state: catalog has exactly the entries ECDSA, RSA, and Ed25519
-// key generation added, nothing more (the remaining asymmetric families and
-// symmetric are still later commits). This test is meant to start failing
+// TestProvider_SupportedAlgorithms_includesAllAsymmetric documents the
+// current state: catalog has exactly the entries every asymmetric key
+// family added so far (ECDSA, RSA, Ed25519, ML-DSA), nothing more
+// (symmetric is still a later commit). This test is meant to start failing
 // the moment the next entry lands — that failure is the signal to update
 // it, not a regression.
-func TestProvider_SupportedAlgorithms_includesECDSARSAAndEd25519(t *testing.T) {
+func TestProvider_SupportedAlgorithms_includesAllAsymmetric(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
@@ -205,6 +205,9 @@ func TestProvider_SupportedAlgorithms_includesECDSARSAAndEd25519(t *testing.T) {
 		"rsa-pkcs1v15-sha256-2048":    true,
 		"ed25519":                     true,
 		"ed25519ph":                   true,
+		"ml-dsa-44":                   true,
+		"ml-dsa-65":                   true,
+		"ml-dsa-87":                   true,
 	}
 	got := p.SupportedAlgorithms()
 	if len(got) != len(want) {
@@ -217,13 +220,13 @@ func TestProvider_SupportedAlgorithms_includesECDSARSAAndEd25519(t *testing.T) {
 	}
 }
 
-// TestProvider_VerifyCapabilities_ecdsaRSAAndEd25519 proves VerifyCapabilities
+// TestProvider_VerifyCapabilities_allAsymmetric proves VerifyCapabilities
 // performs real key generation, sign, and verify for every advertised
-// ECDSA, RSA, and Ed25519 capability (ossl.Context.VerifyCapability), not
-// just the structural Supports check SupportedAlgorithms relies on. The RSA
-// entries' trial exercises PSS specifically, including the PKCS#1 v1.5
-// entry — see the caveat on catalog's RSA entries in capability.go.
-func TestProvider_VerifyCapabilities_ecdsaRSAAndEd25519(t *testing.T) {
+// capability (ossl.Context.VerifyCapability), not just the structural
+// Supports check SupportedAlgorithms relies on. The RSA entries' trial
+// exercises PSS specifically, including the PKCS#1 v1.5 entry — see the
+// caveat on catalog's RSA entries in capability.go.
+func TestProvider_VerifyCapabilities_allAsymmetric(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
