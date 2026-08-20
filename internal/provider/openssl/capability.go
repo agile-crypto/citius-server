@@ -14,10 +14,6 @@ import (
 // documents — to the ossl.Capability New checks the instance's context
 // against.
 //
-// Curve and Digest are set explicitly (not left to ossl-go's
-// default) to match the exact pairing the template ID and software's own
-// curveMinHash both declare: P-256/SHA-256, P-384/SHA-384, P-521/SHA-512.
-//
 // This is narrower than the full IDs software.SupportedAlgorithms
 // advertises for these curves — the "-prehashed-der" variants use
 // DigestSign/DigestVerify, which do not exist in this package yet, so they
@@ -26,6 +22,31 @@ var catalog = map[string]ossl.Capability{
 	"ecdsa-p256-sha256-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P256, Digest: ossl.SHA256},
 	"ecdsa-p384-sha384-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P384, Digest: ossl.SHA384},
 	"ecdsa-p521-sha512-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P521, Digest: ossl.SHA512},
+
+	// All four RSA entries use Key: ossl.RSA, the same plain key type
+	// keyAlgorithmFor generates for both RsaPss and RsaPkcs1V15 (see its
+	// doc comment). This has two consequences worth knowing:
+	//
+	//  - No bit-size field exists on ossl.SignatureCapability, and
+	//    availability does not vary by key size at 2048/3072/4096 (all
+	//    FIPS-approved), so the two SHA-256 PSS entries below intentionally
+	//    check the identical capability. They stay separate catalog entries
+	//    because they are separate template IDs with separate GenerateKey
+	//    bit-size behavior.
+	//  - No Padding field exists either. The structural check (Supports) is
+	//    still accurate for every entry here — a plain "RSA" key
+	//    structurally permits both PSS and PKCS#1 v1.5, so "RSA + this
+	//    digest available" is a true claim regardless of scheme. But
+	//    VerifyCapabilities' trial signs and verifies through SignOptions'
+	//    zero-value default, which is PSS — so that trial proves PSS
+	//    specifically for every RSA entry here, including the PKCS#1 v1.5
+	//    one. Real PKCS#1 v1.5 signing correctness is proven where it
+	//    actually matters: by Sign/Verify's own dedicated tests once they
+	//    exist, not by this capability probe.
+	"rsa-pss-sha256-mgf1-32-2048": ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA256},
+	"rsa-pss-sha256-mgf1-32-3072": ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA256},
+	"rsa-pss-sha384-mgf1-48-4096": ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA384},
+	"rsa-pkcs1v15-sha256-2048":    ossl.SignatureCapability{Key: ossl.RSA, Digest: ossl.SHA256},
 }
 
 // deriveAlgorithms filters table down to the entries libctx can actually

@@ -14,12 +14,18 @@ import (
 // ossl.KeyAlgorithm (and, for EC, the ossl.Curve) that ossl.Context.GenerateKey
 // needs.
 //
-// RsaPss and RsaPkcs1V15 map to different ossl-go key types, not the same
-// one: an "RSA-PSS"-typed key carries its scheme in the key itself and
-// cannot produce a PKCS#1 v1.5 signature at all (ossl-go's checkSignOptions
-// rejects it outright), so a PSS template gets the scheme-locked RSAPSSKey
-// — which also means that key can never accidentally sign PKCS#1 v1.5 —
-// while a PKCS1v15 template must use the unrestricted RSA type instead.
+// RsaPss and RsaPkcs1V15 both resolve to plain "RSA", not the scheme-locked
+// "RSA-PSS" key type ossl-go also offers. "RSA-PSS" is more precise in
+// isolation — that type structurally cannot produce a PKCS#1 v1.5 signature
+// at all — but it costs real interop: OpenSSL correctly marshals it under
+// the rsassaPss OID (1.2.840.113549.1.1.10) in PKCS#8/SPKI, and Go's
+// stdlib crypto/x509 does not implement parsing that OID at all, so
+// software (which always emits plain "RSA" under rsaEncryption,
+// 1.2.840.113549.1.1.1) could never read openssl-generated PSS key
+// material — verified directly: x509.ParsePKCS8PrivateKey fails outright
+// on it. Plain "RSA" is what software already generates for both schemes,
+// with the scheme chosen only at Sign() time (SignOptions.Padding), so
+// that is what this function uses too, for both arms.
 //
 // Symmetric arms (AES*, ChaCha20-Poly1305) have no ossl.Key at all — their
 // key material is raw bytes generated without this function — so they are
@@ -32,9 +38,7 @@ func keyAlgorithmFor(ctx context.Context, op errors.Op, alg *types.AlgorithmDeta
 			return "", "", err
 		}
 		return ossl.EC, curve, nil
-	case *types.AlgorithmDetails_RsaPss:
-		return ossl.RSAPSSKey, "", nil
-	case *types.AlgorithmDetails_RsaPkcs1V15:
+	case *types.AlgorithmDetails_RsaPss, *types.AlgorithmDetails_RsaPkcs1V15:
 		return ossl.RSA, "", nil
 	case *types.AlgorithmDetails_Ed25519:
 		return ossl.Ed25519, "", nil

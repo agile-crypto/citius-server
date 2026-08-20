@@ -114,7 +114,10 @@ func (p *Provider) FIPSEnabled() bool {
 	return p.libctx.FIPSEnabled()
 }
 
-// GenerateKey dispatches to the algorithm-specific key generator.
+// GenerateKey dispatches to the algorithm-specific key generator. Structure
+// mirrors software.Provider.GenerateKey: each case sets the shared
+// pubDER/privDER/encoding variables and falls through to one response
+// construction, rather than each case building its own.
 func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	const op errors.Op = "openssl.(Provider).GenerateKey"
 
@@ -122,26 +125,59 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		return nil, err
 	}
 
+	var (
+		pubDER  []byte
+		privDER []byte
+		privEnc providerpb.PrivateKeyEncoding
+		pubEnc  providerpb.PublicKeyEncoding
+		err     error
+	)
+
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
-		pubDER, privDER, err := generateECDSAKey(ctx, p.libctx, alg.Ecdsa.GetCurve())
+		pubDER, privDER, err = generateECDSAKey(ctx, p.libctx, alg.Ecdsa.GetCurve())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		// The two halves differ: SEC1 (RFC 5915) for the private key, SPKI
 		// (RFC 5280) for the public key — the same split software's ECDSA
 		// path uses, for the same reason (see generateECDSAKey's doc).
-		return &providerpb.GenerateKeyResponse{
-			PublicKeyBytes:      pubDER,
-			KeyMaterial:         privDER,
-			Output:              provider.NoOutputUnencoded(),
-			KeyMaterialEncoding: providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1,
-			PublicKeyEncoding:   providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI,
-		}, nil
+		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
+		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
+	case *types.AlgorithmDetails_RsaPss:
+		keyAlg, _, kerr := keyAlgorithmFor(ctx, op, req.GetAlgorithm())
+		if kerr != nil {
+			return nil, errors.Wrap(ctx, op, kerr)
+		}
+		pubDER, privDER, err = generateRSAKey(ctx, p.libctx, keyAlg, alg.RsaPss.GetKeySizeBits())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
+		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
+	case *types.AlgorithmDetails_RsaPkcs1V15:
+		keyAlg, _, kerr := keyAlgorithmFor(ctx, op, req.GetAlgorithm())
+		if kerr != nil {
+			return nil, errors.Wrap(ctx, op, kerr)
+		}
+		pubDER, privDER, err = generateRSAKey(ctx, p.libctx, keyAlg, alg.RsaPkcs1V15.GetKeySizeBits())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
+		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
+
+	return &providerpb.GenerateKeyResponse{
+		PublicKeyBytes:      pubDER,
+		KeyMaterial:         privDER,
+		Output:              provider.NoOutputUnencoded(),
+		KeyMaterialEncoding: privEnc,
+		PublicKeyEncoding:   pubEnc,
+	}, nil
 }
 
 // DestroyKey is not yet implemented.

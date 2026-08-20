@@ -86,12 +86,12 @@ func TestKeyAlgorithmFor(t *testing.T) {
 		{"ecdsa p256", ecdsaDetails(types.EllipticCurve_ELLIPTIC_CURVE_P256), ossl.EC, ossl.P256},
 		{"ecdsa p384", ecdsaDetails(types.EllipticCurve_ELLIPTIC_CURVE_P384), ossl.EC, ossl.P384},
 		{"ecdsa p521", ecdsaDetails(types.EllipticCurve_ELLIPTIC_CURVE_P521), ossl.EC, ossl.P521},
-		// RSA-PSS and PKCS#1v1.5 deliberately resolve to different ossl-go
-		// key types: an "RSA-PSS" key cannot produce a PKCS#1 v1.5
-		// signature at all (see keyAlgorithmFor's doc comment), so this
-		// assertion is standing in for that scheme-locking guarantee, not
-		// just checking a string.
-		{"rsa pss", rsaPssDetails(), ossl.RSAPSSKey, ""},
+		// RSA-PSS and PKCS#1v1.5 both resolve to plain "RSA", not the
+		// scheme-locked "RSA-PSS" key type — see keyAlgorithmFor's doc
+		// comment for why: the scheme-locked type breaks cross-provider
+		// interop (Go's stdlib x509 cannot parse it), so the scheme is
+		// chosen at Sign() time instead, matching software.
+		{"rsa pss", rsaPssDetails(), ossl.RSA, ""},
 		{"rsa pkcs1v15", rsaPkcs1v15Details(), ossl.RSA, ""},
 		{"ed25519", ed25519Details(), ossl.Ed25519, ""},
 		{"ml-dsa-44", mlDSADetails(types.MlDsaParameterSet_ML_DSA_44), ossl.MLDSA44, ""},

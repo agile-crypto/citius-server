@@ -182,12 +182,13 @@ func TestProvider_ExportPublicKey_notImplemented(t *testing.T) {
 // Capability tests
 // ============================================================================
 
-// TestProvider_SupportedAlgorithms_includesECDSA documents the current
-// state: catalog has exactly the three entries ECDSA key generation added,
-// nothing more (symmetric and the other asymmetric families are still
-// later commits). This test is meant to start failing the moment the next
-// entry lands — that failure is the signal to update it, not a regression.
-func TestProvider_SupportedAlgorithms_includesECDSA(t *testing.T) {
+// TestProvider_SupportedAlgorithms_includesECDSAAndRSA documents the
+// current state: catalog has exactly the entries ECDSA and RSA key
+// generation added, nothing more (symmetric and the other asymmetric
+// families are still later commits). This test is meant to start failing
+// the moment the next entry lands — that failure is the signal to update
+// it, not a regression.
+func TestProvider_SupportedAlgorithms_includesECDSAAndRSA(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
@@ -195,13 +196,17 @@ func TestProvider_SupportedAlgorithms_includesECDSA(t *testing.T) {
 	defer p.Close()
 
 	want := map[string]bool{
-		"ecdsa-p256-sha256-der": true,
-		"ecdsa-p384-sha384-der": true,
-		"ecdsa-p521-sha512-der": true,
+		"ecdsa-p256-sha256-der":       true,
+		"ecdsa-p384-sha384-der":       true,
+		"ecdsa-p521-sha512-der":       true,
+		"rsa-pss-sha256-mgf1-32-2048": true,
+		"rsa-pss-sha256-mgf1-32-3072": true,
+		"rsa-pss-sha384-mgf1-48-4096": true,
+		"rsa-pkcs1v15-sha256-2048":    true,
 	}
 	got := p.SupportedAlgorithms()
 	if len(got) != len(want) {
-		t.Fatalf("SupportedAlgorithms: got %v, want exactly %d ECDSA entries", got, len(want))
+		t.Fatalf("SupportedAlgorithms: got %v, want exactly %d ECDSA/RSA entries", got, len(want))
 	}
 	for _, id := range got {
 		if !want[id] {
@@ -210,11 +215,13 @@ func TestProvider_SupportedAlgorithms_includesECDSA(t *testing.T) {
 	}
 }
 
-// TestProvider_VerifyCapabilities_ecdsa proves VerifyCapabilities performs
-// real key generation, sign, and verify for every advertised ECDSA
-// capability (ossl.Context.VerifyCapability), not just the structural
-// Supports check SupportedAlgorithms relies on.
-func TestProvider_VerifyCapabilities_ecdsa(t *testing.T) {
+// TestProvider_VerifyCapabilities_ecdsaAndRSA proves VerifyCapabilities
+// performs real key generation, sign, and verify for every advertised
+// ECDSA and RSA capability (ossl.Context.VerifyCapability), not just the
+// structural Supports check SupportedAlgorithms relies on. The RSA entries'
+// trial exercises PSS specifically, including the PKCS#1 v1.5 entry — see
+// the caveat on catalog's RSA entries in capability.go.
+func TestProvider_VerifyCapabilities_ecdsaAndRSA(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
