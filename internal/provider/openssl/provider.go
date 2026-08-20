@@ -1,14 +1,15 @@
 // Package openssl implements a provider.Backend backed by OpenSSL 3.5
 // libcrypto via github.com/agile-crypto/ossl-go.
 //
-// Mode — default, FIPS, PKCS#11 — is a property of which *ossl.Context a
-// Provider instance wraps, not a runtime flag: an isolated OSSL_LIB_CTX has
-// its own provider set, default property query, and DRBG state, independent
-// of every other context. New builds the default-mode context; FIPS and
-// PKCS#11 variants are constructed the same way through options, each
-// registered under its own provider.Registry name so the existing
-// key-to-provider routing (KeyVersion.ProviderId) binds every later
-// operation on a key back to the exact context that created it.
+// Mode — default, FIPS, and (planned) PKCS#11 — is a property of which
+// *ossl.Context a Provider instance wraps, not a runtime flag: an isolated
+// OSSL_LIB_CTX has its own provider set, default property query, and DRBG
+// state, independent of every other context. New builds the default-mode
+// context; WithFIPS builds one restricted to the validated module the same
+// way, through options — each mode registered under its own
+// provider.Registry name so the existing key-to-provider routing
+// (KeyVersion.ProviderId) binds every later operation on a key back to the
+// exact context that created it.
 //
 // This package compiles under CGO_ENABLED=0: ossl-go ships a no-cgo mirror
 // that returns ossl.ErrUnavailable from every operation rather than failing
@@ -41,7 +42,8 @@ type Provider struct {
 	libctx *ossl.Context
 }
 
-// New constructs a Provider using an isolated OpenSSL library context.
+// New constructs a Provider using an isolated OpenSSL library context —
+// FIPS-restricted if WithFIPS is given, the default provider set otherwise.
 //
 // It fails loudly if the runtime libcrypto does not match the library this
 // package was built against — see ossl.CheckVersion — because a mismatch
@@ -59,9 +61,27 @@ func New(ctx context.Context, opts ...Option) (*Provider, error) {
 		opt(cfg)
 	}
 
-	libctx, err := ossl.NewContext()
+	var libctx *ossl.Context
+	var err error
+	if cfg.fipsConfigPath != "" {
+		libctx, err = ossl.NewFIPSContext(cfg.fipsConfigPath)
+	} else {
+		libctx, err = ossl.NewContext()
+	}
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
+	}
+
+	// EnableFIPS (which NewFIPSContext calls) only reports FIPSEnabled true
+	// on a path that already succeeded, so this cannot fail given a correct
+	// ossl-go — it exists as a self-check specifically because a FIPS
+	// context that looks restricted and is not is the one failure mode in
+	// this area that fails silently rather than with an error. Close before
+	// returning: a failed New must not leak the context it just created.
+	if cfg.fipsConfigPath != "" && !libctx.FIPSEnabled() {
+		libctx.Close()
+		return nil, errors.New(ctx, op, errors.CodeUnavailable,
+			"FIPS context construction reported success but the context is not FIPS-restricted")
 	}
 
 	return &Provider{name: cfg.name, libctx: libctx}, nil
@@ -83,6 +103,12 @@ func (p *Provider) Type() string { return "openssl" }
 // a future server-shutdown path.
 func (p *Provider) Close() error {
 	return p.libctx.Close()
+}
+
+// FIPSEnabled reports whether this instance's context is restricted to the
+// FIPS provider — true for an instance built with WithFIPS, false otherwise.
+func (p *Provider) FIPSEnabled() bool {
+	return p.libctx.FIPSEnabled()
 }
 
 // GenerateKey is not yet implemented — key generation lands incrementally
