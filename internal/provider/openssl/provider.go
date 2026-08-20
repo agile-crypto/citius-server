@@ -1,7 +1,7 @@
 // Package openssl implements a provider.Backend backed by OpenSSL 3.5
 // libcrypto via github.com/agile-crypto/ossl-go.
 //
-// Mode — default, FIPS, and (planned) PKCS#11 — is a property of which
+// Mode — default, FIPS — is a property of which
 // *ossl.Context a Provider instance wraps, not a runtime flag: an isolated
 // OSSL_LIB_CTX has its own provider set, default property query, and DRBG
 // state, independent of every other context. New builds the default-mode
@@ -15,7 +15,7 @@
 // that returns ossl.ErrUnavailable from every operation rather than failing
 // to build. New's ossl.CheckVersion call surfaces that at construction time,
 // so a nocgo build fails to construct this provider instead of registering
-// one that silently errors on every call.
+// one that errors on every call.
 package openssl
 
 import (
@@ -45,10 +45,8 @@ type Provider struct {
 // New constructs a Provider using an isolated OpenSSL library context —
 // FIPS-restricted if WithFIPS is given, the default provider set otherwise.
 //
-// It fails loudly if the runtime libcrypto does not match the library this
-// package was built against — see ossl.CheckVersion — because a mismatch
-// does not fail any other way: algorithms from a newer OpenSSL release just
-// fetch as unsupported, silently.
+// It fails if the runtime libcrypto does not match the library this
+// package was built against.
 func New(ctx context.Context, opts ...Option) (*Provider, error) {
 	const op errors.Op = "openssl.New"
 

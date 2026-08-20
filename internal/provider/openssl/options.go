@@ -36,18 +36,17 @@ func WithName(name string) Option {
 //
 // There is deliberately no default here. ossl.DefaultFIPSModuleConfig
 // returns the path to fipsmodule.cnf itself, which has no openssl_conf
-// directive and cannot be loaded on its own — verified directly: passing it
+// directive and cannot be loaded on its own: passing it
 // alone activates nothing. The wrapper config above is a deployment-specific
 // artifact (which providers besides fips are active, property-query
-// details) that this package has no basis to fabricate; the caller supplies
+// details) that this package has no basis to fabricate. The caller supplies
 // it, the same way ossl.NewFIPSContext requires it.
 //
 // # A wrong configPath does not fail cleanly
 //
-// ossl-go's own EnableFIPS doc warns that a bare LoadProvider("fips") with
+// ossl-go's EnableFIPS doc warns that a bare LoadProvider("fips") with
 // no config in scope poisons the FIPS module process-wide and permanently.
-// Verified directly that the same failure mode is reachable through this
-// safer-looking path too: a configPath that is syntactically valid and
+// A configPath that is syntactically valid and
 // loads without error, but omits the fipsmodule.cnf include (a missing
 // path, a typo, a config meant for something else), produces the identical
 // "missing config data" / "fips module entering error state" error — and

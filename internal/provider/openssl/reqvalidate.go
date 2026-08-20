@@ -32,11 +32,10 @@ func getRequestValidator() (protovalidate.Validator, error) {
 // providerpb request message (e.g. key_material/plaintext/signature
 // bytes.min_len = 1, algorithm required = true).
 //
-// Nothing else in the live call path checks these: the orchestrator layer
+// Nothing else in the call path checks these: the orchestrator layer
 // validates its own caller-facing request shape (internal/crypto.*Request)
 // before ever constructing a providerpb request, so this is not primarily a
-// malicious-caller defense — it is the same class of fix as
-// template.LoadStandardCatalog's catalog-load-time validation, catching a
+// malicious-caller defense. For catching a
 // providerpb request the orchestrator builds incorrectly (e.g. forgetting to
 // set Algorithm) before it reaches provider dispatch logic that assumes a
 // well-formed request.
