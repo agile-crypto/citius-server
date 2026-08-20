@@ -110,10 +110,11 @@ func TestProvider_Close_idempotent(t *testing.T) {
 // Backend stub tests
 // ============================================================================
 
-// TestProvider_GenerateKey_notImplemented uses AES-GCM rather than ECDSA:
-// symmetric key generation is a separate, later commit, so this arm still
-// falls through GenerateKey's dispatch to the default case. ECDSA moved to
-// ecdsa_test.go once it stopped being a stub.
+// TestProvider_GenerateKey_notImplemented probes GenerateKey's dispatch
+// default case with an AlgorithmDetails whose oneof is present but empty --
+// every real algorithm arm now has a case (ECDSA, RSA, Ed25519, ML-DSA, and
+// symmetric all landed), so this is the only shape left that still reaches
+// default rather than a real implementation.
 func TestProvider_GenerateKey_notImplemented(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
@@ -121,13 +122,7 @@ func TestProvider_GenerateKey_notImplemented(t *testing.T) {
 	}
 	defer p.Close()
 
-	req := &providerpb.GenerateKeyRequest{
-		Algorithm: &types.AlgorithmDetails{
-			Algorithm: &types.AlgorithmDetails_AesGcm{
-				AesGcm: &types.AesGcmParams{KeySizeBits: 256, IvSizeBits: 96, TagSizeBits: 128},
-			},
-		},
-	}
+	req := &providerpb.GenerateKeyRequest{Algorithm: &types.AlgorithmDetails{}}
 	_, err = p.GenerateKey(context.Background(), req)
 	if !errors.IsNotImplemented(err) {
 		t.Errorf("expected CodeNotImplemented, got: %v", err)
@@ -182,13 +177,16 @@ func TestProvider_ExportPublicKey_notImplemented(t *testing.T) {
 // Capability tests
 // ============================================================================
 
-// TestProvider_SupportedAlgorithms_includesAllAsymmetric documents the
-// current state: catalog has exactly the entries every asymmetric key
-// family added so far (ECDSA, RSA, Ed25519, ML-DSA), nothing more
-// (symmetric is still a later commit). This test is meant to start failing
-// the moment the next entry lands — that failure is the signal to update
-// it, not a regression.
-func TestProvider_SupportedAlgorithms_includesAllAsymmetric(t *testing.T) {
+// TestProvider_SupportedAlgorithms_includesAllKeygenFamilies documents the
+// current state: catalog has exactly the entries every algorithm family
+// with a working GenerateKey path added so far — every asymmetric family
+// (ECDSA, RSA, Ed25519, ML-DSA) plus the two symmetric families
+// representable as an ossl.Capability (AES-GCM, ChaCha20-Poly1305; AES-CBC
+// and AES-CTR have no representable capability at all — see the comment on
+// catalog's AEAD entries). This test is meant to start failing the moment
+// the next entry lands — that failure is the signal to update it, not a
+// regression.
+func TestProvider_SupportedAlgorithms_includesAllKeygenFamilies(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
@@ -208,6 +206,10 @@ func TestProvider_SupportedAlgorithms_includesAllAsymmetric(t *testing.T) {
 		"ml-dsa-44":                   true,
 		"ml-dsa-65":                   true,
 		"ml-dsa-87":                   true,
+		"aes-128-gcm-128-96":          true,
+		"aes-192-gcm-128-96":          true,
+		"aes-256-gcm-128-96":          true,
+		"chacha20-poly1305":           true,
 	}
 	got := p.SupportedAlgorithms()
 	if len(got) != len(want) {
@@ -220,13 +222,14 @@ func TestProvider_SupportedAlgorithms_includesAllAsymmetric(t *testing.T) {
 	}
 }
 
-// TestProvider_VerifyCapabilities_allAsymmetric proves VerifyCapabilities
-// performs real key generation, sign, and verify for every advertised
-// capability (ossl.Context.VerifyCapability), not just the structural
-// Supports check SupportedAlgorithms relies on. The RSA entries' trial
-// exercises PSS specifically, including the PKCS#1 v1.5 entry — see the
-// caveat on catalog's RSA entries in capability.go.
-func TestProvider_VerifyCapabilities_allAsymmetric(t *testing.T) {
+// TestProvider_VerifyCapabilities_allKeygenFamilies proves VerifyCapabilities
+// performs a real key generation and full round trip (sign+verify for
+// signatures, seal+open for AEAD) for every advertised capability
+// (ossl.Context.VerifyCapability), not just the structural Supports check
+// SupportedAlgorithms relies on. The RSA entries' trial exercises PSS
+// specifically, including the PKCS#1 v1.5 entry — see the caveat on
+// catalog's RSA entries in capability.go.
+func TestProvider_VerifyCapabilities_allKeygenFamilies(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)

@@ -66,6 +66,23 @@ var catalog = map[string]ossl.Capability{
 	"ml-dsa-44": ossl.SignatureCapability{Key: ossl.MLDSA44},
 	"ml-dsa-65": ossl.SignatureCapability{Key: ossl.MLDSA65},
 	"ml-dsa-87": ossl.SignatureCapability{Key: ossl.MLDSA87},
+
+	// AES-GCM and ChaCha20-Poly1305 only: ossl.Capability has exactly two
+	// implementations, SignatureCapability and AEADCapability -- its methods
+	// are unexported, so no third type can be added to satisfy it from
+	// outside ossl-go. AEADCapability covers these two. It has no
+	// counterpart for plain block/stream modes (AES-CBC, AES-CTR are not
+	// AEAD), so those two families have no representable entry here and are
+	// deliberately absent -- the same reasoning names.go's cipherNameFor
+	// already applies to XChaCha20-Poly1305: advertise only what is
+	// genuinely checkable, not what symmetric key generation alone would
+	// suggest is complete. IVBytes/TagBytes are left at zero (the
+	// standard 96-bit IV / 128-bit tag), matching the "-128-96" the
+	// template IDs declare.
+	"aes-128-gcm-128-96": ossl.AEADCapability{Cipher: ossl.AES128GCM},
+	"aes-192-gcm-128-96": ossl.AEADCapability{Cipher: ossl.AES192GCM},
+	"aes-256-gcm-128-96": ossl.AEADCapability{Cipher: ossl.AES256GCM},
+	"chacha20-poly1305":  ossl.AEADCapability{Cipher: ossl.ChaCha20Poly1305},
 }
 
 // deriveAlgorithms filters table down to the entries libctx can actually

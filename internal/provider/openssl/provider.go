@@ -145,22 +145,14 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_RsaPss:
-		keyAlg, _, kerr := keyAlgorithmFor(ctx, op, req.GetAlgorithm())
-		if kerr != nil {
-			return nil, errors.Wrap(ctx, op, kerr)
-		}
-		pubDER, privDER, err = generateRSAKey(ctx, p.libctx, keyAlg, alg.RsaPss.GetKeySizeBits())
+		pubDER, privDER, err = generateRSAKeyForTemplate(ctx, p.libctx, req.GetAlgorithm(), alg.RsaPss.GetKeySizeBits())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_RsaPkcs1V15:
-		keyAlg, _, kerr := keyAlgorithmFor(ctx, op, req.GetAlgorithm())
-		if kerr != nil {
-			return nil, errors.Wrap(ctx, op, kerr)
-		}
-		pubDER, privDER, err = generateRSAKey(ctx, p.libctx, keyAlg, alg.RsaPkcs1V15.GetKeySizeBits())
+		pubDER, privDER, err = generateRSAKeyForTemplate(ctx, p.libctx, req.GetAlgorithm(), alg.RsaPkcs1V15.GetKeySizeBits())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
@@ -185,6 +177,13 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		// the more obvious choice by analogy with ECDSA/RSA/Ed25519.
 		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
+	case *types.AlgorithmDetails_AesGcm, *types.AlgorithmDetails_AesCbc, *types.AlgorithmDetails_AesCtr, *types.AlgorithmDetails_Chacha20Poly1305:
+		privDER, err = generateSymmetricKey(ctx, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		// Symmetric: no public half -- pubDER/pubEnc stay at their zero values.
+		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
