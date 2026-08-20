@@ -64,13 +64,11 @@ func TestNew_withName(t *testing.T) {
 // are independently constructible and closeable: closing one instance must
 // not break the other's Backend surface.
 //
-// This does not yet exercise ossl.Context isolation itself (GenerateKey in
-// this commit is a stub that never reads Provider.libctx) — that guarantee
-// belongs to ossl-go and is proven meaningfully once a real operation runs
-// per-context, starting with capability derivation. What this test does
-// prove: Close on one instance cannot panic or corrupt package-level state
-// (e.g. the shared protovalidate validator) that the other instance depends
-// on.
+// GenerateKey now performs a real EVP_PKEY_generate through libctx (ECDSA
+// landed), so a successful key generation on p2 after p1.Close is a genuine
+// exercise of p2's own, independent context — not just its
+// request-validation path, which is all this test could prove before any
+// real operation existed.
 func TestNew_multipleInstances_independentLifecycle(t *testing.T) {
 	p1, err := openssl.New(context.Background(), openssl.WithName("a"))
 	if err != nil {
@@ -82,12 +80,16 @@ func TestNew_multipleInstances_independentLifecycle(t *testing.T) {
 	}
 	defer p2.Close()
 
-	if err := p1.Close(); err != nil {
-		t.Fatalf("p1.Close: %v", err)
+	if closeErr := p1.Close(); closeErr != nil {
+		t.Fatalf("p1.Close: %v", closeErr)
 	}
 
-	if _, err := p2.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{Algorithm: ecdsaP256Details()}); !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented from p2 after p1.Close, got: %v", err)
+	resp, err := p2.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{Algorithm: ecdsaP256Details()})
+	if err != nil {
+		t.Fatalf("GenerateKey on p2 after p1.Close: %v", err)
+	}
+	if len(resp.GetKeyMaterial()) == 0 || len(resp.GetPublicKeyBytes()) == 0 {
+		t.Errorf("expected non-empty key material and public key bytes, got %+v", resp)
 	}
 }
 
@@ -108,6 +110,10 @@ func TestProvider_Close_idempotent(t *testing.T) {
 // Backend stub tests
 // ============================================================================
 
+// TestProvider_GenerateKey_notImplemented uses AES-GCM rather than ECDSA:
+// symmetric key generation is a separate, later commit, so this arm still
+// falls through GenerateKey's dispatch to the default case. ECDSA moved to
+// ecdsa_test.go once it stopped being a stub.
 func TestProvider_GenerateKey_notImplemented(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
@@ -115,7 +121,14 @@ func TestProvider_GenerateKey_notImplemented(t *testing.T) {
 	}
 	defer p.Close()
 
-	_, err = p.GenerateKey(context.Background(), &providerpb.GenerateKeyRequest{Algorithm: ecdsaP256Details()})
+	req := &providerpb.GenerateKeyRequest{
+		Algorithm: &types.AlgorithmDetails{
+			Algorithm: &types.AlgorithmDetails_AesGcm{
+				AesGcm: &types.AesGcmParams{KeySizeBits: 256, IvSizeBits: 96, TagSizeBits: 128},
+			},
+		},
+	}
+	_, err = p.GenerateKey(context.Background(), req)
 	if !errors.IsNotImplemented(err) {
 		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
@@ -169,27 +182,39 @@ func TestProvider_ExportPublicKey_notImplemented(t *testing.T) {
 // Capability tests
 // ============================================================================
 
-// TestProvider_SupportedAlgorithms_currentlyEmpty documents the current,
-// deliberate state: no algorithm's full keygen/sign/verify path exists in
-// this package yet, so the catalog this derives from is empty. This test is
-// meant to start failing the moment the first entry lands — that failure is
-// the signal to update it, not a regression.
-func TestProvider_SupportedAlgorithms_currentlyEmpty(t *testing.T) {
+// TestProvider_SupportedAlgorithms_includesECDSA documents the current
+// state: catalog has exactly the three entries ECDSA key generation added,
+// nothing more (symmetric and the other asymmetric families are still
+// later commits). This test is meant to start failing the moment the next
+// entry lands — that failure is the signal to update it, not a regression.
+func TestProvider_SupportedAlgorithms_includesECDSA(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
 	}
 	defer p.Close()
 
-	if got := p.SupportedAlgorithms(); len(got) != 0 {
-		t.Errorf("SupportedAlgorithms: got %v, want empty (catalog has no entries yet)", got)
+	want := map[string]bool{
+		"ecdsa-p256-sha256-der": true,
+		"ecdsa-p384-sha384-der": true,
+		"ecdsa-p521-sha512-der": true,
+	}
+	got := p.SupportedAlgorithms()
+	if len(got) != len(want) {
+		t.Fatalf("SupportedAlgorithms: got %v, want exactly %d ECDSA entries", got, len(want))
+	}
+	for _, id := range got {
+		if !want[id] {
+			t.Errorf("unexpected algorithm %q in SupportedAlgorithms", id)
+		}
 	}
 }
 
-// TestProvider_VerifyCapabilities_currentlyNoop confirms VerifyCapabilities
-// is callable and succeeds trivially while the catalog is empty — there is
-// nothing yet to verify, which is different from silently skipping real work.
-func TestProvider_VerifyCapabilities_currentlyNoop(t *testing.T) {
+// TestProvider_VerifyCapabilities_ecdsa proves VerifyCapabilities performs
+// real key generation, sign, and verify for every advertised ECDSA
+// capability (ossl.Context.VerifyCapability), not just the structural
+// Supports check SupportedAlgorithms relies on.
+func TestProvider_VerifyCapabilities_ecdsa(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)

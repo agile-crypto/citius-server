@@ -13,7 +13,20 @@ import (
 // TemplateID values, the same contract software.SupportedAlgorithms
 // documents — to the ossl.Capability New checks the instance's context
 // against.
-var catalog = map[string]ossl.Capability{}
+//
+// Curve and Digest are set explicitly (not left to ossl-go's
+// default) to match the exact pairing the template ID and software's own
+// curveMinHash both declare: P-256/SHA-256, P-384/SHA-384, P-521/SHA-512.
+//
+// This is narrower than the full IDs software.SupportedAlgorithms
+// advertises for these curves — the "-prehashed-der" variants use
+// DigestSign/DigestVerify, which do not exist in this package yet, so they
+// are not in this catalog either.
+var catalog = map[string]ossl.Capability{
+	"ecdsa-p256-sha256-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P256, Digest: ossl.SHA256},
+	"ecdsa-p384-sha384-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P384, Digest: ossl.SHA384},
+	"ecdsa-p521-sha512-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P521, Digest: ossl.SHA512},
+}
 
 // deriveAlgorithms filters table down to the entries libctx can actually
 // perform, via ossl.Context.Supports — a structural check, cheap enough to

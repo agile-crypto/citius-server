@@ -20,9 +20,11 @@ package openssl
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/agile-crypto/ossl-go/ossl"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider"
@@ -112,16 +114,34 @@ func (p *Provider) FIPSEnabled() bool {
 	return p.libctx.FIPSEnabled()
 }
 
-// GenerateKey is not yet implemented — key generation lands incrementally
-// per algorithm family. The request is still validated first, matching the
-// validate-then-dispatch shape every later method here follows.
+// GenerateKey dispatches to the algorithm-specific key generator.
 func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	const op errors.Op = "openssl.(Provider).GenerateKey"
 
 	if err := validateRequest(ctx, op, req); err != nil {
 		return nil, err
 	}
-	return nil, errors.New(ctx, op, errors.CodeNotImplemented, "GenerateKey not yet implemented")
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		pubDER, privDER, err := generateECDSAKey(ctx, p.libctx, alg.Ecdsa.GetCurve())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		// The two halves differ: SEC1 (RFC 5915) for the private key, SPKI
+		// (RFC 5280) for the public key — the same split software's ECDSA
+		// path uses, for the same reason (see generateECDSAKey's doc).
+		return &providerpb.GenerateKeyResponse{
+			PublicKeyBytes:      pubDER,
+			KeyMaterial:         privDER,
+			Output:              provider.NoOutputUnencoded(),
+			KeyMaterialEncoding: providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1,
+			PublicKeyEncoding:   providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI,
+		}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
 }
 
 // DestroyKey is not yet implemented.
