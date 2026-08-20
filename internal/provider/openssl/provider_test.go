@@ -164,3 +164,39 @@ func TestProvider_ExportPublicKey_notImplemented(t *testing.T) {
 		t.Errorf("expected CodeNotImplemented, got: %v", err)
 	}
 }
+
+// ============================================================================
+// Capability tests
+// ============================================================================
+
+// TestProvider_SupportedAlgorithms_currentlyEmpty documents the current,
+// deliberate state: no algorithm's full keygen/sign/verify path exists in
+// this package yet, so the catalog this derives from is empty. This test is
+// meant to start failing the moment the first entry lands — that failure is
+// the signal to update it, not a regression.
+func TestProvider_SupportedAlgorithms_currentlyEmpty(t *testing.T) {
+	p, err := openssl.New(context.Background())
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	if got := p.SupportedAlgorithms(); len(got) != 0 {
+		t.Errorf("SupportedAlgorithms: got %v, want empty (catalog has no entries yet)", got)
+	}
+}
+
+// TestProvider_VerifyCapabilities_currentlyNoop confirms VerifyCapabilities
+// is callable and succeeds trivially while the catalog is empty — there is
+// nothing yet to verify, which is different from silently skipping real work.
+func TestProvider_VerifyCapabilities_currentlyNoop(t *testing.T) {
+	p, err := openssl.New(context.Background())
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	if err := p.VerifyCapabilities(context.Background()); err != nil {
+		t.Errorf("VerifyCapabilities: %v", err)
+	}
+}

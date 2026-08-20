@@ -40,6 +40,9 @@ const defaultName = "openssl"
 type Provider struct {
 	name   string
 	libctx *ossl.Context
+	// algs is this instance's SupportedAlgorithms result, derived once at
+	// construction from catalog against libctx — see capability.go.
+	algs []string
 }
 
 // New constructs a Provider using an isolated OpenSSL library context —
@@ -82,7 +85,7 @@ func New(ctx context.Context, opts ...Option) (*Provider, error) {
 			"FIPS context construction reported success but the context is not FIPS-restricted")
 	}
 
-	return &Provider{name: cfg.name, libctx: libctx}, nil
+	return &Provider{name: cfg.name, libctx: libctx, algs: deriveAlgorithms(libctx, catalog)}, nil
 }
 
 // Name returns the provider's registry identity — distinct per mode instance
@@ -135,3 +138,6 @@ func (p *Provider) ExportPublicKey(ctx context.Context, _ *providerpb.ExportPubl
 
 // Compile-time assertion: Provider implements provider.Backend.
 var _ provider.Backend = (*Provider)(nil)
+
+// Compile-time assertion: Provider implements AlgorithmCapabilityProvider.
+var _ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
