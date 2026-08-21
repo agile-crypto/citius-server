@@ -16,7 +16,7 @@ import (
 //
 // This is narrower than the full IDs software.SupportedAlgorithms
 // advertises for these curves — the "-prehashed-der" variants use
-// DigestSign/DigestVerify, which do not exist in this package yet, so they
+// SignDigest/VerifyDigest, which do not exist in this package yet, so they
 // are not in this catalog either.
 var catalog = map[string]ossl.Capability{
 	"ecdsa-p256-sha256-der": ossl.SignatureCapability{Key: ossl.EC, Curve: ossl.P256, Digest: ossl.SHA256},

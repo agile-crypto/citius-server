@@ -38,11 +38,11 @@ func (s *stubProvider) Sign(_ context.Context, _ *providerpb.SignRequest) (*prov
 func (s *stubProvider) Verify(_ context.Context, _ *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
 	return nil, errors.New(context.Background(), "stub.Verify", errors.CodeNotImplemented, "stub")
 }
-func (s *stubProvider) DigestSign(_ context.Context, _ *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	return nil, errors.New(context.Background(), "stub.DigestSign", errors.CodeNotImplemented, "stub")
+func (s *stubProvider) SignDigest(_ context.Context, _ *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error) {
+	return nil, errors.New(context.Background(), "stub.SignDigest", errors.CodeNotImplemented, "stub")
 }
-func (s *stubProvider) DigestVerify(_ context.Context, _ *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	return nil, errors.New(context.Background(), "stub.DigestVerify", errors.CodeNotImplemented, "stub")
+func (s *stubProvider) VerifyDigest(_ context.Context, _ *providerpb.VerifyDigestRequest) (*providerpb.VerifyDigestResponse, error) {
+	return nil, errors.New(context.Background(), "stub.VerifyDigest", errors.CodeNotImplemented, "stub")
 }
 func (s *stubProvider) Encrypt(_ context.Context, _ *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
 	return nil, errors.New(context.Background(), "stub.Encrypt", errors.CodeNotImplemented, "stub")

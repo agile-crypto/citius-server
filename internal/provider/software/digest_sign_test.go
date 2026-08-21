@@ -11,94 +11,94 @@ import (
 )
 
 // ============================================================================
-// DigestSign / DigestVerify — AlgorithmDetails Dispatch
+// SignDigest / VerifyDigest — AlgorithmDetails Dispatch
 // ============================================================================
 
-func TestDigestSign_ECDSA_P256_happyPath(t *testing.T) {
+func TestSignDigest_ECDSA_P256_happyPath(t *testing.T) {
 	p, keyMaterial := genECDSAKey(t)
 	digest := sha256.Sum256([]byte("pre-hashed by the caller"))
 
-	result, err := p.DigestSign(context.Background(), &providerpb.DigestSignRequest{
+	result, err := p.SignDigest(context.Background(), &providerpb.SignDigestRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(),
 		Digest:      digest[:],
 		Algorithm:   ecdsaP256Details(),
 	})
 	if err != nil {
-		t.Fatalf("DigestSign: %v", err)
+		t.Fatalf("SignDigest: %v", err)
 	}
 	if len(result.GetSignature()) == 0 {
 		t.Error("expected non-empty signature")
 	}
 }
 
-func TestDigestSign_DigestVerify_roundtrip(t *testing.T) {
+func TestSignDigest_VerifyDigest_roundtrip(t *testing.T) {
 	p, keyMaterial := genECDSAKey(t)
 	ctx := context.Background()
 	digest := sha256.Sum256([]byte("round-trip payload"))
 
-	signResult, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{
+	signResult, err := p.SignDigest(ctx, &providerpb.SignDigestRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(),
 		Digest:      digest[:],
 		Algorithm:   ecdsaP256Details(),
 	})
 	if err != nil {
-		t.Fatalf("DigestSign: %v", err)
+		t.Fatalf("SignDigest: %v", err)
 	}
 
-	verifyResult, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{
+	verifyResult, err := p.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{
 		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
 		Digest:      digest[:],
 		Signature:   signResult.GetSignature(),
 		Algorithm:   ecdsaP256Details(),
 	})
 	if err != nil {
-		t.Fatalf("DigestVerify: %v", err)
+		t.Fatalf("VerifyDigest: %v", err)
 	}
 	if !verifyResult.GetValid() {
 		t.Error("expected valid=true for a correctly round-tripped digest signature")
 	}
 }
 
-func TestDigestSign_MLDSA_returnsInvalidArgument(t *testing.T) {
-	// Pure ML-DSA is not prehashable — DigestSign must reject it with a
+func TestSignDigest_MLDSA_returnsInvalidArgument(t *testing.T) {
+	// Pure ML-DSA is not prehashable — SignDigest must reject it with a
 	// specific, explanatory error, not the generic "unsupported type" message
 	// a truly unrecognized algorithm would get.
-	_, err := software.New().DigestSign(context.Background(), &providerpb.DigestSignRequest{
+	_, err := software.New().SignDigest(context.Background(), &providerpb.SignDigestRequest{
 		KeyMaterial: []byte("fake-key"),
 		Digest:      []byte("fake-digest"),
 		Algorithm:   mlDSA65Details(),
 	})
 	if err == nil {
-		t.Fatal("expected error for ML-DSA DigestSign")
+		t.Fatal("expected error for ML-DSA SignDigest")
 	}
 	if !errors.IsInvalidArgument(err) {
 		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }
 
-func TestDigestVerify_MLDSA_returnsInvalidArgument(t *testing.T) {
-	_, err := software.New().DigestVerify(context.Background(), &providerpb.DigestVerifyRequest{
+func TestVerifyDigest_MLDSA_returnsInvalidArgument(t *testing.T) {
+	_, err := software.New().VerifyDigest(context.Background(), &providerpb.VerifyDigestRequest{
 		KeyMaterial: []byte("fake-key"),
 		Digest:      []byte("fake-digest"),
 		Signature:   []byte("fake-sig"),
 		Algorithm:   mlDSA65Details(),
 	})
 	if err == nil {
-		t.Fatal("expected error for ML-DSA DigestVerify")
+		t.Fatal("expected error for ML-DSA VerifyDigest")
 	}
 	if !errors.IsInvalidArgument(err) {
 		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }
 
-// TestDigestSign_unsetAlgorithm_returnsInvalidArgument proves an unset
+// TestSignDigest_unsetAlgorithm_returnsInvalidArgument proves an unset
 // algorithm is rejected. protovalidate (wired into every software.Provider
 // method) now catches this via AlgorithmDetails' required=true constraint
 // before dispatch reaches the switch's default case, so the error is
 // CodeInvalidArgument rather than the CodeNotImplemented the default case
 // itself would return.
-func TestDigestSign_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
-	_, err := software.New().DigestSign(context.Background(), &providerpb.DigestSignRequest{
+func TestSignDigest_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
+	_, err := software.New().SignDigest(context.Background(), &providerpb.SignDigestRequest{
 		KeyMaterial: []byte("fake-key"),
 		Digest:      []byte("fake-digest"),
 	})
@@ -110,10 +110,10 @@ func TestDigestSign_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
 	}
 }
 
-// TestDigestVerify_unsetAlgorithm_returnsInvalidArgument is the DigestVerify
-// analogue of TestDigestSign_unsetAlgorithm_returnsInvalidArgument.
-func TestDigestVerify_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
-	_, err := software.New().DigestVerify(context.Background(), &providerpb.DigestVerifyRequest{
+// TestVerifyDigest_unsetAlgorithm_returnsInvalidArgument is the VerifyDigest
+// analogue of TestSignDigest_unsetAlgorithm_returnsInvalidArgument.
+func TestVerifyDigest_unsetAlgorithm_returnsInvalidArgument(t *testing.T) {
+	_, err := software.New().VerifyDigest(context.Background(), &providerpb.VerifyDigestRequest{
 		KeyMaterial: []byte("fake-key"),
 		Digest:      []byte("fake-digest"),
 		Signature:   []byte("fake-sig"),

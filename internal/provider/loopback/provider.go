@@ -72,14 +72,14 @@ func (p *Provider) Verify(_ context.Context, req *providerpb.VerifyRequest) (*pr
 	}, nil
 }
 
-// DigestSign echoes the digest as the "signature" (loopback invariant).
-func (p *Provider) DigestSign(_ context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	return &providerpb.DigestSignResponse{Signature: req.GetDigest(), Output: provider.NoOutput("raw")}, nil
+// SignDigest echoes the digest as the "signature" (loopback invariant).
+func (p *Provider) SignDigest(_ context.Context, req *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error) {
+	return &providerpb.SignDigestResponse{Signature: req.GetDigest(), Output: provider.NoOutput("raw")}, nil
 }
 
-// DigestVerify returns valid=true when signature == digest (loopback invariant).
-func (p *Provider) DigestVerify(_ context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	return &providerpb.DigestVerifyResponse{
+// VerifyDigest returns valid=true when signature == digest (loopback invariant).
+func (p *Provider) VerifyDigest(_ context.Context, req *providerpb.VerifyDigestRequest) (*providerpb.VerifyDigestResponse, error) {
+	return &providerpb.VerifyDigestResponse{
 		Valid:  bytes.Equal(req.GetSignature(), req.GetDigest()),
 		Output: provider.NoOutputUnencoded(),
 	}, nil

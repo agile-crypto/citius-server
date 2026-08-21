@@ -18,14 +18,14 @@ import (
 )
 
 // capturingSigner wraps the real software provider, recording the last
-// SignRequest/DigestSignRequest/EncryptRequest/DecryptRequest it receives —
+// SignRequest/SignDigestRequest/EncryptRequest/DecryptRequest it receives —
 // including fields (like key_material_encoding) — so tests can verify
 // exactly what the orchestrator sends without depending on provider behavior
 // that hasn't been wired up.
 type capturingSigner struct {
 	*software.Provider
 	lastSignRequest       *providerpb.SignRequest
-	lastDigestSignRequest *providerpb.DigestSignRequest
+	lastSignDigestRequest *providerpb.SignDigestRequest
 	lastEncryptRequest    *providerpb.EncryptRequest
 	lastDecryptRequest    *providerpb.DecryptRequest
 }
@@ -35,9 +35,9 @@ func (c *capturingSigner) Sign(ctx context.Context, req *providerpb.SignRequest)
 	return c.Provider.Sign(ctx, req)
 }
 
-func (c *capturingSigner) DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	c.lastDigestSignRequest = req
-	return c.Provider.DigestSign(ctx, req)
+func (c *capturingSigner) SignDigest(ctx context.Context, req *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error) {
+	c.lastSignDigestRequest = req
+	return c.Provider.SignDigest(ctx, req)
 }
 
 func (c *capturingSigner) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
@@ -181,12 +181,12 @@ func TestDigestSign_threadsKeyEncodingFromStoredGenerateKeyResponse(t *testing.T
 		t.Fatalf("DigestSign: %v", err)
 	}
 
-	if sig.lastDigestSignRequest == nil {
-		t.Fatal("provider never received a DigestSignRequest")
+	if sig.lastSignDigestRequest == nil {
+		t.Fatal("provider never received a SignDigestRequest")
 	}
 	want := providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
-	if got := sig.lastDigestSignRequest.GetKeyMaterialEncoding(); got != want {
-		t.Errorf("DigestSignRequest.key_material_encoding = %s, want %s — GenerateKeyResponse encoding was not threaded through", got, want)
+	if got := sig.lastSignDigestRequest.GetKeyMaterialEncoding(); got != want {
+		t.Errorf("SignDigestRequest.key_material_encoding = %s, want %s — GenerateKeyResponse encoding was not threaded through", got, want)
 	}
 }
 

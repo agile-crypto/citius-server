@@ -87,26 +87,26 @@ func applySignScopeParams(req crypto.SignRequest, provReq *providerpb.SignReques
 }
 
 // applyDigestSignScopeParams copies the caller's scope_params oneof into provReq.
-func applyDigestSignScopeParams(req crypto.DigestSignRequest, provReq *providerpb.DigestSignRequest) {
+func applyDigestSignScopeParams(req crypto.DigestSignRequest, provReq *providerpb.SignDigestRequest) {
 	switch {
 	case req.NoContext != nil:
-		provReq.ScopeParams = &providerpb.DigestSignRequest_NoContext{NoContext: req.NoContext}
+		provReq.ScopeParams = &providerpb.SignDigestRequest_NoContext{NoContext: req.NoContext}
 	case req.DomainContext != nil:
-		provReq.ScopeParams = &providerpb.DigestSignRequest_DomainContext{DomainContext: req.DomainContext}
+		provReq.ScopeParams = &providerpb.SignDigestRequest_DomainContext{DomainContext: req.DomainContext}
 	case req.VendorContext != nil:
-		provReq.ScopeParams = &providerpb.DigestSignRequest_VendorContext{VendorContext: req.VendorContext}
+		provReq.ScopeParams = &providerpb.SignDigestRequest_VendorContext{VendorContext: req.VendorContext}
 	}
 }
 
 // applyDigestVerifyScopeParams copies the caller's scope_params oneof into provReq.
-func applyDigestVerifyScopeParams(req crypto.DigestVerifyRequest, provReq *providerpb.DigestVerifyRequest) {
+func applyDigestVerifyScopeParams(req crypto.DigestVerifyRequest, provReq *providerpb.VerifyDigestRequest) {
 	switch {
 	case req.NoContext != nil:
-		provReq.ScopeParams = &providerpb.DigestVerifyRequest_NoContext{NoContext: req.NoContext}
+		provReq.ScopeParams = &providerpb.VerifyDigestRequest_NoContext{NoContext: req.NoContext}
 	case req.DomainContext != nil:
-		provReq.ScopeParams = &providerpb.DigestVerifyRequest_DomainContext{DomainContext: req.DomainContext}
+		provReq.ScopeParams = &providerpb.VerifyDigestRequest_DomainContext{DomainContext: req.DomainContext}
 	case req.VendorContext != nil:
-		provReq.ScopeParams = &providerpb.DigestVerifyRequest_VendorContext{VendorContext: req.VendorContext}
+		provReq.ScopeParams = &providerpb.VerifyDigestRequest_VendorContext{VendorContext: req.VendorContext}
 	}
 }
 
@@ -403,9 +403,9 @@ func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSi
 		return crypto.SignResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 7. Build provider-level DigestSignRequest with scope_params oneof.
+	// 7. Build provider-level SignDigestRequest with scope_params oneof.
 	// KeyMaterialEncoding carries the private key's stored encoding — see Sign.
-	provReq := &providerpb.DigestSignRequest{
+	provReq := &providerpb.SignDigestRequest{
 		KeyMaterial:         genResp.GetKeyMaterial(),
 		Digest:              req.Digest,
 		HashAlgorithm:       req.HashAlgorithm,
@@ -437,14 +437,14 @@ func (o *cryptoOrchestrator) DigestSign(ctx context.Context, req crypto.DigestSi
 	}, nil
 }
 
-// callDigestSignerAndValidate calls the provider's DigestSign and enforces
+// callDigestSignerAndValidate calls the provider's SignDigest and enforces
 // the ProviderOutput contract (an unset algorithm_output is a provider bug,
 // not a caller error).  Extracted for symmetry with callDigestVerifierAndValidate
 // — DigestSign and DigestVerify are mirror-image operations, so both follow
 // the same call-provider-then-validate shape even though DigestSign alone
 // stays under the cyclomatic complexity limit inline.
-func callDigestSignerAndValidate(ctx context.Context, op errors.Op, signer provider.Signer, provReq *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	digestSignResp, err := signer.DigestSign(ctx, provReq)
+func callDigestSignerAndValidate(ctx context.Context, op errors.Op, signer provider.Signer, provReq *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error) {
+	digestSignResp, err := signer.SignDigest(ctx, provReq)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
@@ -516,10 +516,10 @@ func (o *cryptoOrchestrator) DigestVerify(ctx context.Context, req crypto.Digest
 		return crypto.VerifyResult{}, errors.Wrap(ctx, op, err)
 	}
 
-	// 6. Build provider-level DigestVerifyRequest with scope_params oneof.
+	// 6. Build provider-level VerifyDigestRequest with scope_params oneof.
 	//    DigestVerify receives the public key bytes, not the private key material.
 	// KeyMaterialEncoding here is the PUBLIC key's encoding — see Verify.
-	provReq := &providerpb.DigestVerifyRequest{
+	provReq := &providerpb.VerifyDigestRequest{
 		KeyMaterial:         genResp.GetPublicKeyBytes(),
 		Digest:              req.Digest,
 		Signature:           req.Signature,
@@ -552,11 +552,11 @@ func (o *cryptoOrchestrator) DigestVerify(ctx context.Context, req crypto.Digest
 	}, nil
 }
 
-// callDigestVerifierAndValidate calls the provider's DigestVerify and
+// callDigestVerifierAndValidate calls the provider's VerifyDigest and
 // enforces the ProviderOutput contract.  Extracted from DigestVerify to keep
 // cyclomatic complexity within linter limits (mirrors callVerifierAndValidate).
-func callDigestVerifierAndValidate(ctx context.Context, op errors.Op, verifier provider.Signer, provReq *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	digestVerifyResp, err := verifier.DigestVerify(ctx, provReq)
+func callDigestVerifierAndValidate(ctx context.Context, op errors.Op, verifier provider.Signer, provReq *providerpb.VerifyDigestRequest) (*providerpb.VerifyDigestResponse, error) {
+	digestVerifyResp, err := verifier.VerifyDigest(ctx, provReq)
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}

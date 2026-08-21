@@ -210,58 +210,58 @@ func TestSign_ECDSA_P384_hashBelowMinimum_returnsError(t *testing.T) {
 	}
 }
 
-func TestDigestSignVerify_ECDSA_P384_roundTrip(t *testing.T) {
+func TestSignVerifyDigest_ECDSA_P384_roundTrip(t *testing.T) {
 	alg := ecdsaDetails(types.EllipticCurve_ELLIPTIC_CURVE_P384, types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED)
 	p, keyMaterial := genECDSAKeyWithAlgorithm(t, alg)
 	ctx := context.Background()
 	digest := sha512.Sum384([]byte("pre-hashed by the caller"))
 
-	signResp, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{
+	signResp, err := p.SignDigest(ctx, &providerpb.SignDigestRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(),
 		Digest:      digest[:],
 		Algorithm:   alg,
 	})
 	if err != nil {
-		t.Fatalf("DigestSign: %v", err)
+		t.Fatalf("SignDigest: %v", err)
 	}
 
-	verifyResp, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{
+	verifyResp, err := p.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{
 		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
 		Digest:      digest[:],
 		Signature:   signResp.GetSignature(),
 		Algorithm:   alg,
 	})
 	if err != nil {
-		t.Fatalf("DigestVerify: %v", err)
+		t.Fatalf("VerifyDigest: %v", err)
 	}
 	if !verifyResp.GetValid() {
 		t.Error("expected valid=true")
 	}
 }
 
-func TestDigestSignVerify_ECDSA_P521_roundTrip(t *testing.T) {
+func TestSignVerifyDigest_ECDSA_P521_roundTrip(t *testing.T) {
 	alg := ecdsaDetails(types.EllipticCurve_ELLIPTIC_CURVE_P521, types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED)
 	p, keyMaterial := genECDSAKeyWithAlgorithm(t, alg)
 	ctx := context.Background()
 	digest := sha512.Sum512([]byte("pre-hashed by the caller"))
 
-	signResp, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{
+	signResp, err := p.SignDigest(ctx, &providerpb.SignDigestRequest{
 		KeyMaterial: keyMaterial.GetKeyMaterial(),
 		Digest:      digest[:],
 		Algorithm:   alg,
 	})
 	if err != nil {
-		t.Fatalf("DigestSign: %v", err)
+		t.Fatalf("SignDigest: %v", err)
 	}
 
-	verifyResp, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{
+	verifyResp, err := p.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{
 		KeyMaterial: keyMaterial.GetPublicKeyBytes(),
 		Digest:      digest[:],
 		Signature:   signResp.GetSignature(),
 		Algorithm:   alg,
 	})
 	if err != nil {
-		t.Fatalf("DigestVerify: %v", err)
+		t.Fatalf("VerifyDigest: %v", err)
 	}
 	if !verifyResp.GetValid() {
 		t.Error("expected valid=true")

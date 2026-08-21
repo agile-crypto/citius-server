@@ -59,24 +59,24 @@ func TestSign_ECDSA_explicitEncodingMismatch_returnsError(t *testing.T) {
 	}
 }
 
-func TestDigestSign_ECDSA_explicitSEC1Encoding_succeeds(t *testing.T) {
+func TestSignDigest_ECDSA_explicitSEC1Encoding_succeeds(t *testing.T) {
 	p, keyMaterial := genECDSAKey(t)
 
-	_, err := p.DigestSign(context.Background(), &providerpb.DigestSignRequest{
+	_, err := p.SignDigest(context.Background(), &providerpb.SignDigestRequest{
 		KeyMaterial:         keyMaterial.GetKeyMaterial(),
 		Digest:              make([]byte, 32),
 		Algorithm:           ecdsaP256Details(),
 		KeyMaterialEncoding: providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1,
 	})
 	if err != nil {
-		t.Fatalf("DigestSign with explicit sec1 encoding: %v", err)
+		t.Fatalf("SignDigest with explicit sec1 encoding: %v", err)
 	}
 }
 
-func TestDigestSign_ECDSA_explicitEncodingMismatch_returnsError(t *testing.T) {
+func TestSignDigest_ECDSA_explicitEncodingMismatch_returnsError(t *testing.T) {
 	p, keyMaterial := genECDSAKey(t)
 
-	_, err := p.DigestSign(context.Background(), &providerpb.DigestSignRequest{
+	_, err := p.SignDigest(context.Background(), &providerpb.SignDigestRequest{
 		KeyMaterial:         keyMaterial.GetKeyMaterial(),
 		Digest:              make([]byte, 32),
 		Algorithm:           ecdsaP256Details(),

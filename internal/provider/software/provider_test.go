@@ -139,11 +139,11 @@ func TestProvider_SupportedAlgorithms_everyEntryMatchesCatalogAndDispatches(t *t
 			case *api.AlgorithmDetails_Ed25519:
 				// Ed25519ph is the one signature variant Sign/Verify
 				// rejects outright (signEd25519 requires the pure/ctx
-				// variants) — it is only reachable via DigestSign/
-				// DigestVerify with a real SHA-512 digest, see
+				// variants) — it is only reachable via SignDigest/
+				// VerifyDigest with a real SHA-512 digest, see
 				// checkEd25519PHHash.
 				if a.Ed25519.GetVariant() == api.Ed25519Variant_ED25519_VARIANT_PH {
-					assertDigestSignVerifyRoundTrip(t, p, genResp, alg)
+					assertSignVerifyDigestRoundTrip(t, p, genResp, alg)
 				} else {
 					assertSignVerifyRoundTrip(t, p, genResp, alg)
 				}
@@ -195,16 +195,16 @@ func assertSignVerifyRoundTrip(t *testing.T, p *software.Provider, genResp *prov
 	}
 }
 
-// assertDigestSignVerifyRoundTrip is assertSignVerifyRoundTrip's DigestSign/
-// DigestVerify analogue, for the one signature variant (Ed25519ph) that
+// assertSignVerifyDigestRoundTrip is assertSignVerifyRoundTrip's SignDigest/
+// VerifyDigest analogue, for the one signature variant (Ed25519ph) that
 // Sign/Verify rejects outright — see checkEd25519PHHash, which requires a
 // real SHA-512 digest, not an arbitrary byte string.
-func assertDigestSignVerifyRoundTrip(t *testing.T, p *software.Provider, genResp *providerpb.GenerateKeyResponse, alg *api.AlgorithmDetails) {
+func assertSignVerifyDigestRoundTrip(t *testing.T, p *software.Provider, genResp *providerpb.GenerateKeyResponse, alg *api.AlgorithmDetails) {
 	t.Helper()
 	ctx := context.Background()
 	digest := sha512.Sum512([]byte("dispatch-arm coverage payload"))
 
-	signResp, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{
+	signResp, err := p.SignDigest(ctx, &providerpb.SignDigestRequest{
 		KeyMaterial:         genResp.GetKeyMaterial(),
 		Digest:              digest[:],
 		HashAlgorithm:       api.HashAlgorithm_HASH_ALGORITHM_SHA512,
@@ -212,10 +212,10 @@ func assertDigestSignVerifyRoundTrip(t *testing.T, p *software.Provider, genResp
 		KeyMaterialEncoding: genResp.GetKeyMaterialEncoding(),
 	})
 	if err != nil {
-		t.Fatalf("DigestSign: %v", err)
+		t.Fatalf("SignDigest: %v", err)
 	}
 
-	verifyResp, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{
+	verifyResp, err := p.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{
 		KeyMaterial:   genResp.GetPublicKeyBytes(),
 		Digest:        digest[:],
 		HashAlgorithm: api.HashAlgorithm_HASH_ALGORITHM_SHA512,
@@ -223,10 +223,10 @@ func assertDigestSignVerifyRoundTrip(t *testing.T, p *software.Provider, genResp
 		Algorithm:     alg,
 	})
 	if err != nil {
-		t.Fatalf("DigestVerify: %v", err)
+		t.Fatalf("VerifyDigest: %v", err)
 	}
 	if !verifyResp.GetValid() {
-		t.Error("DigestVerify: expected valid=true for a signature just produced by DigestSign")
+		t.Error("VerifyDigest: expected valid=true for a signature just produced by SignDigest")
 	}
 }
 

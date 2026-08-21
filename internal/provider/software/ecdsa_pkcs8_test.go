@@ -52,30 +52,30 @@ func TestSign_ECDSA_acceptsPKCS8EncodedKeyMaterial(t *testing.T) {
 	}
 }
 
-func TestDigestSign_ECDSA_acceptsPKCS8EncodedKeyMaterial(t *testing.T) {
+func TestSignDigest_ECDSA_acceptsPKCS8EncodedKeyMaterial(t *testing.T) {
 	pkcs8DER, pkixDER := genECDSAPKCS8Key(t)
 
 	p := software.New()
 	ctx := context.Background()
 	digest := sha256.Sum256([]byte("pre-hashed by the caller"))
 
-	signResp, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{
+	signResp, err := p.SignDigest(ctx, &providerpb.SignDigestRequest{
 		KeyMaterial: pkcs8DER,
 		Digest:      digest[:],
 		Algorithm:   ecdsaP256Details(),
 	})
 	if err != nil {
-		t.Fatalf("DigestSign with PKCS#8 key: %v", err)
+		t.Fatalf("SignDigest with PKCS#8 key: %v", err)
 	}
 
-	verifyResp, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{
+	verifyResp, err := p.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{
 		KeyMaterial: pkixDER,
 		Digest:      digest[:],
 		Signature:   signResp.GetSignature(),
 		Algorithm:   ecdsaP256Details(),
 	})
 	if err != nil {
-		t.Fatalf("DigestVerify: %v", err)
+		t.Fatalf("VerifyDigest: %v", err)
 	}
 	if !verifyResp.GetValid() {
 		t.Error("expected valid=true for a digest signature produced from a PKCS#8-encoded key")

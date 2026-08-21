@@ -212,7 +212,7 @@ func TestSign_Ed25519_ctxVariant_returnsError(t *testing.T) {
 }
 
 // TestSign_Ed25519_phVariant_returnsError proves Ed25519ph is rejected
-// through the plain Sign path — it is only reachable via DigestSign, since
+// through the plain Sign path — it is only reachable via SignDigest, since
 // the entire point of a prehashed variant is that the caller hashes first.
 func TestSign_Ed25519_phVariant_returnsError(t *testing.T) {
 	phAlg := &types.AlgorithmDetails{

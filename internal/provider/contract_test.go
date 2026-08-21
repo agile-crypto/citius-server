@@ -43,10 +43,10 @@ func assertBackendAlwaysSetsOutput(t *testing.T, backend provider.Backend) {
 
 	// ECDSA-P256 is supported by every registered provider today, and
 	// supports all four Signer methods uniformly (unlike ML-DSA and pure
-	// Ed25519, which reject DigestSign/DigestVerify outright since they are
+	// Ed25519, which reject SignDigest/VerifyDigest outright since they are
 	// not prehashable — see additionalSignVerifyOnlyAlgorithms below), so it
 	// is the one algorithm exercised through the full Sign/Verify/
-	// DigestSign/DigestVerify surface.
+	// SignDigest/VerifyDigest surface.
 	algo := &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_Ecdsa{
 			Ecdsa: &types.EcdsaParams{
@@ -109,7 +109,7 @@ func assertBackendAlwaysSetsOutput(t *testing.T, backend provider.Backend) {
 
 // assertSignVerifyAlwaysSetsOutput checks only Sign/Verify — the two
 // methods every signature algorithm in this provider supports, unlike
-// DigestSign/DigestVerify which ML-DSA and pure Ed25519 reject outright
+// SignDigest/VerifyDigest which ML-DSA and pure Ed25519 reject outright
 // (not prehashable). Extracted from assertSignerAlwaysSetsOutput so the
 // additional-algorithm loop in assertBackendAlwaysSetsOutput can reuse it
 // without needing to know which algorithms support prehashing.
@@ -183,26 +183,26 @@ func assertSignerAlwaysSetsOutput(t *testing.T, ctx context.Context, signer prov
 	// contract, not digest-length validation, so any digest length works.
 	digest := []byte("arbitrary-length-pre-hashed-digest")
 
-	digestSignResp, err := signer.DigestSign(ctx, &providerpb.DigestSignRequest{
+	digestSignResp, err := signer.SignDigest(ctx, &providerpb.SignDigestRequest{
 		KeyMaterial: genResp.GetKeyMaterial(),
 		Digest:      digest,
 		Algorithm:   algo,
 	})
 	if err != nil {
-		t.Fatalf("DigestSign: %v", err)
+		t.Fatalf("SignDigest: %v", err)
 	}
-	requireAlgorithmOutput(t, "DigestSign", digestSignResp.GetOutput())
+	requireAlgorithmOutput(t, "SignDigest", digestSignResp.GetOutput())
 
-	digestVerifyResp, err := signer.DigestVerify(ctx, &providerpb.DigestVerifyRequest{
+	digestVerifyResp, err := signer.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{
 		KeyMaterial: genResp.GetPublicKeyBytes(),
 		Digest:      digest,
 		Signature:   digestSignResp.GetSignature(),
 		Algorithm:   algo,
 	})
 	if err != nil {
-		t.Fatalf("DigestVerify: %v", err)
+		t.Fatalf("VerifyDigest: %v", err)
 	}
-	requireAlgorithmOutput(t, "DigestVerify", digestVerifyResp.GetOutput())
+	requireAlgorithmOutput(t, "VerifyDigest", digestVerifyResp.GetOutput())
 }
 
 func assertCipherAlwaysSetsOutput(t *testing.T, ctx context.Context, cipher provider.Cipher, algo *types.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {

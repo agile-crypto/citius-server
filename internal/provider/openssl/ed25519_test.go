@@ -189,7 +189,7 @@ func TestSign_Ed25519_verifiesWithSoftware(t *testing.T) {
 }
 
 // TestSign_Ed25519ph_verifiesWithOsslGo is Ed25519ph's sign-side cross-check.
-// software only reaches ph through DigestVerify with a caller-supplied
+// software only reaches ph through VerifyDigest with a caller-supplied
 // pre-hashed digest -- a different code path with its own hashing
 // convention, not software's regular Verify -- so rather than risk getting
 // that convention subtly wrong, this verifies with ossl-go's own Key.Verify

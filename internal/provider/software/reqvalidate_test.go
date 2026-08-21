@@ -37,12 +37,12 @@ func TestProviderMethods_rejectRequestsViolatingCELConstraints(t *testing.T) {
 			_, err := p.Verify(ctx, &providerpb.VerifyRequest{Input: []byte("payload"), Signature: []byte("sig")})
 			return err
 		}},
-		{"DigestSign", func() error {
-			_, err := p.DigestSign(ctx, &providerpb.DigestSignRequest{Digest: []byte("digest")})
+		{"SignDigest", func() error {
+			_, err := p.SignDigest(ctx, &providerpb.SignDigestRequest{Digest: []byte("digest")})
 			return err
 		}},
-		{"DigestVerify", func() error {
-			_, err := p.DigestVerify(ctx, &providerpb.DigestVerifyRequest{Digest: []byte("digest"), Signature: []byte("sig")})
+		{"VerifyDigest", func() error {
+			_, err := p.VerifyDigest(ctx, &providerpb.VerifyDigestRequest{Digest: []byte("digest"), Signature: []byte("sig")})
 			return err
 		}},
 		{"Encrypt", func() error {

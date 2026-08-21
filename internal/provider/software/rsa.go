@@ -261,10 +261,10 @@ func verifyRSAPSS(ctx context.Context, pubDER, payload, signature []byte, keyEnc
 }
 
 // signRSAPSSDigest signs a pre-computed digest directly, without hashing.
-// Used by DigestSign, where the caller has already hashed the message.
+// Used by SignDigest, where the caller has already hashed the message.
 //
 // Unlike signRSAPSS, the hash algorithm comes from hashAlg (the request's
-// declared digest origin, DigestSignRequest.hash_algorithm) rather than
+// declared digest origin, SignDigestRequest.hash_algorithm) rather than
 // params.GetHash(): the prehashed catalog templates (rsa-pss-*-prehashed)
 // leave RsaPssParams.hash unset, since a single prehashed template accepts
 // digests produced under any hash the caller declares — the digest bytes
@@ -275,7 +275,7 @@ func signRSAPSSDigest(ctx context.Context, privDER, digest []byte, keyEncoding p
 }
 
 // verifyRSAPSSDigest verifies a signature over a pre-computed digest
-// directly, without hashing.  Used by DigestVerify; see signRSAPSSDigest for
+// directly, without hashing.  Used by VerifyDigest; see signRSAPSSDigest for
 // why hashAlg (not params.GetHash()) selects the hash algorithm.
 func verifyRSAPSSDigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPssParams) (bool, error) {
 	const op errors.Op = "software.verifyRSAPSSDigest"

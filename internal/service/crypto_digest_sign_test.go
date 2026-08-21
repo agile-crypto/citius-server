@@ -47,7 +47,7 @@ func seedDigestSignPolicy(t *testing.T, ctx context.Context, pol policy.Engine) 
 // ecdsa-p256-sha256-der, creates a key, and returns the CryptoOrchestrator
 // and the key's name.
 //
-// ECDSA is used (not ML-DSA) because the software provider's DigestSign is
+// ECDSA is used (not ML-DSA) because the software provider's SignDigest is
 // currently hard-coded to ECDSA-P256 only — the AlgorithmDetails-based
 // dispatch is a later change.
 func setupDigestSignWithKey(t *testing.T) (CryptoOrchestrator, string) {

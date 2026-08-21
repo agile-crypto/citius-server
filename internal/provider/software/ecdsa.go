@@ -253,7 +253,7 @@ func signECDSA(ctx context.Context, privDER, payload []byte, keyEncoding provide
 }
 
 // signECDSADigest signs a pre-computed digest directly, without hashing.
-// Used by DigestSign where the caller has already computed the digest.
+// Used by SignDigest where the caller has already computed the digest.
 func signECDSADigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve, format types.SignatureFormat) ([]byte, error) {
 	const op errors.Op = "software.signECDSADigest"
 
@@ -303,7 +303,7 @@ func verifyECDSA(ctx context.Context, pubDER, payload, signature []byte, keyEnco
 }
 
 // verifyECDSADigest verifies a signature over a pre-computed digest directly,
-// without hashing.  Used by DigestVerify.
+// without hashing.  Used by VerifyDigest.
 func verifyECDSADigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, format types.SignatureFormat) (bool, error) {
 	const op errors.Op = "software.verifyECDSADigest"
 

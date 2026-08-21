@@ -16,7 +16,7 @@
 // orchestrator type-asserts the capability it needs and returns
 // CodeNotImplemented when the provider lacks it:
 //
-//	Signer          => CryptoService.Sign / Verify / DigestSign / DigestVerify
+//	Signer          => CryptoService.Sign / Verify / SignDigest / VerifyDigest
 //	Cipher          => CryptoService.Encrypt / Decrypt
 //	Macer           => CryptoService.GenerateMac / VerifyMac
 //	Hasher          => CryptoService.Digest / Xof
@@ -63,12 +63,17 @@ type Backend interface {
 }
 
 // Signer is an optional interface for providers that support signature
-// operations (CryptoService.Sign / Verify / DigestSign / DigestVerify).
+// operations (CryptoService.Sign / Verify / SignDigest / VerifyDigest).
+//
+// Sign takes a message and hashes it; SignDigest takes a digest the caller
+// already computed and signs it as-is. The qualifier names the input, not an
+// action performed on it — see SignDigestRequest in the provider proto for why
+// that convention is worth holding to against OpenSSL's opposite one.
 type Signer interface {
 	Sign(ctx context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error)
 	Verify(ctx context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error)
-	DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error)
-	DigestVerify(ctx context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error)
+	SignDigest(ctx context.Context, req *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error)
+	VerifyDigest(ctx context.Context, req *providerpb.VerifyDigestRequest) (*providerpb.VerifyDigestResponse, error)
 }
 
 // Cipher is an optional interface for providers that support encryption

@@ -83,8 +83,8 @@ func parseEd25519PublicKey(ctx context.Context, op errors.Op, pubDER []byte, enc
 
 // checkEd25519PureVariant rejects anything but the pure variant. Ed25519ctx
 // is not implemented at all; Ed25519ph is prehashed by definition and so is
-// never reachable through Sign/Verify — it has its own DigestSign/
-// DigestVerify path once implemented, exactly like every other prehashable
+// never reachable through Sign/Verify — it has its own SignDigest/
+// VerifyDigest path once implemented, exactly like every other prehashable
 // signature scheme in this provider.
 func checkEd25519PureVariant(ctx context.Context, op errors.Op, variant types.Ed25519Variant) error {
 	switch variant {
@@ -130,7 +130,7 @@ func verifyEd25519(ctx context.Context, pubDER, payload, signature []byte, keyEn
 	return ed25519.Verify(pubKey, payload, signature), nil
 }
 
-// checkEd25519PHHash validates that a DigestSign/DigestVerify call declares
+// checkEd25519PHHash validates that a SignDigest/VerifyDigest call declares
 // SHA-512 as the digest's origin hash. Unlike RSA's prehashed variants,
 // Ed25519ph is not generic over hash algorithm — RFC 8032 §5.1 defines
 // PH(x) = SHA-512(x), full stop, so there is no "Ed25519ph with SHA-384" or
@@ -148,7 +148,7 @@ func checkEd25519PHHash(ctx context.Context, op errors.Op, hashAlg types.HashAlg
 }
 
 // signEd25519PHDigest signs a pre-computed SHA-512 digest with Ed25519ph
-// (RFC 8032). Used by DigestSign, where the caller has already hashed the
+// (RFC 8032). Used by SignDigest, where the caller has already hashed the
 // message with SHA-512 — the mandatory hash for this variant.
 func signEd25519PHDigest(ctx context.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm) ([]byte, error) {
 	const op errors.Op = "software.signEd25519PHDigest"
@@ -168,7 +168,7 @@ func signEd25519PHDigest(ctx context.Context, privDER, digest []byte, keyEncodin
 }
 
 // verifyEd25519PHDigest verifies a signature over a pre-computed SHA-512
-// digest using Ed25519ph. Used by DigestVerify; see signEd25519PHDigest.
+// digest using Ed25519ph. Used by VerifyDigest; see signEd25519PHDigest.
 func verifyEd25519PHDigest(ctx context.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm) (bool, error) {
 	const op errors.Op = "software.verifyEd25519PHDigest"
 

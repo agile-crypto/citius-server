@@ -15,9 +15,9 @@ import (
 // leaving the field nil.
 //
 // Use this only when the operation PRODUCES a new serialized artifact whose
-// encoding a later consumer needs — Sign, DigestSign, Encrypt, GenerateKey,
+// encoding a later consumer needs — Sign, SignDigest, Encrypt, GenerateKey,
 // ExportPublicKey.  Operations that only check or consume an existing
-// artifact (Verify, DigestVerify, Decrypt) have nothing to encode; use
+// artifact (Verify, VerifyDigest, Decrypt) have nothing to encode; use
 // NoOutputUnencoded for those instead of guessing a value here.
 func NoOutput(encoding string) *metapb.ProviderOutput {
 	return &metapb.ProviderOutput{
@@ -32,8 +32,8 @@ func NoOutput(encoding string) *metapb.ProviderOutput {
 // encoding declared.
 //
 // encoding documents "how the cryptographic output (ciphertext, signature,
-// wrapped key) is serialized" (metadata.proto).  Verify, DigestVerify, and
-// Decrypt don't produce one of those — Verify/DigestVerify return a bool, and
+// wrapped key) is serialized" (metadata.proto).  Verify, VerifyDigest, and
+// Decrypt don't produce one of those — Verify/VerifyDigest return a bool, and
 // Decrypt's recovered plaintext is application data, not a serialized crypto
 // artifact.  The proto places no required/min_len constraint on encoding, so
 // leaving it empty is a valid, meaningful "not applicable" — not a value the

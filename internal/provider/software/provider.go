@@ -261,13 +261,13 @@ func validateDigestLength(ctx context.Context, op errors.Op, hashAlg types.HashA
 	return nil
 }
 
-// DigestSign signs a pre-computed digest — the provider does NOT hash.
+// SignDigest signs a pre-computed digest — the provider does NOT hash.
 // Dispatches on the typed AlgorithmDetails oneof, exactly like Sign; the
 // digest and key material alone cannot select the signature scheme (a single
 // RSA key is valid under both PSS and PKCS1v15), so hash_algorithm describes
 // only the digest's origin, never the algorithm to dispatch on.
-func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignRequest) (*providerpb.DigestSignResponse, error) {
-	const op errors.Op = "software.(Provider).DigestSign"
+func (p *Provider) SignDigest(ctx context.Context, req *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error) {
+	const op errors.Op = "software.(Provider).SignDigest"
 
 	if err := validateRequest(ctx, op, req); err != nil {
 		return nil, err
@@ -283,45 +283,45 @@ func (p *Provider) DigestSign(ctx context.Context, req *providerpb.DigestSignReq
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-			"DigestSign unsupported for ML-DSA: pure ML-DSA is not prehashable")
+			"SignDigest unsupported for ML-DSA: pure ML-DSA is not prehashable")
 	case *types.AlgorithmDetails_RsaPss:
 		sig, err := signRSAPSSDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
 			req.GetHashAlgorithm(), alg.RsaPss)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	case *types.AlgorithmDetails_RsaPkcs1V15:
 		sig, err := signRSAPKCS1v15Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
 			req.GetHashAlgorithm(), alg.RsaPkcs1V15)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	case *types.AlgorithmDetails_Ed25519:
 		if alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_UNSPECIFIED &&
 			alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_PH {
 			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-				"DigestSign requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
+				"SignDigest requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
 		}
 		sig, err := signEd25519PHDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(), req.GetHashAlgorithm())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestSignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for digest sign: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
 }
 
-// DigestVerify verifies a signature over a pre-computed digest.
+// VerifyDigest verifies a signature over a pre-computed digest.
 // Dispatches on the typed AlgorithmDetails oneof, exactly like Verify.
-func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerifyRequest) (*providerpb.DigestVerifyResponse, error) {
-	const op errors.Op = "software.(Provider).DigestVerify"
+func (p *Provider) VerifyDigest(ctx context.Context, req *providerpb.VerifyDigestRequest) (*providerpb.VerifyDigestResponse, error) {
+	const op errors.Op = "software.(Provider).VerifyDigest"
 
 	if err := validateRequest(ctx, op, req); err != nil {
 		return nil, err
@@ -337,36 +337,36 @@ func (p *Provider) DigestVerify(ctx context.Context, req *providerpb.DigestVerif
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 	case *types.AlgorithmDetails_MlDsa:
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-			"DigestVerify unsupported for ML-DSA: pure ML-DSA is not prehashable")
+			"VerifyDigest unsupported for ML-DSA: pure ML-DSA is not prehashable")
 	case *types.AlgorithmDetails_RsaPss:
 		valid, err := verifyRSAPSSDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
 			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPss)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 	case *types.AlgorithmDetails_RsaPkcs1V15:
 		valid, err := verifyRSAPKCS1v15Digest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
 			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPkcs1V15)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 	case *types.AlgorithmDetails_Ed25519:
 		if alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_UNSPECIFIED &&
 			alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_PH {
 			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-				"DigestVerify requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
+				"VerifyDigest requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
 		}
 		valid, err := verifyEd25519PHDigest(ctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
 			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return &providerpb.DigestVerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm for digest verify: %T", req.GetAlgorithm().GetAlgorithm()))

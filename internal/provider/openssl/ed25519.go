@@ -43,7 +43,7 @@ func generateEd25519Key(ctx context.Context, libctx *ossl.Context) (pubDER, priv
 // provider has no catalog entry for (software does not support it either —
 // see software's own SupportedAlgorithms doc comment). Pure and ph are both
 // genuinely supported here through the same Sign call, unlike software,
-// where ph requires the separate DigestSign entry point — see capability.go's
+// where ph requires the separate SignDigest entry point — see capability.go's
 // "ed25519ph" entry, verified directly to work end-to-end.
 func checkEd25519VariantSupported(ctx context.Context, op errors.Op, variant types.Ed25519Variant) error {
 	switch variant {

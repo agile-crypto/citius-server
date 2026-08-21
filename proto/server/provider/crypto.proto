@@ -19,7 +19,7 @@ import "server/provider/key_encoding.proto";
 // The core engine resolves the algorithm from the template — the provider
 // receives the raw message bytes and signs using the key material it holds.
 //
-// For pre-hashed input, use DigestSignRequest instead.
+// For pre-hashed input, use SignDigestRequest instead.
 //
 // PKCS #11 equivalent: C_Sign (single-part, message-level)
 message SignRequest {
@@ -103,13 +103,22 @@ message VerifyResponse {
   caas.crypto.v1.ProviderOutput output = 2;
 }
 
-// DigestSignRequest asks the provider to sign a pre-computed digest.
+// SignDigestRequest asks the provider to sign a pre-computed digest.
 //
 // Use when the caller has already hashed the message (prehash mode).
 // The provider applies the raw signature primitive (e.g., CKM_ECDSA, CKM_RSA_PKCS_PSS).
 //
 // PKCS #11 equivalent: C_Sign with pre-hashed data and CKM_ECDSA (no hash prefix)
-message DigestSignRequest {
+//
+// Named SignDigest, not DigestSign, and the distinction is not cosmetic: the
+// qualifier names the *input* this operation takes (a digest), not an action it
+// performs on the input. OpenSSL's EVP_DigestSign uses the opposite convention —
+// there the prefix names what the callee does, so EVP_DigestSign hashes the
+// message for you and EVP_PKEY_sign is the one that signs a digest as-is. A
+// provider backed by OpenSSL therefore implements SignDigest with EVP_PKEY_sign
+// and Sign with EVP_DigestSign; wiring them the other way round compiles, runs,
+// and silently signs a hash of the digest instead of the digest.
+message SignDigestRequest {
   bytes key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
 
   // The digest bytes — output of the hash algorithm below.
@@ -141,21 +150,21 @@ message DigestSignRequest {
   // from the key's bound template and always sets it.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
-  // How key_material is serialized — DigestSign uses the PRIVATE half, so
+  // How key_material is serialized — SignDigest uses the PRIVATE half, so
   // see SignRequest.key_material_encoding.
   PrivateKeyEncoding key_material_encoding = 10;
 }
 
-// DigestSignResponse contains the signature over the digest.
-message DigestSignResponse {
+// SignDigestResponse contains the signature over the digest.
+message SignDigestResponse {
   bytes signature = 1 [(buf.validate.field).bytes.min_len = 1];
   caas.crypto.v1.ProviderOutput output = 2;
 }
 
-// DigestVerifyRequest asks the provider to verify a signature over a pre-computed digest.
+// VerifyDigestRequest asks the provider to verify a signature over a pre-computed digest.
 //
 // PKCS #11 equivalent: C_Verify with pre-hashed data
-message DigestVerifyRequest {
+message VerifyDigestRequest {
   bytes  key_material = 1 [(buf.validate.field).bytes.min_len = 1];  // opaque key material
   bytes  digest       = 2 [(buf.validate.field).bytes.min_len = 1];
   bytes  signature    = 3 [(buf.validate.field).bytes.min_len = 1];
@@ -166,27 +175,27 @@ message DigestVerifyRequest {
     caas.crypto.v1.VendorSignatureContext   vendor_context = 6;
   }
 
-  // Must match the hash_algorithm from the corresponding DigestSignRequest.
+  // Must match the hash_algorithm from the corresponding SignDigestRequest.
   caas.crypto.v1.HashAlgorithm hash_algorithm = 7;
   string hash_algorithm_oid = 8;
 
   // Typed algorithm specification — must match the algorithm used during
-  // DigestSign.  REQUIRED — consumed by
+  // SignDigest.  REQUIRED — consumed by
   // service.(cryptoOrchestrator).DigestVerify, which resolves this from the
-  // key's bound template and always sets it (see DigestSignRequest.algorithm).
+  // key's bound template and always sets it (see SignDigestRequest.algorithm).
   caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
 
-  // Provider output captured during DigestSign — carries the signature
+  // Provider output captured during SignDigest — carries the signature
   // encoding (e.g. "der" vs "p1363").  Mirrors VerifyRequest.output.
   caas.crypto.v1.ProviderOutput output = 10;
 
-  // How key_material is serialized — DigestVerify uses the PUBLIC half, so
+  // How key_material is serialized — VerifyDigest uses the PUBLIC half, so
   // see VerifyRequest.key_material_encoding.
   PublicKeyEncoding key_material_encoding = 12;
 }
 
-// DigestVerifyResponse reports whether the digest signature is valid.
-message DigestVerifyResponse {
+// VerifyDigestResponse reports whether the digest signature is valid.
+message VerifyDigestResponse {
   bool valid = 1;
   caas.crypto.v1.ProviderOutput output = 2;
 }
@@ -417,8 +426,8 @@ service CryptoService {
   rpc Verify(VerifyRequest)           returns (VerifyResponse);
 
   // Pre-hashed signing (caller already computed digest).
-  rpc DigestSign(DigestSignRequest)   returns (DigestSignResponse);
-  rpc DigestVerify(DigestVerifyRequest) returns (DigestVerifyResponse);
+  rpc SignDigest(SignDigestRequest)   returns (SignDigestResponse);
+  rpc VerifyDigest(VerifyDigestRequest) returns (VerifyDigestResponse);
 
   // Encryption / Decryption (all scope families via oneof).
   rpc Encrypt(EncryptRequest)         returns (EncryptResponse);
