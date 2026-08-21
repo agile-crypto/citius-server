@@ -11,6 +11,7 @@ import (
 
 	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
@@ -32,6 +33,18 @@ func ecdsaP521Details() *types.AlgorithmDetails {
 			Ecdsa: &types.EcdsaParams{
 				Curve: types.EllipticCurve_ELLIPTIC_CURVE_P521,
 				Hash:  types.HashAlgorithm_HASH_ALGORITHM_SHA512,
+			},
+		},
+	}
+}
+
+func ecdsaP256P1363Details() *types.AlgorithmDetails {
+	return &types.AlgorithmDetails{
+		Algorithm: &types.AlgorithmDetails_Ecdsa{
+			Ecdsa: &types.EcdsaParams{
+				Curve:           types.EllipticCurve_ELLIPTIC_CURVE_P256,
+				Hash:            types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+				SignatureFormat: types.SignatureFormat_SIGNATURE_FORMAT_IEEE_P1363,
 			},
 		},
 	}
@@ -180,4 +193,137 @@ func TestGenerateKey_ECDSA_crossProviderInterop(t *testing.T) {
 		t.Fatalf("ossl-go ParseSPKIPublicKey could not parse software-generated SPKI material: %v", err)
 	}
 	defer pubKey.Close()
+}
+
+// TestSign_ECDSA_verifiesWithSoftware is the sign-side cross-check the plan
+// requires: sign with openssl, then verify with software's independent
+// implementation, over every advertised curve and both signature formats --
+// proving the signature is genuinely valid, not just that Sign returned
+// without an error.
+func TestSign_ECDSA_verifiesWithSoftware(t *testing.T) {
+	tests := []struct {
+		name string
+		alg  *types.AlgorithmDetails
+	}{
+		{"p256-der", ecdsaP256Details()},
+		{"p384-der", ecdsaP384Details()},
+		{"p521-der", ecdsaP521Details()},
+		{"p256-p1363", ecdsaP256P1363Details()},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			p, err := openssl.New(ctx)
+			if err != nil {
+				t.Fatalf("openssl.New: %v", err)
+			}
+			defer p.Close()
+
+			keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: tt.alg})
+			if err != nil {
+				t.Fatalf("GenerateKey: %v", err)
+			}
+
+			message := []byte("sign with openssl, verify with software")
+			signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+				Algorithm:           tt.alg,
+				KeyMaterial:         keyResp.GetKeyMaterial(),
+				KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+				Input:               message,
+				ScopeParams:         signRequestNoContext(),
+			})
+			if err != nil {
+				t.Fatalf("Sign: %v", err)
+			}
+
+			sw := software.New()
+			verifyResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+				Algorithm:           tt.alg,
+				KeyMaterial:         keyResp.GetPublicKeyBytes(),
+				KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+				Input:               message,
+				Signature:           signResp.GetSignature(),
+				ScopeParams:         verifyRequestNoContext(),
+			})
+			if err != nil {
+				t.Fatalf("software Verify: %v", err)
+			}
+			if !verifyResp.GetValid() {
+				t.Error("software rejected a signature openssl produced")
+			}
+		})
+	}
+}
+
+// TestSign_ECDSA_softwareRejectsTamperedMessage is the negative control for
+// the cross-check above: verifying a genuinely different message against
+// the same signature must fail, proving the cross-check can actually catch
+// a bad signature rather than always reporting success.
+func TestSign_ECDSA_softwareRejectsTamperedMessage(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: ecdsaP256Details()})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           ecdsaP256Details(),
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               []byte("the original message"),
+		ScopeParams:         signRequestNoContext(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	sw := software.New()
+	verifyResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+		Algorithm:           ecdsaP256Details(),
+		KeyMaterial:         keyResp.GetPublicKeyBytes(),
+		KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+		Input:               []byte("a different message"),
+		Signature:           signResp.GetSignature(),
+		ScopeParams:         verifyRequestNoContext(),
+	})
+	if err != nil {
+		t.Fatalf("software Verify: %v", err)
+	}
+	if verifyResp.GetValid() {
+		t.Error("software accepted a signature over a message it was never computed for")
+	}
+}
+
+// TestSign_ECDSA_curveMismatch is the negative control for checkCurveMatches:
+// signing a P-256 key while declaring P-384 must be rejected with
+// CodeInvalidArgument rather than silently signing under whichever curve
+// the stored key actually is.
+func TestSign_ECDSA_curveMismatch(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: ecdsaP256Details()})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	_, err = p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           ecdsaP384Details(),
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               []byte("message"),
+		ScopeParams:         signRequestNoContext(),
+	})
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument for a P-256 key declared as P-384, got: %v", err)
+	}
 }

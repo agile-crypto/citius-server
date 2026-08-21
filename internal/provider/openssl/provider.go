@@ -198,6 +198,53 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	}, nil
 }
 
+// Sign dispatches to the algorithm-specific sign implementation.
+func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*providerpb.SignResponse, error) {
+	const op errors.Op = "openssl.(Provider).Sign"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		sig, err := signECDSA(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(),
+			alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash(), alg.Ecdsa.GetSignatureFormat())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		sig, err := signMLDSA(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetDomainContext().GetContext(),
+			req.GetKeyMaterialEncoding(), alg.MlDsa.GetParameterSet(), alg.MlDsa.GetDeterministic())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	case *types.AlgorithmDetails_RsaPss:
+		sig, err := signRSAPSS(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.RsaPss)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	case *types.AlgorithmDetails_RsaPkcs1V15:
+		sig, err := signRSAPKCS1v15(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.RsaPkcs1V15)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	case *types.AlgorithmDetails_Ed25519:
+		sig, err := signEd25519(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetKeyMaterialEncoding(), alg.Ed25519.GetVariant())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for sign: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+}
+
 // Encrypt dispatches to the algorithm-specific encrypt implementation.
 // AES-CBC and AES-CTR are implemented; AES-GCM and ChaCha20-Poly1305 (AEAD)
 // are a separate, later commit and still fall through to the default case.

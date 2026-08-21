@@ -10,6 +10,7 @@ import (
 
 	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
@@ -172,4 +173,97 @@ func TestGenerateKey_RSA_crossProviderInterop(t *testing.T) {
 		t.Fatalf("ossl-go ParseSPKIPublicKey could not parse software-generated SPKI material: %v", err)
 	}
 	defer pubKey.Close()
+}
+
+// TestSign_RSA_verifiesWithSoftware is the sign-side cross-check the plan
+// requires: sign with openssl, then verify with software's independent
+// implementation, over PSS (default SHA-256, and explicit SHA-384) and
+// PKCS#1 v1.5 -- proving the signature is genuinely valid, not just that
+// Sign returned without an error.
+func TestSign_RSA_verifiesWithSoftware(t *testing.T) {
+	rsaPss4096SHA384Details := &types.AlgorithmDetails{
+		Algorithm: &types.AlgorithmDetails_RsaPss{
+			RsaPss: &types.RsaPssParams{KeySizeBits: 4096, Hash: types.HashAlgorithm_HASH_ALGORITHM_SHA384},
+		},
+	}
+	tests := []struct {
+		name string
+		alg  *types.AlgorithmDetails
+	}{
+		{"pss-2048-sha256", rsaPssDetails(2048)},
+		{"pss-4096-sha384", rsaPss4096SHA384Details},
+		{"pkcs1v15-2048", rsaPkcs1v15Details(2048)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			p, err := openssl.New(ctx)
+			if err != nil {
+				t.Fatalf("openssl.New: %v", err)
+			}
+			defer p.Close()
+
+			keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: tt.alg})
+			if err != nil {
+				t.Fatalf("GenerateKey: %v", err)
+			}
+
+			message := []byte("sign with openssl, verify with software")
+			signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+				Algorithm:           tt.alg,
+				KeyMaterial:         keyResp.GetKeyMaterial(),
+				KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+				Input:               message,
+				ScopeParams:         signRequestNoContext(),
+			})
+			if err != nil {
+				t.Fatalf("Sign: %v", err)
+			}
+
+			sw := software.New()
+			verifyResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+				Algorithm:           tt.alg,
+				KeyMaterial:         keyResp.GetPublicKeyBytes(),
+				KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+				Input:               message,
+				Signature:           signResp.GetSignature(),
+				ScopeParams:         verifyRequestNoContext(),
+			})
+			if err != nil {
+				t.Fatalf("software Verify: %v", err)
+			}
+			if !verifyResp.GetValid() {
+				t.Error("software rejected a signature openssl produced")
+			}
+		})
+	}
+}
+
+// TestSign_RSA_keySizeMismatch is the negative control for checkRSAKeySize:
+// signing a 2048-bit key while declaring 3072 bits must be rejected with
+// CodeInvalidArgument rather than silently signing under whichever size the
+// stored key actually is.
+func TestSign_RSA_keySizeMismatch(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: rsaPssDetails(2048)})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	_, err = p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           rsaPssDetails(3072),
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               []byte("message"),
+		ScopeParams:         signRequestNoContext(),
+	})
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument for a 2048-bit key declared as 3072-bit, got: %v", err)
+	}
 }

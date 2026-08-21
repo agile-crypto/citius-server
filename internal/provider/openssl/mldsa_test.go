@@ -8,6 +8,7 @@ import (
 
 	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
@@ -203,5 +204,163 @@ func TestGenerateKey_MLDSA_crossProviderInterop(t *testing.T) {
 		t.Errorf("ossl-go ParseRawPublicKey could not parse software-generated raw public material: %v", err)
 	} else {
 		defer pubKey.Close()
+	}
+}
+
+// TestSign_MLDSA_verifiesWithSoftware is the sign-side cross-check the plan
+// requires, over every advertised parameter set, with no domain context --
+// proving the signature is genuinely valid, not just that Sign returned
+// without an error.
+func TestSign_MLDSA_verifiesWithSoftware(t *testing.T) {
+	tests := []struct {
+		name string
+		ps   types.MlDsaParameterSet
+	}{
+		{"ml-dsa-44", types.MlDsaParameterSet_ML_DSA_44},
+		{"ml-dsa-65", types.MlDsaParameterSet_ML_DSA_65},
+		{"ml-dsa-87", types.MlDsaParameterSet_ML_DSA_87},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			alg := mlDSADetails(tt.ps)
+
+			p, err := openssl.New(ctx)
+			if err != nil {
+				t.Fatalf("openssl.New: %v", err)
+			}
+			defer p.Close()
+
+			keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: alg})
+			if err != nil {
+				t.Fatalf("GenerateKey: %v", err)
+			}
+
+			message := []byte("sign with openssl, verify with software")
+			signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+				Algorithm:           alg,
+				KeyMaterial:         keyResp.GetKeyMaterial(),
+				KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+				Input:               message,
+				ScopeParams:         signRequestNoContext(),
+			})
+			if err != nil {
+				t.Fatalf("Sign: %v", err)
+			}
+
+			sw := software.New()
+			verifyResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+				Algorithm:           alg,
+				KeyMaterial:         keyResp.GetPublicKeyBytes(),
+				KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+				Input:               message,
+				Signature:           signResp.GetSignature(),
+				ScopeParams:         verifyRequestNoContext(),
+			})
+			if err != nil {
+				t.Fatalf("software Verify: %v", err)
+			}
+			if !verifyResp.GetValid() {
+				t.Error("software rejected a signature openssl produced")
+			}
+		})
+	}
+}
+
+// TestSign_MLDSA_honorsDomainContext proves signMLDSA genuinely threads
+// req.GetDomainContext().GetContext() into the signature rather than
+// ignoring it: software must accept the signature when verifying with the
+// same context, and reject it -- a different signature entirely, not a
+// verification-time filter -- when verifying with a different one.
+func TestSign_MLDSA_honorsDomainContext(t *testing.T) {
+	ctx := context.Background()
+	alg := mlDSADetails(types.MlDsaParameterSet_ML_DSA_65)
+
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: alg})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	message := []byte("message signed under a specific domain context")
+	domainContext := []byte("citius-test-context")
+
+	signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           alg,
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               message,
+		ScopeParams:         signRequestDomainContext(domainContext),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	sw := software.New()
+
+	matchResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+		Algorithm:           alg,
+		KeyMaterial:         keyResp.GetPublicKeyBytes(),
+		KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+		Input:               message,
+		Signature:           signResp.GetSignature(),
+		ScopeParams:         verifyRequestDomainContext(domainContext),
+	})
+	if err != nil {
+		t.Fatalf("software Verify (matching context): %v", err)
+	}
+	if !matchResp.GetValid() {
+		t.Error("software rejected a signature verified with the same domain context it was signed under")
+	}
+
+	mismatchResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+		Algorithm:           alg,
+		KeyMaterial:         keyResp.GetPublicKeyBytes(),
+		KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+		Input:               message,
+		Signature:           signResp.GetSignature(),
+		ScopeParams:         verifyRequestDomainContext([]byte("a-different-context")),
+	})
+	if err != nil {
+		t.Fatalf("software Verify (mismatched context): %v", err)
+	}
+	if mismatchResp.GetValid() {
+		t.Error("software accepted a signature under a domain context it was never signed with -- signMLDSA is not threading the context")
+	}
+}
+
+// TestSign_MLDSA_contextTooLong is the negative control for
+// checkMLDSAContextLength: a domain separation context over the FIPS 204
+// §3.2 255-byte maximum must be rejected with CodeInvalidArgument.
+func TestSign_MLDSA_contextTooLong(t *testing.T) {
+	ctx := context.Background()
+	alg := mlDSADetails(types.MlDsaParameterSet_ML_DSA_65)
+
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: alg})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	overLong := make([]byte, 256)
+	_, err = p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           alg,
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               []byte("message"),
+		ScopeParams:         signRequestDomainContext(overLong),
+	})
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument for a 256-byte domain context, got: %v", err)
 	}
 }

@@ -10,6 +10,7 @@ import (
 
 	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
@@ -131,4 +132,146 @@ func TestGenerateKey_Ed25519_crossProviderInterop(t *testing.T) {
 		t.Fatalf("ossl-go ParseSPKIPublicKey could not parse software-generated SPKI material: %v", err)
 	}
 	defer pubKey.Close()
+}
+
+func ed25519phDetails() *types.AlgorithmDetails {
+	return &types.AlgorithmDetails{
+		Algorithm: &types.AlgorithmDetails_Ed25519{
+			Ed25519: &types.Ed25519Params{Variant: types.Ed25519Variant_ED25519_VARIANT_PH},
+		},
+	}
+}
+
+// TestSign_Ed25519_verifiesWithSoftware is the sign-side cross-check the
+// plan requires, for pure Ed25519: sign with openssl, then verify with
+// software's independent implementation, proving the signature is
+// genuinely valid.
+func TestSign_Ed25519_verifiesWithSoftware(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: ed25519Details()})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	message := []byte("sign with openssl, verify with software")
+	signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           ed25519Details(),
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               message,
+		ScopeParams:         signRequestNoContext(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	sw := software.New()
+	verifyResp, err := sw.Verify(ctx, &providerpb.VerifyRequest{
+		Algorithm:           ed25519Details(),
+		KeyMaterial:         keyResp.GetPublicKeyBytes(),
+		KeyMaterialEncoding: keyResp.GetPublicKeyEncoding(),
+		Input:               message,
+		Signature:           signResp.GetSignature(),
+		ScopeParams:         verifyRequestNoContext(),
+	})
+	if err != nil {
+		t.Fatalf("software Verify: %v", err)
+	}
+	if !verifyResp.GetValid() {
+		t.Error("software rejected a signature openssl produced")
+	}
+}
+
+// TestSign_Ed25519ph_verifiesWithOsslGo is Ed25519ph's sign-side cross-check.
+// software only reaches ph through DigestVerify with a caller-supplied
+// pre-hashed digest -- a different code path with its own hashing
+// convention, not software's regular Verify -- so rather than risk getting
+// that convention subtly wrong, this verifies with ossl-go's own Key.Verify
+// directly, which the plan allows explicitly ("verify with the software
+// provider (or ossl-go directly)"). This is still a genuine, independent
+// check of the signature's validity, not a self-consistency loop: Verify is
+// a different code path than Sign, actually re-deriving and checking the
+// signature rather than assuming Sign's success means it is valid.
+func TestSign_Ed25519ph_verifiesWithOsslGo(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: ed25519phDetails()})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	message := []byte("sign with openssl (ph), verify with ossl-go directly")
+	signResp, err := p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           ed25519phDetails(),
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               message,
+		ScopeParams:         signRequestNoContext(),
+	})
+	if err != nil {
+		t.Fatalf("Sign: %v", err)
+	}
+
+	libctx, err := ossl.NewContext()
+	if err != nil {
+		t.Fatalf("ossl.NewContext: %v", err)
+	}
+	defer libctx.Close()
+
+	pubKey, err := libctx.ParseSPKIPublicKey(keyResp.GetPublicKeyBytes())
+	if err != nil {
+		t.Fatalf("ParseSPKIPublicKey: %v", err)
+	}
+	defer pubKey.Close()
+
+	if err := pubKey.Verify(message, signResp.GetSignature(), &ossl.SignOptions{Prehash: true}); err != nil {
+		t.Errorf("ossl-go rejected a signature openssl.Provider.Sign produced: %v", err)
+	}
+}
+
+// TestSign_Ed25519_ctxVariantRejected is the negative control for
+// checkEd25519VariantSupported: Ed25519ctx has no catalog entry (see its
+// doc comment), and must be rejected with CodeNotImplemented rather than
+// silently falling through to Key.Sign with a Context set -- which, per
+// SignOptions.Context's doc comment, would select Ed25519ctx even if this
+// function never intended to support it.
+func TestSign_Ed25519_ctxVariantRejected(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: ed25519Details()})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+
+	ctxDetails := &types.AlgorithmDetails{
+		Algorithm: &types.AlgorithmDetails_Ed25519{
+			Ed25519: &types.Ed25519Params{Variant: types.Ed25519Variant_ED25519_VARIANT_CTX},
+		},
+	}
+	_, err = p.Sign(ctx, &providerpb.SignRequest{
+		Algorithm:           ctxDetails,
+		KeyMaterial:         keyResp.GetKeyMaterial(),
+		KeyMaterialEncoding: keyResp.GetKeyMaterialEncoding(),
+		Input:               []byte("message"),
+		ScopeParams:         signRequestNoContext(),
+	})
+	if !errors.IsNotImplemented(err) {
+		t.Errorf("expected CodeNotImplemented for Ed25519ctx, got: %v", err)
+	}
 }
