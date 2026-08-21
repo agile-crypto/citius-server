@@ -67,22 +67,24 @@ var catalog = map[string]ossl.Capability{
 	"ml-dsa-65": ossl.SignatureCapability{Key: ossl.MLDSA65},
 	"ml-dsa-87": ossl.SignatureCapability{Key: ossl.MLDSA87},
 
-	// AES-GCM and ChaCha20-Poly1305 only: ossl.Capability has exactly two
-	// implementations, SignatureCapability and AEADCapability -- its methods
-	// are unexported, so no third type can be added to satisfy it from
-	// outside ossl-go. AEADCapability covers these two. It has no
-	// counterpart for plain block/stream modes (AES-CBC, AES-CTR are not
-	// AEAD), so those two families have no representable entry here and are
-	// deliberately absent -- the same reasoning names.go's cipherNameFor
-	// already applies to XChaCha20-Poly1305: advertise only what is
-	// genuinely checkable, not what symmetric key generation alone would
-	// suggest is complete. IVBytes/TagBytes are left at zero (the
-	// standard 96-bit IV / 128-bit tag), matching the "-128-96" the
-	// template IDs declare.
+	// AEAD ciphers: AES-GCM and ChaCha20-Poly1305.
 	"aes-128-gcm-128-96": ossl.AEADCapability{Cipher: ossl.AES128GCM},
 	"aes-192-gcm-128-96": ossl.AEADCapability{Cipher: ossl.AES192GCM},
 	"aes-256-gcm-128-96": ossl.AEADCapability{Cipher: ossl.AES256GCM},
 	"chacha20-poly1305":  ossl.AEADCapability{Cipher: ossl.ChaCha20Poly1305},
+
+	// Plain block/stream ciphers: AES-CBC and AES-CTR. These are not AEAD,
+	// so AEADCapability cannot represent them -- ossl.CipherCapability
+	// (ossl-go v0.1.0+) is the counterpart built on NewCipher instead of
+	// NewAEAD. Padding matters for CBC's partial final block; CTR is a
+	// stream mode and ignores it (ossl.CipherCapability's own doc comment),
+	// so it is left at its zero value there rather than restated.
+	"aes-128-cbc-pkcs7-128": ossl.CipherCapability{Cipher: ossl.AES128CBC, Padding: ossl.PaddingPKCS7},
+	"aes-192-cbc-pkcs7-128": ossl.CipherCapability{Cipher: ossl.AES192CBC, Padding: ossl.PaddingPKCS7},
+	"aes-256-cbc-pkcs7-128": ossl.CipherCapability{Cipher: ossl.AES256CBC, Padding: ossl.PaddingPKCS7},
+	"aes-128-ctr":           ossl.CipherCapability{Cipher: ossl.AES128CTR},
+	"aes-192-ctr":           ossl.CipherCapability{Cipher: ossl.AES192CTR},
+	"aes-256-ctr":           ossl.CipherCapability{Cipher: ossl.AES256CTR},
 }
 
 // deriveAlgorithms filters table down to the entries libctx can actually

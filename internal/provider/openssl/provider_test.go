@@ -180,12 +180,12 @@ func TestProvider_ExportPublicKey_notImplemented(t *testing.T) {
 // TestProvider_SupportedAlgorithms_includesAllKeygenFamilies documents the
 // current state: catalog has exactly the entries every algorithm family
 // with a working GenerateKey path added so far — every asymmetric family
-// (ECDSA, RSA, Ed25519, ML-DSA) plus the two symmetric families
-// representable as an ossl.Capability (AES-GCM, ChaCha20-Poly1305; AES-CBC
-// and AES-CTR have no representable capability at all — see the comment on
-// catalog's AEAD entries). This test is meant to start failing the moment
-// the next entry lands — that failure is the signal to update it, not a
-// regression.
+// (ECDSA, RSA, Ed25519, ML-DSA) plus every symmetric family representable
+// as an ossl.Capability, which as of ossl-go v0.1.0's CipherCapability is
+// now all four of them: AES-GCM and ChaCha20-Poly1305 (AEADCapability),
+// AES-CBC and AES-CTR (CipherCapability). This test is meant to start
+// failing the moment the next entry lands — that failure is the signal to
+// update it, not a regression.
 func TestProvider_SupportedAlgorithms_includesAllKeygenFamilies(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
@@ -210,6 +210,12 @@ func TestProvider_SupportedAlgorithms_includesAllKeygenFamilies(t *testing.T) {
 		"aes-192-gcm-128-96":          true,
 		"aes-256-gcm-128-96":          true,
 		"chacha20-poly1305":           true,
+		"aes-128-cbc-pkcs7-128":       true,
+		"aes-192-cbc-pkcs7-128":       true,
+		"aes-256-cbc-pkcs7-128":       true,
+		"aes-128-ctr":                 true,
+		"aes-192-ctr":                 true,
+		"aes-256-ctr":                 true,
 	}
 	got := p.SupportedAlgorithms()
 	if len(got) != len(want) {
@@ -224,11 +230,11 @@ func TestProvider_SupportedAlgorithms_includesAllKeygenFamilies(t *testing.T) {
 
 // TestProvider_VerifyCapabilities_allKeygenFamilies proves VerifyCapabilities
 // performs a real key generation and full round trip (sign+verify for
-// signatures, seal+open for AEAD) for every advertised capability
-// (ossl.Context.VerifyCapability), not just the structural Supports check
-// SupportedAlgorithms relies on. The RSA entries' trial exercises PSS
-// specifically, including the PKCS#1 v1.5 entry — see the caveat on
-// catalog's RSA entries in capability.go.
+// signatures, seal+open for AEAD, encrypt+decrypt for CBC/CTR) for every
+// advertised capability (ossl.Context.VerifyCapability), not just the
+// structural Supports check SupportedAlgorithms relies on. The RSA entries'
+// trial exercises PSS specifically, including the PKCS#1 v1.5 entry — see
+// the caveat on catalog's RSA entries in capability.go.
 func TestProvider_VerifyCapabilities_allKeygenFamilies(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
