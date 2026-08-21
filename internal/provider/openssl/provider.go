@@ -198,6 +198,88 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	}, nil
 }
 
+// Encrypt dispatches to the algorithm-specific encrypt implementation.
+// AES-CBC and AES-CTR are implemented; AES-GCM and ChaCha20-Poly1305 (AEAD)
+// are a separate, later commit and still fall through to the default case.
+func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) (*providerpb.EncryptResponse, error) {
+	const op errors.Op = "openssl.(Provider).Encrypt"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_AesCbc:
+		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		ciphertext, iv, err := encryptAESCBC(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetPlaintext(), alg.AesCbc)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.EncryptResponse{
+			Ciphertext: ciphertext,
+			Output:     provider.BlockCipherOutput(iv, "raw"),
+		}, nil
+	case *types.AlgorithmDetails_AesCtr:
+		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		ciphertext, iv, err := encryptAESCTR(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetPlaintext(), alg.AesCtr)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.EncryptResponse{
+			Ciphertext: ciphertext,
+			Output:     provider.BlockCipherOutput(iv, "raw"),
+		}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for encrypt: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+}
+
+// Decrypt dispatches to the algorithm-specific decrypt implementation. The
+// IV comes from req.GetOutput() — the ProviderOutput the core extracted
+// from the stored OperationMetadata that Encrypt originally produced.
+func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) (*providerpb.DecryptResponse, error) {
+	const op errors.Op = "openssl.(Provider).Decrypt"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_AesCbc:
+		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		plaintext, err := decryptAESCBC(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetCiphertext(),
+			req.GetOutput().GetBlockCipherOutput().GetIv(), alg.AesCbc)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_AesCtr:
+		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		plaintext, err := decryptAESCTR(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetCiphertext(),
+			req.GetOutput().GetBlockCipherOutput().GetIv(), alg.AesCtr)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for decrypt: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+}
+
 // DestroyKey is not yet implemented.
 func (p *Provider) DestroyKey(ctx context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
 	const op errors.Op = "openssl.(Provider).DestroyKey"
@@ -212,6 +294,9 @@ func (p *Provider) ExportPublicKey(ctx context.Context, _ *providerpb.ExportPubl
 
 // Compile-time assertion: Provider implements provider.Backend.
 var _ provider.Backend = (*Provider)(nil)
+
+// Compile-time assertion: Provider implements provider.Cipher.
+var _ provider.Cipher = (*Provider)(nil)
 
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.
 var _ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
