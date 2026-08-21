@@ -42,13 +42,7 @@ func generateRSAKey(ctx context.Context, libctx *ossl.Context, algorithm ossl.Ke
 }
 
 // generateRSAKeyForTemplate resolves the ossl-go key algorithm for details
-// (via keyAlgorithmFor) and generates the key in one call, folding the
-// "resolve, then generate" sequence RsaPss and RsaPkcs1V15 both need into a
-// single call site — the shape every other case in
-// Provider.GenerateKey's dispatch switch already has, and what keeps that
-// switch's own complexity from growing with each algorithm family that
-// needs an extra resolution step RSA's key-type split requires but ECDSA's
-// single EC type does not.
+// (via keyAlgorithmFor) and generates the key in one call
 func generateRSAKeyForTemplate(ctx context.Context, libctx *ossl.Context, details *types.AlgorithmDetails, bits uint32) (pubDER, privDER []byte, _ error) {
 	const op errors.Op = "openssl.generateRSAKeyForTemplate"
 
