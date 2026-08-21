@@ -8,7 +8,7 @@ cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 github.com/DataDog/datadog-go v3.2.0+incompatible/go.mod h1:LButxg5PwREeZtORoXG3tL4fMGNddJ+vMq1mwgfaqoQ=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
-github.com/agile-crypto/ossl-go v0.1.0 h1:q1nhLou4OPlO5uH/TdjA4AbwavrE9ATXYPGJoejSuS4=
+github.com/agile-crypto/ossl-go v0.1.0 h1:rRTlCg2Pce6SnFTH5TUMpPddX5Iw8YJW8Mmil+KSHaM=
 github.com/agile-crypto/ossl-go v0.1.0/go.mod h1:KHpxTLbOHWwTg+EO7wGN02ito3byHbxjLU17b4q+4dM=
 github.com/agile-crypto/zitadel-grpc-auth v0.1.0 h1:G43avm3gx55WZVVAiSEiSXgcu0N44WkHS1jhPj+b8V8=
 github.com/agile-crypto/zitadel-grpc-auth v0.1.0/go.mod h1:APcuKmEB/FCfIRrIEKgRtcnf0OU0NWbotpyIDsMySgo=
