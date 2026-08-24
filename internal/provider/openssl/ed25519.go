@@ -88,3 +88,55 @@ func signEd25519(ctx context.Context, libctx *ossl.Context, privDER, payload []b
 	}
 	return sig, nil
 }
+
+// checkEd25519PHHash validates that a SignDigest call declares SHA-512 as
+// the digest's origin hash. Unlike RSA's prehashed variants, Ed25519ph is
+// not generic over hash algorithm — RFC 8032 §5.1 defines PH(x) = SHA-512(x),
+// full stop, so there is no "Ed25519ph with SHA-384" or similar.
+// validateDigestLength alone cannot catch a wrong hash here: SHA3-512,
+// BLAKE2b-512, and others also produce 64-byte digests, so a caller
+// declaring one of those would otherwise slip through unnoticed. Mirrors
+// software's checkEd25519PHHash exactly.
+func checkEd25519PHHash(ctx context.Context, op errors.Op, hashAlg types.HashAlgorithm) error {
+	switch hashAlg {
+	case types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED, types.HashAlgorithm_HASH_ALGORITHM_SHA512:
+		return nil
+	default:
+		return errors.New(ctx, op, errors.CodeNotImplemented,
+			"Ed25519ph requires a SHA-512 digest, got hash_algorithm=%s", hashAlg)
+	}
+}
+
+// signEd25519PHDigest signs a pre-computed SHA-512 digest with Ed25519ph
+// (RFC 8032). Used by SignDigest, where the caller has already hashed the
+// message with SHA-512 — the mandatory hash for this variant.
+//
+// This is the one algorithm where SignDigest genuinely needs the raw
+// EVP_PKEY_sign entry point Key.SignDigest provides: Key.Sign's Prehash
+// option always hashes whatever it is given, so passing an
+// already-computed digest through it would hash it a second time and sign
+// SHA-512(digest) instead of SHA-512(message) -- see ossl.Key.SignDigest's
+// doc comment.
+func signEd25519PHDigest(ctx context.Context, libctx *ossl.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm) ([]byte, error) {
+	const op errors.Op = "openssl.signEd25519PHDigest"
+
+	if err := checkEd25519PHHash(ctx, op, hashAlg); err != nil {
+		return nil, err
+	}
+	key, err := parsePrivateKey(ctx, op, libctx, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	defer key.Close()
+
+	if key.Type() != ossl.Ed25519 {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"key type %s does not match declared algorithm Ed25519", key.Type())
+	}
+
+	sig, err := key.SignDigest(digest, &ossl.SignOptions{Prehash: true})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}

@@ -178,3 +178,65 @@ func signECDSA(ctx context.Context, libctx *ossl.Context, privDER, payload []byt
 	}
 	return sig, nil
 }
+
+// ecdsaDigestSignName resolves the DigestName SignDigest passes to ossl-go.
+//
+// Unlike Sign's ecdsaDigestName, this never applies curve-minimum-strength
+// validation or defaulting from the curve — software's signECDSADigest takes
+// no hash parameter at all, because Go's ecdsa.Sign treats its input as an
+// opaque value to sign regardless of what produced it, with no length
+// requirement. ossl-go's SignDigest is not that permissive: it always
+// validates the digest length against a resolved digest name's size (see
+// ossl.Key.SignDigest's doc comment), even for EC, where OpenSSL itself
+// doesn't need to know the digest's origin either. An UNSPECIFIED
+// hash_algorithm therefore still needs *some* digest name to satisfy that
+// check, so it is inferred from the digest's own length here rather than
+// rejected outright -- preserving software's permissiveness for the common
+// case (a standard-length digest with no declared origin) while still
+// giving ossl-go something concrete to validate against.
+func ecdsaDigestSignName(ctx context.Context, op errors.Op, hash types.HashAlgorithm, digestLen int) (ossl.DigestName, error) {
+	if hash != types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED {
+		return digestNameFor(ctx, op, hash)
+	}
+	switch digestLen {
+	case 32:
+		return ossl.SHA256, nil
+	case 48:
+		return ossl.SHA384, nil
+	case 64:
+		return ossl.SHA512, nil
+	default:
+		return "", errors.New(ctx, op, errors.CodeInvalidArgument,
+			"cannot infer a hash algorithm for a %d-byte digest; declare hash_algorithm explicitly", digestLen)
+	}
+}
+
+// signECDSADigest signs a pre-computed digest directly, without hashing.
+// Used by SignDigest, where the caller has already computed the digest.
+func signECDSADigest(ctx context.Context, libctx *ossl.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm, format types.SignatureFormat) ([]byte, error) {
+	const op errors.Op = "openssl.signECDSADigest"
+
+	key, err := parsePrivateKey(ctx, op, libctx, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	defer key.Close()
+
+	if err = checkCurveMatches(ctx, op, key, curve); err != nil {
+		return nil, err
+	}
+	digestName, err := ecdsaDigestSignName(ctx, op, hash, len(digest))
+	if err != nil {
+		return nil, err
+	}
+	sigFormat, err := ecdsaSignatureFormat(ctx, op, format)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := key.SignDigest(digest, &ossl.SignOptions{Digest: digestName, Format: sigFormat})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}

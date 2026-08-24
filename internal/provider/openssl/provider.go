@@ -245,6 +245,91 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 	}
 }
 
+// validateDigestLength rejects a digest whose length contradicts the
+// declared hash algorithm (e.g. a 20-byte digest claiming to be SHA-256,
+// which must be 32 bytes). Hash algorithms with no fixed length
+// (UNSPECIFIED, OTHER, the SHAKE XOFs) are not checked — the caller declared
+// no fixed-length hash, so there is nothing to validate the digest against.
+//
+// Mirrors software.validateDigestLength exactly, sharing the same
+// provider.DigestLengthForHash table, so a malformed request is rejected
+// identically regardless of which provider serves it.
+func validateDigestLength(ctx context.Context, op errors.Op, hashAlg types.HashAlgorithm, digestLen int) error {
+	wantLen, ok := provider.DigestLengthForHash(hashAlg)
+	if !ok {
+		return nil
+	}
+	if digestLen != wantLen {
+		return errors.New(ctx, op, errors.CodeInvalidArgument,
+			"digest length %d bytes does not match expected length %d bytes for %s", digestLen, wantLen, hashAlg)
+	}
+	return nil
+}
+
+// SignDigest signs a pre-computed digest — the provider does NOT hash.
+// Dispatches on the typed AlgorithmDetails oneof, exactly like Sign; the
+// digest and key material alone cannot select the signature scheme (a single
+// RSA key is valid under both PSS and PKCS1v15), so hash_algorithm describes
+// only the digest's origin, never the algorithm to dispatch on.
+//
+// Unlike Sign, which always calls Key.Sign (EVP_DigestSign — hashes
+// internally), every arm here calls Key.SignDigest (EVP_PKEY_sign — signs
+// the given bytes as-is). Routing a caller-supplied digest through Key.Sign
+// would hash it a second time and silently produce a signature over the
+// wrong statement; see SignDigestRequest's doc comment in the provider proto
+// for the full rationale.
+func (p *Provider) SignDigest(ctx context.Context, req *providerpb.SignDigestRequest) (*providerpb.SignDigestResponse, error) {
+	const op errors.Op = "openssl.(Provider).SignDigest"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+	if err := validateDigestLength(ctx, op, req.GetHashAlgorithm(), len(req.GetDigest())); err != nil {
+		return nil, err
+	}
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		sig, err := signECDSADigest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
+			alg.Ecdsa.GetCurve(), req.GetHashAlgorithm(), alg.Ecdsa.GetSignatureFormat())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput(ecdsaSignatureEncodingLabel(alg.Ecdsa.GetSignatureFormat()))}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"SignDigest unsupported for ML-DSA: pure ML-DSA is not prehashable")
+	case *types.AlgorithmDetails_RsaPss:
+		sig, err := signRSAPSSDigest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
+			req.GetHashAlgorithm(), alg.RsaPss)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	case *types.AlgorithmDetails_RsaPkcs1V15:
+		sig, err := signRSAPKCS1v15Digest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(),
+			req.GetHashAlgorithm(), alg.RsaPkcs1V15)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	case *types.AlgorithmDetails_Ed25519:
+		if alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_UNSPECIFIED &&
+			alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_PH {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+				"SignDigest requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
+		}
+		sig, err := signEd25519PHDigest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetKeyMaterialEncoding(), req.GetHashAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.SignDigestResponse{Signature: sig, Output: provider.NoOutput("raw")}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for digest sign: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+}
+
 // Encrypt dispatches to the algorithm-specific encrypt implementation.
 // AES-CBC and AES-CTR are implemented; AES-GCM and ChaCha20-Poly1305 (AEAD)
 // are a separate, later commit and still fall through to the default case.

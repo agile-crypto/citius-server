@@ -181,3 +181,71 @@ func signRSAPKCS1v15(ctx context.Context, libctx *ossl.Context, privDER, payload
 	}
 	return sig, nil
 }
+
+// signRSAPSSDigest signs a pre-computed digest directly, without hashing.
+// Used by SignDigest, where the caller has already hashed the message.
+//
+// Unlike signRSAPSS, the hash algorithm comes from hashAlg (the request's
+// declared digest origin, SignDigestRequest.hash_algorithm) rather than
+// params.GetHash(): the prehashed catalog templates (rsa-pss-*-prehashed)
+// leave RsaPssParams.hash unset, since a single prehashed template accepts
+// digests produced under any hash the caller declares — the digest bytes
+// alone cannot say which hash produced them. Mirrors software's
+// signRSAPSSDigest exactly.
+func signRSAPSSDigest(ctx context.Context, libctx *ossl.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPssParams) ([]byte, error) {
+	const op errors.Op = "openssl.signRSAPSSDigest"
+
+	key, err := parsePrivateKey(ctx, op, libctx, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	defer key.Close()
+
+	if err = checkRSAKeySize(ctx, op, key, params.GetKeySizeBits()); err != nil {
+		return nil, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), hashAlg, params.GetMgfHash()); err != nil {
+		return nil, err
+	}
+	digestName, err := rsaHashName(ctx, op, hashAlg)
+	if err != nil {
+		return nil, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := key.SignDigest(digest, &ossl.SignOptions{Digest: digestName, Padding: ossl.RSAPSS, PSSSaltLen: saltLen})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}
+
+// signRSAPKCS1v15Digest signs a pre-computed digest directly, without
+// hashing. See signRSAPSSDigest for why hashAlg, not params.GetHash(),
+// selects the hash algorithm for prehashed operations.
+func signRSAPKCS1v15Digest(ctx context.Context, libctx *ossl.Context, privDER, digest []byte, keyEncoding providerpb.PrivateKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPkcs1V15Params) ([]byte, error) {
+	const op errors.Op = "openssl.signRSAPKCS1v15Digest"
+
+	key, err := parsePrivateKey(ctx, op, libctx, privDER, keyEncoding)
+	if err != nil {
+		return nil, err
+	}
+	defer key.Close()
+
+	if err = checkRSAKeySize(ctx, op, key, params.GetKeySizeBits()); err != nil {
+		return nil, err
+	}
+	digestName, err := rsaHashName(ctx, op, hashAlg)
+	if err != nil {
+		return nil, err
+	}
+
+	sig, err := key.SignDigest(digest, &ossl.SignOptions{Digest: digestName, Padding: ossl.RSAPKCS1v15})
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	return sig, nil
+}
