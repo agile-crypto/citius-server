@@ -35,7 +35,7 @@ func NewTestableServer(ctx context.Context, cfg Config) (*TestableHandler, error
 		return nil, err
 	}
 
-	providerReg, err := buildProviderRegistry(ctx, templateReg)
+	providerReg, err := buildProviderRegistry(ctx, templateReg, cfg.FIPSConfigPath)
 	if err != nil {
 		return nil, err
 	}

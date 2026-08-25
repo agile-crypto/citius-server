@@ -34,6 +34,9 @@ func main() {
 	catalog := flag.String("catalog", defaultCatalogPath(), "path to standard_algorithms.json")
 	tlsCert := flag.String("tls-cert", os.Getenv("TLS_CERT_FILE"), "path to TLS certificate (PEM); required when AUTH_ENABLED=true")
 	tlsKey := flag.String("tls-key", os.Getenv("TLS_KEY_FILE"), "path to TLS private key (PEM); required when AUTH_ENABLED=true")
+	fipsConfig := flag.String("fips-config", os.Getenv("OPENSSL_FIPS_CONFIG"),
+		"path to an OpenSSL config activating the fips provider (see openssl.WithFIPS); "+
+			"when unset, no openssl-fips provider is registered")
 	enableReflection := flag.Bool("grpc-reflection", os.Getenv("GRPC_REFLECTION") == "true",
 		"register the gRPC reflection service. Default false; production deployments should leave it off. "+
 			"When true, reflection RPCs bypass authentication and authorization \u2014 a deliberate carve-out "+
@@ -85,7 +88,8 @@ func main() {
 	}
 
 	handler, err := server.NewServer(ctx, server.Config{
-		CatalogPath: *catalog,
+		CatalogPath:    *catalog,
+		FIPSConfigPath: *fipsConfig,
 	})
 	if err != nil {
 		log.Fatalf("failed to initialise server: %v", err)

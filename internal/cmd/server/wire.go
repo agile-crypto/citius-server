@@ -9,6 +9,7 @@ package server
 
 import (
 	"context"
+	"log"
 
 	"github.com/hashicorp/vault/sdk/logical"
 
@@ -31,6 +32,14 @@ type Config struct {
 	// CatalogPath is the path to the proto-JSON standard_algorithms.json file.
 	// When empty, NewServer does not load a catalog (useful for testing).
 	CatalogPath string
+
+	// FIPSConfigPath is an OpenSSL config that `.include`s fipsmodule.cnf and
+	// activates the fips provider (see openssl.WithFIPS's doc comment for the
+	// exact shape required). When set, a second "openssl-fips" provider
+	// instance is registered alongside the default-mode "openssl" one. When
+	// empty, no FIPS instance is registered — FIPS is optional infrastructure
+	// most deployments and most CI machines do not have installed.
+	FIPSConfigPath string
 }
 
 // NewServer assembles the full dependency graph and returns a ready-to-use
@@ -44,7 +53,7 @@ func NewServer(ctx context.Context, cfg Config) (*grpchandler.Handler, error) {
 	}
 
 	// Provider registry + validation
-	providerReg, err := buildProviderRegistry(ctx, templateReg)
+	providerReg, err := buildProviderRegistry(ctx, templateReg, cfg.FIPSConfigPath)
 	if err != nil {
 		return nil, err
 	}
@@ -94,11 +103,13 @@ func buildTemplateRegistry(
 }
 
 // buildProviderRegistry creates a provider.Registry, registers the
-// software and openssl providers, and validates capabilities against the
+// software and openssl providers (plus an openssl-fips instance when
+// fipsConfigPath is configured), and validates capabilities against the
 // template registry.
 func buildProviderRegistry(
 	ctx context.Context,
 	templateReg template.Registry,
+	fipsConfigPath string,
 ) (provider.Registry, error) {
 	const op engerr.Op = "server.buildProviderRegistry"
 	providerReg := provider.NewRegistry()
@@ -117,10 +128,38 @@ func buildProviderRegistry(
 	if err := providerReg.Register(ctx, osslProvider); err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}
+	registerFIPSProvider(ctx, providerReg, fipsConfigPath)
 	if err := app.ValidateAllProviders(ctx, providerReg, templateReg); err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}
 	return providerReg, nil
+}
+
+// registerFIPSProvider registers a second openssl instance restricted to
+// the FIPS module, when fipsConfigPath is configured.
+//
+// Unlike the software/openssl registrations above, failure here is
+// deliberately non-fatal: FIPS is optional infrastructure most deployments
+// and most CI machines do not have installed, and requiring it would break
+// a stock build. This is the one place in this file that logs instead of
+// just returning an error -- there is no error-return channel for "skipped,
+// not wrong" the way there is for the fatal registrations, and a silent
+// skip would let an operator who genuinely configured FIPS not notice it
+// never activated.
+func registerFIPSProvider(ctx context.Context, providerReg provider.Registry, fipsConfigPath string) {
+	if fipsConfigPath == "" {
+		return
+	}
+	fipsProvider, err := openssl.New(ctx, openssl.WithName("openssl-fips"), openssl.WithFIPS(fipsConfigPath))
+	if err != nil {
+		log.Printf("openssl-fips: construction failed, continuing without a FIPS provider: %v", err)
+		return
+	}
+	if err := providerReg.Register(ctx, fipsProvider); err != nil {
+		log.Printf("openssl-fips: registration failed, continuing without a FIPS provider: %v", err)
+		return
+	}
+	log.Printf("openssl-fips: FIPS provider registered (config: %s)", fipsConfigPath)
 }
 
 // buildAppService constructs an app.Service from the shared registries.
