@@ -18,6 +18,7 @@ import (
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
@@ -92,8 +93,9 @@ func buildTemplateRegistry(
 	return reg, nil
 }
 
-// buildProviderRegistry creates a provider.Registry, registers the software
-// provider, and validates capabilities against the template registry.
+// buildProviderRegistry creates a provider.Registry, registers the
+// software and openssl providers, and validates capabilities against the
+// template registry.
 func buildProviderRegistry(
 	ctx context.Context,
 	templateReg template.Registry,
@@ -101,6 +103,18 @@ func buildProviderRegistry(
 	const op engerr.Op = "server.buildProviderRegistry"
 	providerReg := provider.NewRegistry()
 	if err := providerReg.Register(ctx, software.New()); err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	// openssl.New fails at construction time on a runtime that cannot back
+	// it -- a nocgo build, or a libcrypto that doesn't match the OpenSSL 3.5
+	// this package was built against (see the package's own doc comment) --
+	// rather than registering a provider that would error on every call, so
+	// this is deliberately fatal the same way the software registration is.
+	osslProvider, err := openssl.New(ctx)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	if err := providerReg.Register(ctx, osslProvider); err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}
 	if err := app.ValidateAllProviders(ctx, providerReg, templateReg); err != nil {
