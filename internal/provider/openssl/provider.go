@@ -446,6 +446,19 @@ func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) 
 	}
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_AesGcm:
+		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		ciphertext, nonce, err := encryptAESGCM(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetPlaintext(), req.GetAeadParams().GetAad(), alg.AesGcm)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.EncryptResponse{
+			Ciphertext: ciphertext,
+			Output:     provider.AeadOutput(nonce, alg.AesGcm.GetTagSizeBits()/8, "raw"),
+		}, nil
 	case *types.AlgorithmDetails_AesCbc:
 		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
 		if err != nil {
@@ -471,6 +484,18 @@ func (p *Provider) Encrypt(ctx context.Context, req *providerpb.EncryptRequest) 
 		return &providerpb.EncryptResponse{
 			Ciphertext: ciphertext,
 			Output:     provider.BlockCipherOutput(iv, "raw"),
+		}, nil
+	case *types.AlgorithmDetails_Chacha20Poly1305:
+		if _, err := cipherNameFor(ctx, op, req.GetAlgorithm()); err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		ciphertext, nonce, err := encryptChaCha20Poly1305(ctx, p.libctx, req.GetKeyMaterial(), req.GetPlaintext(), req.GetAeadParams().GetAad())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.EncryptResponse{
+			Ciphertext: ciphertext,
+			Output:     provider.AeadOutput(nonce, chaCha20Poly1305TagSizeBytes, "raw"),
 		}, nil
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
