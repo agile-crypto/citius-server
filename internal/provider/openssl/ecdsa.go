@@ -271,3 +271,32 @@ func verifyECDSA(ctx context.Context, libctx *ossl.Context, pubDER, payload, sig
 
 	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Digest: digest, Format: sigFormat}))
 }
+
+// verifyECDSADigest verifies signature over a pre-computed digest directly,
+// without hashing. Used by VerifyDigest, where the caller has already
+// computed the digest. Shares ecdsaDigestSignName with signECDSADigest for
+// the same reason: ossl-go's VerifyDigest validates digest length against a
+// resolved digest name just as SignDigest does.
+func verifyECDSADigest(ctx context.Context, libctx *ossl.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm, format types.SignatureFormat) (bool, error) {
+	const op errors.Op = "openssl.verifyECDSADigest"
+
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if err = checkCurveMatches(ctx, op, key, curve); err != nil {
+		return false, err
+	}
+	digestName, err := ecdsaDigestSignName(ctx, op, hash, len(digest))
+	if err != nil {
+		return false, err
+	}
+	sigFormat, err := ecdsaSignatureFormat(ctx, op, format)
+	if err != nil {
+		return false, err
+	}
+
+	return verifyOutcome(ctx, op, key.VerifyDigest(digest, signature, &ossl.SignOptions{Digest: digestName, Format: sigFormat}))
+}

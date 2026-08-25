@@ -377,6 +377,64 @@ func (p *Provider) SignDigest(ctx context.Context, req *providerpb.SignDigestReq
 	}
 }
 
+// VerifyDigest verifies a signature over a pre-computed digest — the
+// provider does NOT hash. Mirror of SignDigest on the verify side: same
+// non-prehashable rejections, same digest-length validation, and every arm
+// calls Key.VerifyDigest (EVP_PKEY_verify) rather than Key.Verify
+// (EVP_DigestVerify), for the same reason SignDigest calls Key.SignDigest.
+func (p *Provider) VerifyDigest(ctx context.Context, req *providerpb.VerifyDigestRequest) (*providerpb.VerifyDigestResponse, error) {
+	const op errors.Op = "openssl.(Provider).VerifyDigest"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+	if err := validateDigestLength(ctx, op, req.GetHashAlgorithm(), len(req.GetDigest())); err != nil {
+		return nil, err
+	}
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		valid, err := verifyECDSADigest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
+			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve(), req.GetHashAlgorithm(), alg.Ecdsa.GetSignatureFormat())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"VerifyDigest unsupported for ML-DSA: pure ML-DSA is not prehashable")
+	case *types.AlgorithmDetails_RsaPss:
+		valid, err := verifyRSAPSSDigest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
+			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPss)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_RsaPkcs1V15:
+		valid, err := verifyRSAPKCS1v15Digest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
+			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm(), alg.RsaPkcs1V15)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_Ed25519:
+		if alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_UNSPECIFIED &&
+			alg.Ed25519.GetVariant() != types.Ed25519Variant_ED25519_VARIANT_PH {
+			return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+				"VerifyDigest requires Ed25519ph: pure Ed25519 and Ed25519ctx are not prehashable")
+		}
+		valid, err := verifyEd25519PHDigest(ctx, p.libctx, req.GetKeyMaterial(), req.GetDigest(), req.GetSignature(),
+			req.GetKeyMaterialEncoding(), req.GetHashAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyDigestResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for digest verify: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+}
+
 // Encrypt dispatches to the algorithm-specific encrypt implementation.
 // AES-CBC and AES-CTR are implemented; AES-GCM and ChaCha20-Poly1305 (AEAD)
 // are a separate, later commit and still fall through to the default case.

@@ -301,3 +301,56 @@ func verifyRSAPKCS1v15(ctx context.Context, libctx *ossl.Context, pubDER, payloa
 
 	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Digest: digest, Padding: ossl.RSAPKCS1v15}))
 }
+
+// verifyRSAPSSDigest verifies a signature over a pre-computed digest
+// directly, without hashing. See signRSAPSSDigest for why hashAlg, not
+// params.GetHash(), selects the hash algorithm for prehashed operations.
+func verifyRSAPSSDigest(ctx context.Context, libctx *ossl.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPssParams) (bool, error) {
+	const op errors.Op = "openssl.verifyRSAPSSDigest"
+
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if err = checkRSAKeySize(ctx, op, key, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), hashAlg, params.GetMgfHash()); err != nil {
+		return false, err
+	}
+	digestName, err := rsaHashName(ctx, op, hashAlg)
+	if err != nil {
+		return false, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return false, err
+	}
+
+	return verifyOutcome(ctx, op, key.VerifyDigest(digest, signature, &ossl.SignOptions{Digest: digestName, Padding: ossl.RSAPSS, PSSSaltLen: saltLen}))
+}
+
+// verifyRSAPKCS1v15Digest verifies a signature over a pre-computed digest
+// directly, without hashing. See signRSAPSSDigest for why hashAlg, not
+// params.GetHash(), selects the hash algorithm for prehashed operations.
+func verifyRSAPKCS1v15Digest(ctx context.Context, libctx *ossl.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm, params *types.RsaPkcs1V15Params) (bool, error) {
+	const op errors.Op = "openssl.verifyRSAPKCS1v15Digest"
+
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if err = checkRSAKeySize(ctx, op, key, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	digestName, err := rsaHashName(ctx, op, hashAlg)
+	if err != nil {
+		return false, err
+	}
+
+	return verifyOutcome(ctx, op, key.VerifyDigest(digest, signature, &ossl.SignOptions{Digest: digestName, Padding: ossl.RSAPKCS1v15}))
+}

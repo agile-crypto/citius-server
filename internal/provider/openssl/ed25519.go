@@ -165,3 +165,27 @@ func verifyEd25519(ctx context.Context, libctx *ossl.Context, pubDER, payload, s
 
 	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Prehash: variant == types.Ed25519Variant_ED25519_VARIANT_PH}))
 }
+
+// verifyEd25519PHDigest verifies a signature over a pre-computed SHA-512
+// digest with Ed25519ph (RFC 8032). Used by VerifyDigest, mirroring
+// signEd25519PHDigest: Key.VerifyDigest is the raw EVP_PKEY_verify entry
+// point this needs for the same reason Key.SignDigest is on the sign side.
+func verifyEd25519PHDigest(ctx context.Context, libctx *ossl.Context, pubDER, digest, signature []byte, keyEncoding providerpb.PublicKeyEncoding, hashAlg types.HashAlgorithm) (bool, error) {
+	const op errors.Op = "openssl.verifyEd25519PHDigest"
+
+	if err := checkEd25519PHHash(ctx, op, hashAlg); err != nil {
+		return false, err
+	}
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if key.Type() != ossl.Ed25519 {
+		return false, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"key type %s does not match declared algorithm Ed25519", key.Type())
+	}
+
+	return verifyOutcome(ctx, op, key.VerifyDigest(digest, signature, &ossl.SignOptions{Prehash: true}))
+}
