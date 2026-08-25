@@ -563,10 +563,12 @@ func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) 
 	}
 }
 
-// DestroyKey is not yet implemented.
-func (p *Provider) DestroyKey(ctx context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
-	const op errors.Op = "openssl.(Provider).DestroyKey"
-	return nil, errors.New(ctx, op, errors.CodeNotImplemented, "DestroyKey not yet implemented")
+// DestroyKey is a no-op for the stateless openssl provider, matching
+// software.Provider.DestroyKey: the orchestrator manages key lifecycle, and
+// this provider holds no internal state to release beyond the *ossl.Key
+// every operation already closes for itself.
+func (p *Provider) DestroyKey(_ context.Context, _ *providerpb.DestroyKeyRequest) (*providerpb.DestroyKeyResponse, error) {
+	return &providerpb.DestroyKeyResponse{}, nil
 }
 
 // ExportPublicKey is not yet implemented.
@@ -577,6 +579,9 @@ func (p *Provider) ExportPublicKey(ctx context.Context, _ *providerpb.ExportPubl
 
 // Compile-time assertion: Provider implements provider.Backend.
 var _ provider.Backend = (*Provider)(nil)
+
+// Compile-time assertion: Provider implements provider.Signer.
+var _ provider.Signer = (*Provider)(nil)
 
 // Compile-time assertion: Provider implements provider.Cipher.
 var _ provider.Cipher = (*Provider)(nil)

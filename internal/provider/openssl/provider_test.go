@@ -147,16 +147,22 @@ func TestProvider_GenerateKey_validatesBeforeStub(t *testing.T) {
 	}
 }
 
-func TestProvider_DestroyKey_notImplemented(t *testing.T) {
+// TestProvider_DestroyKey_isNoOp proves DestroyKey succeeds without error,
+// matching software.Provider.DestroyKey: the provider is stateless, so
+// there is nothing for it to actually destroy.
+func TestProvider_DestroyKey_isNoOp(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {
 		t.Fatalf("openssl.New: %v", err)
 	}
 	defer p.Close()
 
-	_, err = p.DestroyKey(context.Background(), &providerpb.DestroyKeyRequest{})
-	if !errors.IsNotImplemented(err) {
-		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	resp, err := p.DestroyKey(context.Background(), &providerpb.DestroyKeyRequest{})
+	if err != nil {
+		t.Fatalf("DestroyKey: %v", err)
+	}
+	if resp == nil {
+		t.Error("expected a non-nil response")
 	}
 }
 
