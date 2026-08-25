@@ -44,3 +44,34 @@ func encryptAESGCM(ctx context.Context, libctx *ossl.Context, name ossl.CipherNa
 	}
 	return ciphertext, nonce, nil
 }
+
+// decryptAESGCM decrypts ciphertext using the nonce recorded at encryption
+// time. Unlike Verify's boolean result, DecryptResponse has no channel for
+// "authentication failed, not an error" — decrypt failure MUST surface as
+// an error here, the same convention software.decryptAESGCM documents.
+// aead.Open already collapses every failure mode (tampered ciphertext,
+// wrong tag, wrong AAD, wrong key) into ossl.ErrVerification by design (see
+// its doc comment), so this reports the same single generic authentication
+// failure software does, keeping the error message identical regardless of
+// which provider served the request.
+func decryptAESGCM(ctx context.Context, libctx *ossl.Context, name ossl.CipherName, keyMaterial, ciphertext, nonce, aad []byte, params *types.AesGcmParams) ([]byte, error) {
+	const op errors.Op = "openssl.decryptAESGCM"
+
+	aead, err := libctx.NewAEAD(name, keyMaterial,
+		ossl.WithIVSize(int(params.GetIvSizeBits()/8)), ossl.WithTagSize(int(params.GetTagSizeBits()/8)))
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	defer aead.Close()
+
+	if len(nonce) != aead.NonceSize() {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"nonce is %d bytes, want %d bytes", len(nonce), aead.NonceSize())
+	}
+
+	plaintext, err := aead.Open(nil, nonce, ciphertext, aad)
+	if err != nil {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "AES-GCM authentication failed")
+	}
+	return plaintext, nil
+}

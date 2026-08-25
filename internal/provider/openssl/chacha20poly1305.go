@@ -42,3 +42,28 @@ func encryptChaCha20Poly1305(ctx context.Context, libctx *ossl.Context, keyMater
 	}
 	return ciphertext, nonce, nil
 }
+
+// decryptChaCha20Poly1305 mirrors decryptAESGCM, including collapsing every
+// failure mode (tampered ciphertext, wrong tag, wrong AAD, wrong key) into
+// one generic authentication error — the same convention
+// software.decryptChaCha20Poly1305 documents.
+func decryptChaCha20Poly1305(ctx context.Context, libctx *ossl.Context, keyMaterial, ciphertext, nonce, aad []byte) ([]byte, error) {
+	const op errors.Op = "openssl.decryptChaCha20Poly1305"
+
+	aead, err := libctx.NewAEAD(ossl.ChaCha20Poly1305, keyMaterial)
+	if err != nil {
+		return nil, errors.Wrap(ctx, op, err)
+	}
+	defer aead.Close()
+
+	if len(nonce) != aead.NonceSize() {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"nonce is %d bytes, want %d bytes", len(nonce), aead.NonceSize())
+	}
+
+	plaintext, err := aead.Open(nil, nonce, ciphertext, aad)
+	if err != nil {
+		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "ChaCha20-Poly1305 authentication failed")
+	}
+	return plaintext, nil
+}

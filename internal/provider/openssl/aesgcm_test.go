@@ -8,6 +8,7 @@ import (
 
 	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
@@ -16,50 +17,8 @@ func encryptRequestAead(aad []byte) *providerpb.EncryptRequest_AeadParams {
 	return &providerpb.EncryptRequest_AeadParams{AeadParams: &types.AeadEncryptParams{Aad: aad}}
 }
 
-// TestEncrypt_AESGCM_verifiesWithSoftware proves the ciphertext, nonce, and
-// tag openssl's Encrypt produces are wire-compatible with software's
-// independent Decrypt -- a real cross-provider check, not a
-// self-consistency loop. openssl's own Decrypt for AEAD lands in a later
-// commit, so only this direction is provable for now.
-func TestEncrypt_AESGCM_verifiesWithSoftware(t *testing.T) {
-	ctx := context.Background()
-	p, err := openssl.New(ctx)
-	if err != nil {
-		t.Fatalf("openssl.New: %v", err)
-	}
-	defer p.Close()
-
-	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: aesGCMDetails(256)})
-	if err != nil {
-		t.Fatalf("GenerateKey: %v", err)
-	}
-
-	plaintext := []byte("encrypt with openssl, decrypt with software")
-	aad := []byte("associated data")
-	encResp, err := p.Encrypt(ctx, &providerpb.EncryptRequest{
-		Algorithm:   aesGCMDetails(256),
-		KeyMaterial: keyResp.GetKeyMaterial(),
-		Plaintext:   plaintext,
-		ScopeParams: encryptRequestAead(aad),
-	})
-	if err != nil {
-		t.Fatalf("Encrypt: %v", err)
-	}
-
-	sw := software.New()
-	decResp, err := sw.Decrypt(ctx, &providerpb.DecryptRequest{
-		Algorithm:   aesGCMDetails(256),
-		KeyMaterial: keyResp.GetKeyMaterial(),
-		Ciphertext:  encResp.GetCiphertext(),
-		Output:      encResp.GetOutput(),
-		ScopeParams: &providerpb.DecryptRequest_AeadParams{AeadParams: &types.AeadEncryptParams{Aad: aad}},
-	})
-	if err != nil {
-		t.Fatalf("software Decrypt of openssl-encrypted ciphertext: %v", err)
-	}
-	if string(decResp.GetPlaintext()) != string(plaintext) {
-		t.Errorf("round trip: got %q want %q", decResp.GetPlaintext(), plaintext)
-	}
+func encryptRequestAeadForDecrypt(aad []byte) *providerpb.DecryptRequest_AeadParams {
+	return &providerpb.DecryptRequest_AeadParams{AeadParams: &types.AeadEncryptParams{Aad: aad}}
 }
 
 // TestEncrypt_AESGCM_noncesAreUnique is the negative control proving
@@ -199,5 +158,155 @@ func TestEncrypt_AESGCM_keySizeMismatch_returnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Error("expected an error for a 16-byte key declared as AES-256-GCM (needs 32 bytes)")
+	}
+}
+
+// TestEncryptDecrypt_AESGCM_crossProviderInterop completes the AEAD wire
+// contract check: both directions (software & OpenSSL), proving the AeadOutput contract
+// (nonce, tag length) is identical regardless of which provider produced
+// it or which consumes it.
+func TestEncryptDecrypt_AESGCM_crossProviderInterop(t *testing.T) {
+	ctx := context.Background()
+	plaintext := []byte("cross-provider AES-GCM interop probe")
+	aad := []byte("associated data")
+
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+	sw := software.New()
+
+	// Direction 1: openssl encrypts, software decrypts.
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: aesGCMDetails(256)})
+	if err != nil {
+		t.Fatalf("openssl GenerateKey: %v", err)
+	}
+	osslEnc, err := p.Encrypt(ctx, &providerpb.EncryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Plaintext:   plaintext,
+		ScopeParams: encryptRequestAead(aad),
+	})
+	if err != nil {
+		t.Fatalf("openssl Encrypt: %v", err)
+	}
+	swDec, err := sw.Decrypt(ctx, &providerpb.DecryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Ciphertext:  osslEnc.GetCiphertext(),
+		Output:      osslEnc.GetOutput(),
+		ScopeParams: encryptRequestAeadForDecrypt(aad),
+	})
+	if err != nil {
+		t.Fatalf("software Decrypt of openssl-encrypted ciphertext: %v", err)
+	}
+	if string(swDec.GetPlaintext()) != string(plaintext) {
+		t.Errorf("direction 1 round trip: got %q want %q", swDec.GetPlaintext(), plaintext)
+	}
+
+	// Direction 2: software encrypts, openssl decrypts.
+	swKeyResp, err := sw.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: aesGCMDetails(256)})
+	if err != nil {
+		t.Fatalf("software GenerateKey: %v", err)
+	}
+	swEnc, err := sw.Encrypt(ctx, &providerpb.EncryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: swKeyResp.GetKeyMaterial(),
+		Plaintext:   plaintext,
+		ScopeParams: encryptRequestAead(aad),
+	})
+	if err != nil {
+		t.Fatalf("software Encrypt: %v", err)
+	}
+	osslDec, err := p.Decrypt(ctx, &providerpb.DecryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: swKeyResp.GetKeyMaterial(),
+		Ciphertext:  swEnc.GetCiphertext(),
+		Output:      swEnc.GetOutput(),
+		ScopeParams: encryptRequestAeadForDecrypt(aad),
+	})
+	if err != nil {
+		t.Fatalf("openssl Decrypt of software-encrypted ciphertext: %v", err)
+	}
+	if string(osslDec.GetPlaintext()) != string(plaintext) {
+		t.Errorf("direction 2 round trip: got %q want %q", osslDec.GetPlaintext(), plaintext)
+	}
+}
+
+// TestDecrypt_AESGCM_tamperedCiphertext_returnsError is the negative
+// control: a tampered ciphertext must fail authentication and surface as an
+// error, not a panic and not silently-wrong plaintext.
+func TestDecrypt_AESGCM_tamperedCiphertext_returnsError(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: aesGCMDetails(256)})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	encResp, err := p.Encrypt(ctx, &providerpb.EncryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Plaintext:   []byte("tamper with this ciphertext after encryption"),
+		ScopeParams: encryptRequestAead(nil),
+	})
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	tampered := append([]byte(nil), encResp.GetCiphertext()...)
+	tampered[0] ^= 0xff
+
+	_, err = p.Decrypt(ctx, &providerpb.DecryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Ciphertext:  tampered,
+		Output:      encResp.GetOutput(),
+		ScopeParams: encryptRequestAeadForDecrypt(nil),
+	})
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument for a tampered ciphertext, got: %v", err)
+	}
+}
+
+// TestDecrypt_AESGCM_tamperedAAD_returnsError is the negative control
+// proving AAD is genuinely authenticated, not merely accepted and ignored:
+// decrypting with different AAD than was used at encryption time must fail.
+func TestDecrypt_AESGCM_tamperedAAD_returnsError(t *testing.T) {
+	ctx := context.Background()
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: aesGCMDetails(256)})
+	if err != nil {
+		t.Fatalf("GenerateKey: %v", err)
+	}
+	encResp, err := p.Encrypt(ctx, &providerpb.EncryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Plaintext:   []byte("message"),
+		ScopeParams: encryptRequestAead([]byte("the original AAD")),
+	})
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	_, err = p.Decrypt(ctx, &providerpb.DecryptRequest{
+		Algorithm:   aesGCMDetails(256),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Ciphertext:  encResp.GetCiphertext(),
+		Output:      encResp.GetOutput(),
+		ScopeParams: encryptRequestAeadForDecrypt([]byte("a different AAD")),
+	})
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument for mismatched AAD, got: %v", err)
 	}
 }

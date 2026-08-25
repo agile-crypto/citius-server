@@ -11,9 +11,80 @@ import (
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
 
-// TestEncrypt_ChaCha20Poly1305_verifiesWithSoftware mirrors
-// TestEncrypt_AESGCM_verifiesWithSoftware for ChaCha20-Poly1305.
-func TestEncrypt_ChaCha20Poly1305_verifiesWithSoftware(t *testing.T) {
+// TestEncryptDecrypt_ChaCha20Poly1305_crossProviderInterop mirrors
+// TestEncryptDecrypt_AESGCM_crossProviderInterop.
+func TestEncryptDecrypt_ChaCha20Poly1305_crossProviderInterop(t *testing.T) {
+	ctx := context.Background()
+	plaintext := []byte("cross-provider ChaCha20-Poly1305 interop probe")
+	aad := []byte("associated data")
+
+	p, err := openssl.New(ctx)
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+	sw := software.New()
+
+	// Direction 1: openssl encrypts, software decrypts.
+	keyResp, err := p.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: chacha20Poly1305Details()})
+	if err != nil {
+		t.Fatalf("openssl GenerateKey: %v", err)
+	}
+	osslEnc, err := p.Encrypt(ctx, &providerpb.EncryptRequest{
+		Algorithm:   chacha20Poly1305Details(),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Plaintext:   plaintext,
+		ScopeParams: encryptRequestAead(aad),
+	})
+	if err != nil {
+		t.Fatalf("openssl Encrypt: %v", err)
+	}
+	swDec, err := sw.Decrypt(ctx, &providerpb.DecryptRequest{
+		Algorithm:   chacha20Poly1305Details(),
+		KeyMaterial: keyResp.GetKeyMaterial(),
+		Ciphertext:  osslEnc.GetCiphertext(),
+		Output:      osslEnc.GetOutput(),
+		ScopeParams: encryptRequestAeadForDecrypt(aad),
+	})
+	if err != nil {
+		t.Fatalf("software Decrypt of openssl-encrypted ciphertext: %v", err)
+	}
+	if string(swDec.GetPlaintext()) != string(plaintext) {
+		t.Errorf("direction 1 round trip: got %q want %q", swDec.GetPlaintext(), plaintext)
+	}
+
+	// Direction 2: software encrypts, openssl decrypts.
+	swKeyResp, err := sw.GenerateKey(ctx, &providerpb.GenerateKeyRequest{Algorithm: chacha20Poly1305Details()})
+	if err != nil {
+		t.Fatalf("software GenerateKey: %v", err)
+	}
+	swEnc, err := sw.Encrypt(ctx, &providerpb.EncryptRequest{
+		Algorithm:   chacha20Poly1305Details(),
+		KeyMaterial: swKeyResp.GetKeyMaterial(),
+		Plaintext:   plaintext,
+		ScopeParams: encryptRequestAead(aad),
+	})
+	if err != nil {
+		t.Fatalf("software Encrypt: %v", err)
+	}
+	osslDec, err := p.Decrypt(ctx, &providerpb.DecryptRequest{
+		Algorithm:   chacha20Poly1305Details(),
+		KeyMaterial: swKeyResp.GetKeyMaterial(),
+		Ciphertext:  swEnc.GetCiphertext(),
+		Output:      swEnc.GetOutput(),
+		ScopeParams: encryptRequestAeadForDecrypt(aad),
+	})
+	if err != nil {
+		t.Fatalf("openssl Decrypt of software-encrypted ciphertext: %v", err)
+	}
+	if string(osslDec.GetPlaintext()) != string(plaintext) {
+		t.Errorf("direction 2 round trip: got %q want %q", osslDec.GetPlaintext(), plaintext)
+	}
+}
+
+// TestDecrypt_ChaCha20Poly1305_tamperedCiphertext_returnsError mirrors
+// TestDecrypt_AESGCM_tamperedCiphertext_returnsError.
+func TestDecrypt_ChaCha20Poly1305_tamperedCiphertext_returnsError(t *testing.T) {
 	ctx := context.Background()
 	p, err := openssl.New(ctx)
 	if err != nil {
@@ -25,32 +96,28 @@ func TestEncrypt_ChaCha20Poly1305_verifiesWithSoftware(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateKey: %v", err)
 	}
-
-	plaintext := []byte("encrypt with openssl, decrypt with software")
-	aad := []byte("associated data")
 	encResp, err := p.Encrypt(ctx, &providerpb.EncryptRequest{
 		Algorithm:   chacha20Poly1305Details(),
 		KeyMaterial: keyResp.GetKeyMaterial(),
-		Plaintext:   plaintext,
-		ScopeParams: encryptRequestAead(aad),
+		Plaintext:   []byte("tamper with this ciphertext after encryption"),
+		ScopeParams: encryptRequestAead(nil),
 	})
 	if err != nil {
 		t.Fatalf("Encrypt: %v", err)
 	}
 
-	sw := software.New()
-	decResp, err := sw.Decrypt(ctx, &providerpb.DecryptRequest{
+	tampered := append([]byte(nil), encResp.GetCiphertext()...)
+	tampered[0] ^= 0xff
+
+	_, err = p.Decrypt(ctx, &providerpb.DecryptRequest{
 		Algorithm:   chacha20Poly1305Details(),
 		KeyMaterial: keyResp.GetKeyMaterial(),
-		Ciphertext:  encResp.GetCiphertext(),
+		Ciphertext:  tampered,
 		Output:      encResp.GetOutput(),
-		ScopeParams: &providerpb.DecryptRequest_AeadParams{AeadParams: &types.AeadEncryptParams{Aad: aad}},
+		ScopeParams: encryptRequestAeadForDecrypt(nil),
 	})
-	if err != nil {
-		t.Fatalf("software Decrypt of openssl-encrypted ciphertext: %v", err)
-	}
-	if string(decResp.GetPlaintext()) != string(plaintext) {
-		t.Errorf("round trip: got %q want %q", decResp.GetPlaintext(), plaintext)
+	if !errors.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument for a tampered ciphertext, got: %v", err)
 	}
 }
 

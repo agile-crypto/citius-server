@@ -514,6 +514,17 @@ func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) 
 	}
 
 	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_AesGcm:
+		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		plaintext, err := decryptAESGCM(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetCiphertext(),
+			req.GetOutput().GetAeadOutput().GetNonce(), req.GetAeadParams().GetAad(), alg.AesGcm)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
 	case *types.AlgorithmDetails_AesCbc:
 		name, err := cipherNameFor(ctx, op, req.GetAlgorithm())
 		if err != nil {
@@ -532,6 +543,16 @@ func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) 
 		}
 		plaintext, err := decryptAESCTR(ctx, p.libctx, name, req.GetKeyMaterial(), req.GetCiphertext(),
 			req.GetOutput().GetBlockCipherOutput().GetIv(), alg.AesCtr)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.DecryptResponse{Plaintext: plaintext, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_Chacha20Poly1305:
+		if _, err := cipherNameFor(ctx, op, req.GetAlgorithm()); err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		plaintext, err := decryptChaCha20Poly1305(ctx, p.libctx, req.GetKeyMaterial(), req.GetCiphertext(),
+			req.GetOutput().GetAeadOutput().GetNonce(), req.GetAeadParams().GetAad())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
