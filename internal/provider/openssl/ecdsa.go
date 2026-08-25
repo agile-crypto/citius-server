@@ -240,3 +240,34 @@ func signECDSADigest(ctx context.Context, libctx *ossl.Context, privDER, digest 
 	}
 	return sig, nil
 }
+
+// verifyECDSA verifies signature over payload with the ECDSA public key in
+// pubDER. Key.Verify hashes payload internally under digest — same absence
+// of a separate hashing step as signECDSA, and the same reason: malformed
+// signature bytes and a genuinely wrong signature are both reported as
+// ossl.ErrVerification (see verifyOutcome), never distinguished the way
+// software's decodeECDSASignature does — ossl-go draws that line inside
+// Key.Verify itself.
+func verifyECDSA(ctx context.Context, libctx *ossl.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, curve types.EllipticCurve, hash types.HashAlgorithm, format types.SignatureFormat) (bool, error) {
+	const op errors.Op = "openssl.verifyECDSA"
+
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if err = checkCurveMatches(ctx, op, key, curve); err != nil {
+		return false, err
+	}
+	digest, err := ecdsaDigestName(ctx, op, curve, hash)
+	if err != nil {
+		return false, err
+	}
+	sigFormat, err := ecdsaSignatureFormat(ctx, op, format)
+	if err != nil {
+		return false, err
+	}
+
+	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Digest: digest, Format: sigFormat}))
+}

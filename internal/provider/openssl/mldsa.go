@@ -116,3 +116,37 @@ func signMLDSA(ctx context.Context, libctx *ossl.Context, privDER, payload, doma
 	}
 	return sig, nil
 }
+
+// verifyMLDSA verifies signature over payload with the ML-DSA public key in
+// pubBytes, honoring the same domain separation context Sign does.
+//
+// pubBytes is parsed with ParseRawPublicKey rather than the shared
+// parsePublicKey: RAW is not self-describing the way SPKI is, so the
+// algorithm resolved from parameterSet is what tells ossl-go which ML-DSA
+// variant these bytes are -- see generateMLDSAKey's doc comment for why RAW
+// is this algorithm's public key encoding at all.
+func verifyMLDSA(ctx context.Context, libctx *ossl.Context, pubBytes, payload, signature, domainContext []byte, parameterSet types.MlDsaParameterSet) (bool, error) {
+	const op errors.Op = "openssl.verifyMLDSA"
+
+	if err := checkMLDSAContextLength(ctx, op, domainContext); err != nil {
+		return false, err
+	}
+	algorithm, _, err := mlDSAKeyAlgorithmFor(ctx, op, parameterSet)
+	if err != nil {
+		return false, err
+	}
+	key, err := libctx.ParseRawPublicKey(algorithm, pubBytes)
+	if err != nil {
+		// Malformed stored public key -- internal consistency error, not a
+		// signature failure -- same distinction software's verifyMLDSA draws.
+		return false, errors.Wrap(ctx, op, err)
+	}
+	defer key.Close()
+
+	if key.Type() != algorithm {
+		return false, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"key type %s does not match declared algorithm %s", key.Type(), algorithm)
+	}
+
+	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Context: domainContext}))
+}

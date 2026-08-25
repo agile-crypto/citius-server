@@ -249,3 +249,55 @@ func signRSAPKCS1v15Digest(ctx context.Context, libctx *ossl.Context, privDER, d
 	}
 	return sig, nil
 }
+
+// verifyRSAPSS verifies signature over payload with the RSA-PSS public key
+// in pubDER.
+func verifyRSAPSS(ctx context.Context, libctx *ossl.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, params *types.RsaPssParams) (bool, error) {
+	const op errors.Op = "openssl.verifyRSAPSS"
+
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if err = checkRSAKeySize(ctx, op, key, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	if err = checkRSAPSSMGF(ctx, op, params.GetMgf(), params.GetHash(), params.GetMgfHash()); err != nil {
+		return false, err
+	}
+	digest, err := rsaHashName(ctx, op, params.GetHash())
+	if err != nil {
+		return false, err
+	}
+	saltLen, err := rsaPSSSaltLength(ctx, op, params.GetSaltLengthMode(), params.GetSaltLengthBytes())
+	if err != nil {
+		return false, err
+	}
+
+	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Digest: digest, Padding: ossl.RSAPSS, PSSSaltLen: saltLen}))
+}
+
+// verifyRSAPKCS1v15 verifies signature over payload with the RSA public key
+// in pubDER using PKCS#1 v1.5 padding. Padding must be set explicitly for
+// the same reason it must on the sign side — see signRSAPKCS1v15.
+func verifyRSAPKCS1v15(ctx context.Context, libctx *ossl.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, params *types.RsaPkcs1V15Params) (bool, error) {
+	const op errors.Op = "openssl.verifyRSAPKCS1v15"
+
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if err = checkRSAKeySize(ctx, op, key, params.GetKeySizeBits()); err != nil {
+		return false, err
+	}
+	digest, err := rsaHashName(ctx, op, params.GetHash())
+	if err != nil {
+		return false, err
+	}
+
+	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Digest: digest, Padding: ossl.RSAPKCS1v15}))
+}

@@ -140,3 +140,28 @@ func signEd25519PHDigest(ctx context.Context, libctx *ossl.Context, privDER, dig
 	}
 	return sig, nil
 }
+
+// verifyEd25519 verifies signature over payload with the Ed25519 public key
+// in pubDER. Pure and ph are both handled by this one Key.Verify call, the
+// same symmetry signEd25519 has on the sign side -- unlike software, whose
+// regular Verify only reaches pure Ed25519 (ph requires the separate
+// VerifyDigest entry point there).
+func verifyEd25519(ctx context.Context, libctx *ossl.Context, pubDER, payload, signature []byte, keyEncoding providerpb.PublicKeyEncoding, variant types.Ed25519Variant) (bool, error) {
+	const op errors.Op = "openssl.verifyEd25519"
+
+	if err := checkEd25519VariantSupported(ctx, op, variant); err != nil {
+		return false, err
+	}
+	key, err := parsePublicKey(ctx, op, libctx, pubDER, keyEncoding)
+	if err != nil {
+		return false, err
+	}
+	defer key.Close()
+
+	if key.Type() != ossl.Ed25519 {
+		return false, errors.New(ctx, op, errors.CodeInvalidArgument,
+			"key type %s does not match declared algorithm Ed25519", key.Type())
+	}
+
+	return verifyOutcome(ctx, op, key.Verify(payload, signature, &ossl.SignOptions{Prehash: variant == types.Ed25519Variant_ED25519_VARIANT_PH}))
+}

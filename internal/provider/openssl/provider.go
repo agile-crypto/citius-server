@@ -245,6 +245,53 @@ func (p *Provider) Sign(ctx context.Context, req *providerpb.SignRequest) (*prov
 	}
 }
 
+// Verify dispatches to the algorithm-specific verify implementation.
+func (p *Provider) Verify(ctx context.Context, req *providerpb.VerifyRequest) (*providerpb.VerifyResponse, error) {
+	const op errors.Op = "openssl.(Provider).Verify"
+
+	if err := validateRequest(ctx, op, req); err != nil {
+		return nil, err
+	}
+
+	switch alg := req.GetAlgorithm().GetAlgorithm().(type) {
+	case *types.AlgorithmDetails_Ecdsa:
+		valid, err := verifyECDSA(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
+			req.GetKeyMaterialEncoding(), alg.Ecdsa.GetCurve(), alg.Ecdsa.GetHash(), alg.Ecdsa.GetSignatureFormat())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_MlDsa:
+		valid, err := verifyMLDSA(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(),
+			req.GetDomainContext().GetContext(), alg.MlDsa.GetParameterSet())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_RsaPss:
+		valid, err := verifyRSAPSS(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(), req.GetKeyMaterialEncoding(), alg.RsaPss)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_RsaPkcs1V15:
+		valid, err := verifyRSAPKCS1v15(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(), req.GetKeyMaterialEncoding(), alg.RsaPkcs1V15)
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	case *types.AlgorithmDetails_Ed25519:
+		valid, err := verifyEd25519(ctx, p.libctx, req.GetKeyMaterial(), req.GetInput(), req.GetSignature(), req.GetKeyMaterialEncoding(), alg.Ed25519.GetVariant())
+		if err != nil {
+			return nil, errors.Wrap(ctx, op, err)
+		}
+		return &providerpb.VerifyResponse{Valid: valid, Output: provider.NoOutputUnencoded()}, nil
+	default:
+		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
+			fmt.Sprintf("unsupported algorithm for verify: %T", req.GetAlgorithm().GetAlgorithm()))
+	}
+}
+
 // validateDigestLength rejects a digest whose length contradicts the
 // declared hash algorithm (e.g. a 20-byte digest claiming to be SHA-256,
 // which must be 32 bytes). Hash algorithms with no fixed length
