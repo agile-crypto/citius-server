@@ -11,8 +11,36 @@ jobs:
     name: ci          
     runs-on: ubuntu-latest
 
+    env:
+      OPENSSL_PREFIX: /opt/openssl3.5.2
+
     steps:
       - uses: actions/checkout@v6
+
+      # internal/provider/openssl (via github.com/agile-crypto/ossl-go) is a
+      # cgo dependency that needs OpenSSL 3.5+ headers/libs -- ubuntu-latest
+      # only ships the distro default (3.0.x), which predates them and fails
+      # typecheck with "openssl/thread.h: No such file or directory". The
+      # Makefile already points PKG_CONFIG_PATH/CGO_LDFLAGS at OPENSSL_PREFIX
+      # (see its "OpenSSL 3.5+ toolchain" comment); this just has to exist.
+      - name: Cache OpenSSL 3.5.2 build
+        id: openssl-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.OPENSSL_PREFIX }}
+          key: openssl-3.5.2-${{ runner.os }}-libdir-lib64-v1
+
+      - name: Build OpenSSL 3.5.2
+        if: steps.openssl-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          curl -fsSL -o openssl.tar.gz https://www.openssl.org/source/openssl-3.5.2.tar.gz
+          echo "c53a47e5e441c930c3928cf7bf6fb00e5d129b630e0aa873b08258656e7345ec  openssl.tar.gz" | sha256sum -c -
+          tar xzf openssl.tar.gz
+          cd openssl-3.5.2
+          ./Configure --prefix="${OPENSSL_PREFIX}" --libdir=lib64 shared linux-x86_64
+          make -j"$(nproc)"
+          sudo make install_sw
 
       - name: Set up Go
         uses: actions/setup-go@v6
