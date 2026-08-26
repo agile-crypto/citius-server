@@ -21,11 +21,20 @@ The server exposes three gRPC services from the API spec:
 | Service | Supported operations |
 |---|---|
 | `KeyManagementService` | `CreateKey`, `ReadKey`, `TransformKey` |
-| `CryptoService` | `Sign`, `Verify` |
-| `CryptoPolicyService` | Policy evaluation used by the above |
+| `CryptoService` | `Sign`, `Verify`, `DigestSign`, `DigestVerify`, `Encrypt`, `Decrypt` |
+| `CryptoPolicyService` | `CreateCryptoPolicy`, `ReadCryptoPolicy`, `UpdateCryptoPolicy` |
 
-- **Algorithms:** `ecdsa-p256-sha256` and `ml-dsa-65` (post-quantum), via a
-  built-in software provider. A loopback provider is available for testing.
+- **Algorithms:** ECDSA (P-256/P-384/P-521), RSA-PSS and RSA-PKCS#1v1.5
+  (2048/3072/4096), Ed25519 (pure and prehashed), and ML-DSA-44/65/87
+  (post-quantum), defined per template in the algorithm catalog.
+- **Providers:** a pure-Go software provider and an OpenSSL provider (via
+  OpenSSL 3.5+, with an optional FIPS-restricted mode) are both registered
+  and implement the full sign/verify/encrypt/decrypt surface at the
+  provider layer; a loopback provider is available for testing. Sign,
+  verify, prehashed sign/verify, and symmetric encrypt/decrypt are exposed
+  over gRPC; MAC, key wrapping/derivation/agreement, digest/XOF, and random
+  generation exist as provider capabilities but aren't wired to a handler
+  yet (see [Roadmap](#roadmap)).
 - **Templates & policies** are loaded from a JSON catalog
   (`proto/standard_algorithms.json`).
 - **Storage** is in-memory (non-persistent).
@@ -105,12 +114,12 @@ make help        # list all targets
 This implementation is actively evolving toward broader coverage of the API
 spec. Planned work, roughly in scope order:
 
-- **Functions:** encrypt/decrypt, MAC, key agreement, encapsulation/
-  decapsulation, key derivation, symmetric crypto, rotation, migration, and the
-  discovery service.
+- **Functions:** expose MAC, key agreement, encapsulation/decapsulation, key
+  wrapping/derivation, digest/XOF, random generation, rotation, migration,
+  and the discovery service over gRPC.
 - **Algorithms:** expand coverage within each primitive.
 - **Provider backends:** additional backends and capabilities — PKCS#11,
-  OpenSSL, KMS, JCA.
+  KMS, JCA.
 - **Knowledge base:** richer templates and their security properties.
 - **gRPC Gateway** for REST/HTTP access.
 - **Persistent storage** with encryption at rest.
