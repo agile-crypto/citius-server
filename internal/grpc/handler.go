@@ -292,6 +292,48 @@ func (h *Handler) Encrypt(ctx context.Context, req *messagespb.EncryptRequest) (
 	}, nil
 }
 
+// Decrypt handles the Decrypt RPC.
+//
+// Proto mapping:
+//
+//	messages.DecryptRequest.key_name                 => crypto.DecryptRequest.KeyName
+//	messages.DecryptRequest.ciphertext                => crypto.DecryptRequest.Ciphertext
+//	messages.DecryptRequest.metadata.key_version      => crypto.DecryptRequest.KeyVersion
+//	messages.DecryptRequest.metadata.provider_output  => crypto.DecryptRequest.Output (carries IV/nonce)
+//	messages.DecryptRequest.scope_params              => crypto.DecryptRequest.EncryptionScopeFields
+func (h *Handler) Decrypt(ctx context.Context, req *messagespb.DecryptRequest) (*messagespb.DecryptResponse, error) {
+	const decryptOp engerr.Op = handlerOp + ".Decrypt"
+
+	if err := authorizeKeyName(ctx, decryptOp, req.GetKeyName()); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	decryptReq := crypto.DecryptRequest{
+		KeyName:    req.GetKeyName(),
+		KeyVersion: req.GetMetadata().GetKeyVersion(),
+		Ciphertext: req.GetCiphertext(),
+		Output:     req.GetMetadata().GetProviderOutput(),
+	}
+	extractDecryptScopeParams(req.GetScopeParams(), &decryptReq)
+
+	result, err := scope.Crypto().Decrypt(ctx, decryptReq)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, decryptOp, err))
+	}
+
+	return &messagespb.DecryptResponse{
+		Plaintext: result.Plaintext,
+		Metadata: &messagespb.OperationMetadata{
+			ProviderOutput: result.Output,
+		},
+	}, nil
+}
+
 // extractSigningScopeParams maps the proto scope_params oneof to Go pointer fields.
 // The proto oneof interface (isSignRequest_ScopeParams) is unexported, so we accept any.
 // Concrete wrapper types SignRequest_NoContext / _DomainContext / _VendorContext are exported.
@@ -337,6 +379,26 @@ func extractEncryptScopeParams(sp any, req *crypto.EncryptRequest) {
 	case *messagespb.EncryptRequest_AsymmetricParams:
 		req.AsymmetricParams = v.AsymmetricParams
 	case *messagespb.EncryptRequest_VendorParams:
+		req.VendorParams = v.VendorParams
+	default:
+		// nil or unrecognised variant — downstream validation will report the issue.
+	}
+}
+
+// extractDecryptScopeParams maps the proto scope_params oneof for DecryptRequest
+// onto crypto.EncryptionScopeFields. Same pattern as extractEncryptScopeParams but
+// uses DecryptRequest_* wrapper types.
+func extractDecryptScopeParams(sp any, req *crypto.DecryptRequest) {
+	switch v := sp.(type) {
+	case *messagespb.DecryptRequest_NoParams:
+		req.NoParams = v.NoParams
+	case *messagespb.DecryptRequest_AeadParams:
+		req.AeadParams = v.AeadParams
+	case *messagespb.DecryptRequest_XtsParams:
+		req.XtsParams = v.XtsParams
+	case *messagespb.DecryptRequest_AsymmetricParams:
+		req.AsymmetricParams = v.AsymmetricParams
+	case *messagespb.DecryptRequest_VendorParams:
 		req.VendorParams = v.VendorParams
 	default:
 		// nil or unrecognised variant — downstream validation will report the issue.

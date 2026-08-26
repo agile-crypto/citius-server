@@ -153,11 +153,12 @@ func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.Tra
 }
 
 // mockCryptoOps stubs CryptoOrchestrator for tests.
-// Only signFn, verifyFn, and encryptFn are wired; all other methods panic.
+// Only signFn, verifyFn, encryptFn, and decryptFn are wired; all other methods panic.
 type mockCryptoOps struct {
 	signFn    func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
 	verifyFn  func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
 	encryptFn func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
+	decryptFn func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
 }
 
 func (m *mockCryptoOps) Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error) {
@@ -187,7 +188,10 @@ func (m *mockCryptoOps) Encrypt(ctx context.Context, req crypto.EncryptRequest) 
 	}
 	panic("mockCryptoOps.Encrypt: not implemented")
 }
-func (m *mockCryptoOps) Decrypt(_ context.Context, _ crypto.DecryptRequest) (crypto.DecryptResult, error) {
+func (m *mockCryptoOps) Decrypt(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error) {
+	if m.decryptFn != nil {
+		return m.decryptFn(ctx, req)
+	}
 	panic("mockCryptoOps.Decrypt: not implemented")
 }
 func (m *mockCryptoOps) WrapKey(_ context.Context, _ crypto.WrapKeyRequest) (crypto.WrapKeyResult, error) {
@@ -548,6 +552,223 @@ func TestHandler_Encrypt_OrchestratorError_MapsToStatus(t *testing.T) {
 		KeyName:   "key_123",
 		Plaintext: []byte("hello"),
 		ScopeParams: &messagespb.EncryptRequest_NoParams{
+			NoParams: &typespb.NoParams{},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	st, _ := status.FromError(err)
+	if st.Code() != codes.Unimplemented {
+		t.Errorf("expected Unimplemented, got %s", st.Code())
+	}
+}
+
+func TestHandler_Decrypt_Success(t *testing.T) {
+	ctx := context.Background()
+	providerOutput := &messagespb.ProviderOutput{
+		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{
+			NoOutput: &messagespb.NoAlgorithmOutput{},
+		},
+		Encoding: "raw",
+	}
+	cr := &mockCryptoOps{
+		decryptFn: func(_ context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error) {
+			if req.KeyVersion != 3 {
+				t.Errorf("expected KeyVersion 3 from metadata.key_version, got %d", req.KeyVersion)
+			}
+			if req.Output == nil {
+				t.Error("expected Output to be set from metadata.provider_output")
+			}
+			if req.AeadParams == nil {
+				t.Error("expected AeadParams to be set for AES-GCM decrypt")
+			}
+			return crypto.DecryptResult{
+				Plaintext:    []byte("hello"),
+				Algorithm:    "aes-256-gcm-128-96",
+				ProviderName: "software",
+				Output:       providerOutput,
+			}, nil
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	resp, err := h.Decrypt(ctx, &messagespb.DecryptRequest{
+		KeyName:    "key_123",
+		Ciphertext: []byte("fake-ciphertext"),
+		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     3,
+			ProviderOutput: providerOutput,
+		},
+		ScopeParams: &messagespb.DecryptRequest_AeadParams{
+			AeadParams: &typespb.AeadEncryptParams{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Decrypt handler: %v", err)
+	}
+	if string(resp.GetPlaintext()) != "hello" {
+		t.Errorf("Decrypt response: expected plaintext %q, got %q", "hello", resp.GetPlaintext())
+	}
+	if resp.GetMetadata() == nil {
+		t.Fatal("Decrypt response: Metadata must not be nil")
+	}
+	if resp.GetMetadata().GetProviderOutput() == nil {
+		t.Error("Decrypt response: Metadata.ProviderOutput must not be nil")
+	}
+}
+
+func TestHandler_Decrypt_ScopeParamsVariants(t *testing.T) {
+	ctx := context.Background()
+	providerOutput := &messagespb.ProviderOutput{
+		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{NoOutput: &messagespb.NoAlgorithmOutput{}},
+		Encoding:        "raw",
+	}
+	metadata := &messagespb.OperationMetadata{ProviderOutput: providerOutput}
+
+	tests := []struct {
+		name     string
+		buildReq func() *messagespb.DecryptRequest
+		check    func(t *testing.T, req crypto.DecryptRequest)
+	}{
+		{
+			name: "NoParams",
+			buildReq: func() *messagespb.DecryptRequest {
+				return &messagespb.DecryptRequest{
+					KeyName: "key_123", Ciphertext: []byte("ct"), Metadata: metadata,
+					ScopeParams: &messagespb.DecryptRequest_NoParams{NoParams: &typespb.NoParams{}},
+				}
+			},
+			check: func(t *testing.T, req crypto.DecryptRequest) {
+				if req.NoParams == nil {
+					t.Error("expected NoParams to be set")
+				}
+			},
+		},
+		{
+			name: "AeadParams",
+			buildReq: func() *messagespb.DecryptRequest {
+				return &messagespb.DecryptRequest{
+					KeyName: "key_123", Ciphertext: []byte("ct"), Metadata: metadata,
+					ScopeParams: &messagespb.DecryptRequest_AeadParams{AeadParams: &typespb.AeadEncryptParams{Aad: []byte("aad")}},
+				}
+			},
+			check: func(t *testing.T, req crypto.DecryptRequest) {
+				if req.AeadParams == nil || string(req.AeadParams.GetAad()) != "aad" {
+					t.Error("expected AeadParams with AAD to be set")
+				}
+			},
+		},
+		{
+			name: "XtsParams",
+			buildReq: func() *messagespb.DecryptRequest {
+				return &messagespb.DecryptRequest{
+					KeyName: "key_123", Ciphertext: []byte("ct"), Metadata: metadata,
+					ScopeParams: &messagespb.DecryptRequest_XtsParams{XtsParams: &typespb.XtsEncryptParams{Tweak: []byte("tweak-16-bytes--")}},
+				}
+			},
+			check: func(t *testing.T, req crypto.DecryptRequest) {
+				if req.XtsParams == nil {
+					t.Error("expected XtsParams to be set")
+				}
+			},
+		},
+		{
+			name: "AsymmetricParams",
+			buildReq: func() *messagespb.DecryptRequest {
+				return &messagespb.DecryptRequest{
+					KeyName: "key_123", Ciphertext: []byte("ct"), Metadata: metadata,
+					ScopeParams: &messagespb.DecryptRequest_AsymmetricParams{AsymmetricParams: &typespb.AsymmetricEncryptParams{Label: []byte("label")}},
+				}
+			},
+			check: func(t *testing.T, req crypto.DecryptRequest) {
+				if req.AsymmetricParams == nil {
+					t.Error("expected AsymmetricParams to be set")
+				}
+			},
+		},
+		{
+			name: "VendorParams",
+			buildReq: func() *messagespb.DecryptRequest {
+				return &messagespb.DecryptRequest{
+					KeyName: "key_123", Ciphertext: []byte("ct"), Metadata: metadata,
+					ScopeParams: &messagespb.DecryptRequest_VendorParams{VendorParams: &typespb.VendorEncryptionParams{}},
+				}
+			},
+			check: func(t *testing.T, req crypto.DecryptRequest) {
+				if req.VendorParams == nil {
+					t.Error("expected VendorParams to be set")
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var captured crypto.DecryptRequest
+			cr := &mockCryptoOps{
+				decryptFn: func(_ context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error) {
+					captured = req
+					return crypto.DecryptResult{Plaintext: []byte("pt"), Output: providerOutput}, nil
+				},
+			}
+			h := wireHandler(nil, cr)
+
+			if _, err := h.Decrypt(ctx, tt.buildReq()); err != nil {
+				t.Fatalf("Decrypt handler: %v", err)
+			}
+			tt.check(t, captured)
+		})
+	}
+}
+
+// TestHandler_Decrypt_MissingMetadata_ReturnsInvalidArgument proves the handler
+// does not nil-deref when metadata is omitted (proto getters are nil-safe) and
+// that the orchestrator's own nil-Output rejection reaches the caller as
+// InvalidArgument rather than surfacing as an unrelated or opaque error.
+func TestHandler_Decrypt_MissingMetadata_ReturnsInvalidArgument(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		decryptFn: func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error) {
+			if req.Output != nil {
+				t.Fatal("expected Output to be nil when metadata is omitted")
+			}
+			return crypto.DecryptResult{}, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "Output must not be nil")
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	_, err := h.Decrypt(ctx, &messagespb.DecryptRequest{
+		KeyName:    "key_123",
+		Ciphertext: []byte("ct"),
+		ScopeParams: &messagespb.DecryptRequest_NoParams{
+			NoParams: &typespb.NoParams{},
+		},
+		// Metadata intentionally omitted.
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	st, _ := status.FromError(err)
+	if st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %s", st.Code())
+	}
+}
+
+func TestHandler_Decrypt_OrchestratorError_MapsToStatus(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		decryptFn: func(ctx context.Context, _ crypto.DecryptRequest) (crypto.DecryptResult, error) {
+			return crypto.DecryptResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support decryption")
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	_, err := h.Decrypt(ctx, &messagespb.DecryptRequest{
+		KeyName:    "key_123",
+		Ciphertext: []byte("ct"),
+		Metadata:   &messagespb.OperationMetadata{},
+		ScopeParams: &messagespb.DecryptRequest_NoParams{
 			NoParams: &typespb.NoParams{},
 		},
 	})
