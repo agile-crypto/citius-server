@@ -252,6 +252,46 @@ func (h *Handler) Verify(ctx context.Context, req *messagespb.VerifyRequest) (*m
 	}, nil
 }
 
+// Encrypt handles the Encrypt RPC.
+//
+// Proto mapping:
+//
+//	messages.EncryptRequest.key_name     => crypto.EncryptRequest.KeyName
+//	messages.EncryptRequest.plaintext    => crypto.EncryptRequest.Plaintext
+//	messages.EncryptRequest.scope_params => crypto.EncryptRequest.EncryptionScopeFields
+//	crypto.EncryptResult.Output          => messages.EncryptResponse.Metadata.ProviderOutput
+func (h *Handler) Encrypt(ctx context.Context, req *messagespb.EncryptRequest) (*messagespb.EncryptResponse, error) {
+	const encryptOp engerr.Op = handlerOp + ".Encrypt"
+
+	if err := authorizeKeyName(ctx, encryptOp, req.GetKeyName()); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	encryptReq := crypto.EncryptRequest{
+		KeyName:   req.GetKeyName(),
+		Plaintext: req.GetPlaintext(),
+	}
+	extractEncryptScopeParams(req.GetScopeParams(), &encryptReq)
+
+	result, err := scope.Crypto().Encrypt(ctx, encryptReq)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, encryptOp, err))
+	}
+
+	return &messagespb.EncryptResponse{
+		Ciphertext: result.Ciphertext,
+		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     result.KeyVersion,
+			ProviderOutput: result.Output,
+		},
+	}, nil
+}
+
 // extractSigningScopeParams maps the proto scope_params oneof to Go pointer fields.
 // The proto oneof interface (isSignRequest_ScopeParams) is unexported, so we accept any.
 // Concrete wrapper types SignRequest_NoContext / _DomainContext / _VendorContext are exported.
@@ -280,6 +320,26 @@ func extractVerifyScopeParams(sp any, req *crypto.VerifyRequest) {
 		req.VendorContext = v.VendorContext
 	default:
 		// nil or unrecognised variant.
+	}
+}
+
+// extractEncryptScopeParams maps the proto scope_params oneof for EncryptRequest
+// onto crypto.EncryptionScopeFields. Same pattern as extractSigningScopeParams but
+// uses EncryptRequest_* wrapper types.
+func extractEncryptScopeParams(sp any, req *crypto.EncryptRequest) {
+	switch v := sp.(type) {
+	case *messagespb.EncryptRequest_NoParams:
+		req.NoParams = v.NoParams
+	case *messagespb.EncryptRequest_AeadParams:
+		req.AeadParams = v.AeadParams
+	case *messagespb.EncryptRequest_XtsParams:
+		req.XtsParams = v.XtsParams
+	case *messagespb.EncryptRequest_AsymmetricParams:
+		req.AsymmetricParams = v.AsymmetricParams
+	case *messagespb.EncryptRequest_VendorParams:
+		req.VendorParams = v.VendorParams
+	default:
+		// nil or unrecognised variant — downstream validation will report the issue.
 	}
 }
 
