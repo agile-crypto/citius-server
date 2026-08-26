@@ -14,6 +14,7 @@ import (
 	grpchandler "github.com/agile-crypto/citius-server/internal/grpc"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
 	"google.golang.org/grpc/codes"
@@ -153,12 +154,14 @@ func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.Tra
 }
 
 // mockCryptoOps stubs CryptoOrchestrator for tests.
-// Only signFn, verifyFn, encryptFn, and decryptFn are wired; all other methods panic.
+// Only signFn, verifyFn, encryptFn, decryptFn, and digestSignFn are wired;
+// all other methods panic.
 type mockCryptoOps struct {
-	signFn    func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
-	verifyFn  func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
-	encryptFn func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
-	decryptFn func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
+	signFn       func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
+	verifyFn     func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
+	encryptFn    func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
+	decryptFn    func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
+	digestSignFn func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error)
 }
 
 func (m *mockCryptoOps) Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error) {
@@ -176,7 +179,10 @@ func (m *mockCryptoOps) Verify(ctx context.Context, req crypto.VerifyRequest) (c
 }
 
 // Stub the rest of the interface.
-func (m *mockCryptoOps) DigestSign(_ context.Context, _ crypto.DigestSignRequest) (crypto.SignResult, error) {
+func (m *mockCryptoOps) DigestSign(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error) {
+	if m.digestSignFn != nil {
+		return m.digestSignFn(ctx, req)
+	}
 	panic("mockCryptoOps.DigestSign: not implemented")
 }
 func (m *mockCryptoOps) DigestVerify(_ context.Context, _ crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
@@ -770,6 +776,130 @@ func TestHandler_Decrypt_OrchestratorError_MapsToStatus(t *testing.T) {
 		Metadata:   &messagespb.OperationMetadata{},
 		ScopeParams: &messagespb.DecryptRequest_NoParams{
 			NoParams: &typespb.NoParams{},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	st, _ := status.FromError(err)
+	if st.Code() != codes.Unimplemented {
+		t.Errorf("expected Unimplemented, got %s", st.Code())
+	}
+}
+
+func TestHandler_DigestSign_Success(t *testing.T) {
+	ctx := context.Background()
+	providerOutput := &messagespb.ProviderOutput{
+		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{
+			NoOutput: &messagespb.NoAlgorithmOutput{},
+		},
+		Encoding: "raw",
+	}
+	digest := make([]byte, 32) // SHA-256 output size
+	cr := &mockCryptoOps{
+		digestSignFn: func(_ context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error) {
+			if req.NoContext == nil {
+				t.Error("expected NoContext to be set for ECDSA digest sign")
+			}
+			if req.HashAlgorithm != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+				t.Errorf("expected HashAlgorithm SHA256, got %s", req.HashAlgorithm)
+			}
+			if req.HashAlgorithmOID != "1.2.3" {
+				t.Errorf("expected HashAlgorithmOID 1.2.3, got %q", req.HashAlgorithmOID)
+			}
+			if len(req.Digest) != len(digest) {
+				t.Errorf("expected digest of length %d, got %d", len(digest), len(req.Digest))
+			}
+			return crypto.SignResult{
+				Signature:    []byte("fake-sig"),
+				KeyVersion:   2,
+				Algorithm:    "ecdsa-p256-sha256-der",
+				ProviderName: "software",
+				Output:       providerOutput,
+			}, nil
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	resp, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
+		KeyName:          "key_123",
+		Digest:           digest,
+		HashAlgorithm:    typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		HashAlgorithmOid: "1.2.3",
+		ScopeParams: &messagespb.DigestSignRequest_NoContext{
+			NoContext: &typespb.NoParams{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("DigestSign handler: %v", err)
+	}
+	if len(resp.GetSignature()) == 0 {
+		t.Error("DigestSign response: empty signature")
+	}
+	if resp.GetMetadata() == nil {
+		t.Fatal("DigestSign response: Metadata must not be nil")
+	}
+	if resp.GetMetadata().GetKeyVersion() != 2 {
+		t.Errorf("DigestSign response: expected KeyVersion 2, got %d", resp.GetMetadata().GetKeyVersion())
+	}
+	if resp.GetMetadata().GetProviderOutput() == nil {
+		t.Error("DigestSign response: Metadata.ProviderOutput must not be nil")
+	}
+}
+
+// TestHandler_DigestSign_DigestLengthMismatch_Rejected proves hash_algorithm
+// actually reaches the orchestrator rather than being silently dropped: the
+// mock replicates the real length check every provider performs (a digest's
+// byte length must match its declared hash algorithm's fixed output size —
+// see provider.DigestLengthForHash) and this test supplies a digest whose
+// length contradicts the declared SHA-256 algorithm.
+func TestHandler_DigestSign_DigestLengthMismatch_Rejected(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		digestSignFn: func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error) {
+			wantLen, ok := provider.DigestLengthForHash(req.HashAlgorithm)
+			if ok && len(req.Digest) != wantLen {
+				return crypto.SignResult{}, engerr.New(ctx, "test", engerr.CodeInvalidArgument,
+					"digest length does not match declared hash algorithm")
+			}
+			t.Fatal("expected digest length mismatch to be detected")
+			return crypto.SignResult{}, nil
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	_, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
+		KeyName:       "key_123",
+		Digest:        make([]byte, 16), // wrong length: SHA-256 digests are 32 bytes
+		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		ScopeParams: &messagespb.DigestSignRequest_NoContext{
+			NoContext: &typespb.NoParams{},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	st, _ := status.FromError(err)
+	if st.Code() != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %s", st.Code())
+	}
+}
+
+func TestHandler_DigestSign_OrchestratorError_MapsToStatus(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		digestSignFn: func(ctx context.Context, _ crypto.DigestSignRequest) (crypto.SignResult, error) {
+			return crypto.SignResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support signing")
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	_, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
+		KeyName:       "key_123",
+		Digest:        make([]byte, 32),
+		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		ScopeParams: &messagespb.DigestSignRequest_NoContext{
+			NoContext: &typespb.NoParams{},
 		},
 	})
 	if err == nil {

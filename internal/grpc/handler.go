@@ -405,6 +405,68 @@ func extractDecryptScopeParams(sp any, req *crypto.DecryptRequest) {
 	}
 }
 
+// DigestSign handles the DigestSign RPC — signing a pre-computed digest
+// rather than hashing the message itself (see Signer's doc comment on the
+// prehashed/hash-then-sign distinction).
+//
+// Proto mapping:
+//
+//	messages.DigestSignRequest.key_name           => crypto.DigestSignRequest.KeyName
+//	messages.DigestSignRequest.digest             => crypto.DigestSignRequest.Digest
+//	messages.DigestSignRequest.hash_algorithm     => crypto.DigestSignRequest.HashAlgorithm
+//	messages.DigestSignRequest.hash_algorithm_oid => crypto.DigestSignRequest.HashAlgorithmOID
+//	messages.DigestSignRequest.scope_params       => crypto.DigestSignRequest.SignatureScopeFields
+//	crypto.SignResult.Output                      => messages.DigestSignResponse.Metadata.ProviderOutput
+func (h *Handler) DigestSign(ctx context.Context, req *messagespb.DigestSignRequest) (*messagespb.DigestSignResponse, error) {
+	const digestSignOp engerr.Op = handlerOp + ".DigestSign"
+
+	if err := authorizeKeyName(ctx, digestSignOp, req.GetKeyName()); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	digestSignReq := crypto.DigestSignRequest{
+		KeyName:          req.GetKeyName(),
+		Digest:           req.GetDigest(),
+		HashAlgorithm:    req.GetHashAlgorithm(),
+		HashAlgorithmOID: req.GetHashAlgorithmOid(),
+	}
+	extractDigestSignScopeParams(req.GetScopeParams(), &digestSignReq)
+
+	result, err := scope.Crypto().DigestSign(ctx, digestSignReq)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, digestSignOp, err))
+	}
+
+	return &messagespb.DigestSignResponse{
+		Signature: result.Signature,
+		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     result.KeyVersion,
+			ProviderOutput: result.Output,
+		},
+	}, nil
+}
+
+// extractDigestSignScopeParams maps the proto scope_params oneof for
+// DigestSignRequest onto crypto.SignatureScopeFields. Same pattern as
+// extractSigningScopeParams but uses DigestSignRequest_* wrapper types.
+func extractDigestSignScopeParams(sp any, req *crypto.DigestSignRequest) {
+	switch v := sp.(type) {
+	case *messagespb.DigestSignRequest_NoContext:
+		req.NoContext = v.NoContext
+	case *messagespb.DigestSignRequest_DomainContext:
+		req.DomainContext = v.DomainContext
+	case *messagespb.DigestSignRequest_VendorContext:
+		req.VendorContext = v.VendorContext
+	default:
+		// nil or unrecognised variant — downstream validation will report the issue.
+	}
+}
+
 // CreateCryptoPolicy handles the CreateCryptoPolicy RPC.
 //
 // Proto mapping:
