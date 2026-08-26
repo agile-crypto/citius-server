@@ -467,6 +467,73 @@ func extractDigestSignScopeParams(sp any, req *crypto.DigestSignRequest) {
 	}
 }
 
+// DigestVerify handles the DigestVerify RPC — verifying a signature over a
+// pre-computed digest, the mirror image of DigestSign.
+//
+// Proto mapping:
+//
+//	messages.DigestVerifyRequest.key_name                 => crypto.DigestVerifyRequest.KeyName
+//	messages.DigestVerifyRequest.digest                   => crypto.DigestVerifyRequest.Digest
+//	messages.DigestVerifyRequest.signature                => crypto.DigestVerifyRequest.Signature
+//	messages.DigestVerifyRequest.metadata.key_version     => crypto.DigestVerifyRequest.KeyVersion
+//	messages.DigestVerifyRequest.metadata.provider_output => crypto.DigestVerifyRequest.Output
+//	messages.DigestVerifyRequest.hash_algorithm           => crypto.DigestVerifyRequest.HashAlgorithm
+//	messages.DigestVerifyRequest.hash_algorithm_oid       => crypto.DigestVerifyRequest.HashAlgorithmOID
+//	messages.DigestVerifyRequest.scope_params             => crypto.DigestVerifyRequest.SignatureScopeFields
+//
+// An invalid signature is NOT an error — it returns Valid: false with no error.
+func (h *Handler) DigestVerify(ctx context.Context, req *messagespb.DigestVerifyRequest) (*messagespb.DigestVerifyResponse, error) {
+	const digestVerifyOp engerr.Op = handlerOp + ".DigestVerify"
+
+	if err := authorizeKeyName(ctx, digestVerifyOp, req.GetKeyName()); err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	scope, err := h.getScope(ctx)
+	if err != nil {
+		return nil, ToStatusError(err)
+	}
+
+	digestVerifyReq := crypto.DigestVerifyRequest{
+		KeyName:          req.GetKeyName(),
+		KeyVersion:       req.GetMetadata().GetKeyVersion(),
+		Digest:           req.GetDigest(),
+		Signature:        req.GetSignature(),
+		HashAlgorithm:    req.GetHashAlgorithm(),
+		HashAlgorithmOID: req.GetHashAlgorithmOid(),
+		Output:           req.GetMetadata().GetProviderOutput(),
+	}
+	extractDigestVerifyScopeParams(req.GetScopeParams(), &digestVerifyReq)
+
+	result, err := scope.Crypto().DigestVerify(ctx, digestVerifyReq)
+	if err != nil {
+		return nil, ToStatusError(engerr.Wrap(ctx, digestVerifyOp, err))
+	}
+
+	return &messagespb.DigestVerifyResponse{
+		Valid: result.Valid,
+		Metadata: &messagespb.OperationMetadata{
+			ProviderOutput: result.Output,
+		},
+	}, nil
+}
+
+// extractDigestVerifyScopeParams maps the proto scope_params oneof for
+// DigestVerifyRequest onto crypto.SignatureScopeFields. Same pattern as
+// extractDigestSignScopeParams but uses DigestVerifyRequest_* wrapper types.
+func extractDigestVerifyScopeParams(sp any, req *crypto.DigestVerifyRequest) {
+	switch v := sp.(type) {
+	case *messagespb.DigestVerifyRequest_NoContext:
+		req.NoContext = v.NoContext
+	case *messagespb.DigestVerifyRequest_DomainContext:
+		req.DomainContext = v.DomainContext
+	case *messagespb.DigestVerifyRequest_VendorContext:
+		req.VendorContext = v.VendorContext
+	default:
+		// nil or unrecognised variant — downstream validation will report the issue.
+	}
+}
+
 // CreateCryptoPolicy handles the CreateCryptoPolicy RPC.
 //
 // Proto mapping:

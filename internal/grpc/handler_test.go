@@ -154,14 +154,15 @@ func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.Tra
 }
 
 // mockCryptoOps stubs CryptoOrchestrator for tests.
-// Only signFn, verifyFn, encryptFn, decryptFn, and digestSignFn are wired;
-// all other methods panic.
+// Only signFn, verifyFn, encryptFn, decryptFn, digestSignFn, and
+// digestVerifyFn are wired; all other methods panic.
 type mockCryptoOps struct {
-	signFn       func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
-	verifyFn     func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
-	encryptFn    func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
-	decryptFn    func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
-	digestSignFn func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error)
+	signFn         func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
+	verifyFn       func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
+	encryptFn      func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
+	decryptFn      func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
+	digestSignFn   func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error)
+	digestVerifyFn func(ctx context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error)
 }
 
 func (m *mockCryptoOps) Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error) {
@@ -185,7 +186,10 @@ func (m *mockCryptoOps) DigestSign(ctx context.Context, req crypto.DigestSignReq
 	}
 	panic("mockCryptoOps.DigestSign: not implemented")
 }
-func (m *mockCryptoOps) DigestVerify(_ context.Context, _ crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+func (m *mockCryptoOps) DigestVerify(ctx context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+	if m.digestVerifyFn != nil {
+		return m.digestVerifyFn(ctx, req)
+	}
 	panic("mockCryptoOps.DigestVerify: not implemented")
 }
 func (m *mockCryptoOps) Encrypt(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error) {
@@ -899,6 +903,112 @@ func TestHandler_DigestSign_OrchestratorError_MapsToStatus(t *testing.T) {
 		Digest:        make([]byte, 32),
 		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
 		ScopeParams: &messagespb.DigestSignRequest_NoContext{
+			NoContext: &typespb.NoParams{},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	st, _ := status.FromError(err)
+	if st.Code() != codes.Unimplemented {
+		t.Errorf("expected Unimplemented, got %s", st.Code())
+	}
+}
+
+func TestHandler_DigestVerify_Valid(t *testing.T) {
+	ctx := context.Background()
+	providerOutput := &messagespb.ProviderOutput{
+		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{NoOutput: &messagespb.NoAlgorithmOutput{}},
+		Encoding:        "raw",
+	}
+	digest := make([]byte, 32)
+	cr := &mockCryptoOps{
+		digestVerifyFn: func(_ context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+			if req.NoContext == nil {
+				t.Error("expected NoContext to be set for ECDSA digest verify")
+			}
+			if req.KeyVersion != 2 {
+				t.Errorf("expected KeyVersion 2 from metadata.key_version, got %d", req.KeyVersion)
+			}
+			if req.Output == nil {
+				t.Error("expected Output to be set from metadata.provider_output")
+			}
+			if req.HashAlgorithm != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+				t.Errorf("expected HashAlgorithm SHA256, got %s", req.HashAlgorithm)
+			}
+			return crypto.VerifyResult{Valid: true, Output: providerOutput}, nil
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	resp, err := h.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
+		KeyName:   "key_123",
+		Digest:    digest,
+		Signature: []byte("fake-sig"),
+		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     2,
+			ProviderOutput: providerOutput,
+		},
+		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		ScopeParams: &messagespb.DigestVerifyRequest_NoContext{
+			NoContext: &typespb.NoParams{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("DigestVerify handler: %v", err)
+	}
+	if !resp.GetValid() {
+		t.Error("DigestVerify response: expected valid=true")
+	}
+	if resp.GetMetadata().GetProviderOutput() == nil {
+		t.Error("DigestVerify response: Metadata.ProviderOutput must not be nil")
+	}
+}
+
+func TestHandler_DigestVerify_InvalidSig_ReturnsValidFalse(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		digestVerifyFn: func(_ context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+			if req.NoContext == nil {
+				t.Error("expected NoContext to be set for ECDSA digest verify")
+			}
+			return crypto.VerifyResult{Valid: false}, nil // invalid sig — not an error
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	resp, err := h.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
+		KeyName:   "key_123",
+		Digest:    make([]byte, 32),
+		Signature: []byte("bad-sig"),
+		Metadata:  &messagespb.OperationMetadata{},
+		ScopeParams: &messagespb.DigestVerifyRequest_NoContext{
+			NoContext: &typespb.NoParams{},
+		},
+	})
+	if err != nil {
+		t.Fatalf("DigestVerify handler should not error for invalid sig: %v", err)
+	}
+	if resp.GetValid() {
+		t.Error("DigestVerify response: expected valid=false")
+	}
+}
+
+func TestHandler_DigestVerify_OrchestratorError_MapsToStatus(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		digestVerifyFn: func(ctx context.Context, _ crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
+			return crypto.VerifyResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support signing")
+		},
+	}
+	h := wireHandler(nil, cr)
+
+	_, err := h.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
+		KeyName:   "key_123",
+		Digest:    make([]byte, 32),
+		Signature: []byte("sig"),
+		Metadata:  &messagespb.OperationMetadata{},
+		ScopeParams: &messagespb.DigestVerifyRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},
 	})
