@@ -22,6 +22,9 @@ var _ provider.Backend = (*software.Provider)(nil)
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.
 var _ provider.AlgorithmCapabilityProvider = (*software.Provider)(nil)
 
+// Compile-time assertion: Provider implements ImplementationDescriber.
+var _ provider.ImplementationDescriber = (*software.Provider)(nil)
+
 // ============================================================================
 // Constructor Tests
 // ============================================================================
@@ -48,6 +51,25 @@ func TestProvider_Type(t *testing.T) {
 	p := software.New()
 	if got := p.Type(); got != "software" {
 		t.Errorf("Type: got %q want %q", got, "software")
+	}
+}
+
+// ============================================================================
+// ImplementationProperties Tests
+// ============================================================================
+
+func TestProvider_ImplementationProperties(t *testing.T) {
+	p := software.New()
+	props := p.ImplementationProperties()
+
+	if got := props.GetImplementationLanguage(); got != "go" {
+		t.Errorf("ImplementationLanguage: got %q want %q", got, "go")
+	}
+	if !props.GetMemorySafeLanguage() {
+		t.Error("MemorySafeLanguage: got false, want true (Go's standard crypto library + circl)")
+	}
+	if props.GetFips_140() != nil {
+		t.Errorf("Fips_140: got %v, want nil — software provider has no FIPS certification to report", props.GetFips_140())
 	}
 }
 

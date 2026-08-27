@@ -27,6 +27,7 @@ package provider
 import (
 	"context"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 )
 
@@ -126,4 +127,19 @@ type KeyEstablisher interface {
 // skipped during template-based matching.
 type AlgorithmCapabilityProvider interface {
 	SupportedAlgorithms() []string
+}
+
+// ImplementationDescriber is an optional interface that provider
+// implementations can implement to report the security-relevant properties
+// of their concrete implementation (FIPS certification, constant-time,
+// hardware acceleration, memory-safe language, ...).
+//
+// Optional, same as AlgorithmCapabilityProvider: a provider that does not
+// implement it is not excluded from matching — it simply cannot substantiate
+// any of these properties, so it scores neutral rather than being penalised.
+// A provider must only report what it can actually substantiate; do not
+// fabricate certificate numbers or validation dates a real audit would
+// contradict.
+type ImplementationDescriber interface {
+	ImplementationProperties() *types.ImplementationProperties
 }

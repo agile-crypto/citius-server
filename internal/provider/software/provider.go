@@ -10,6 +10,7 @@ import (
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider"
+	"google.golang.org/protobuf/proto"
 )
 
 // Provider is a stateless software-backed provider.Backend implementation.
@@ -470,6 +471,16 @@ func (p *Provider) Decrypt(ctx context.Context, req *providerpb.DecryptRequest) 
 	}
 }
 
+// ImplementationProperties reports this provider's implementation-security
+// properties: a pure-Go implementation (Go's standard crypto library plus
+// circl for ML-DSA), so memory-safe and no FIPS certification to report.
+func (p *Provider) ImplementationProperties() *types.ImplementationProperties {
+	return &types.ImplementationProperties{
+		ImplementationLanguage: "go",
+		MemorySafeLanguage:     proto.Bool(true),
+	}
+}
+
 // Compile-time assertion: Provider implements provider.Backend, Signer, and
 // Cipher. The software provider does not (yet) implement Macer, Hasher,
 // Randomizer, or KeyEstablisher.
@@ -481,3 +492,6 @@ var (
 
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.
 var _ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
+
+// Compile-time assertion: Provider implements ImplementationDescriber.
+var _ provider.ImplementationDescriber = (*Provider)(nil)
