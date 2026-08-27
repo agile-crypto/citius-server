@@ -24,12 +24,20 @@ type registry struct {
 	mu        sync.RWMutex
 	providers map[string]Backend
 	order     []string // insertion-order for GetDefault fallback
+
+	// byTemplate indexes provider names by the template IDs they advertise
+	// via AlgorithmCapabilityProvider.SupportedAlgorithms(), built once at
+	// Register time and kept in sync by Remove. Each slice is
+	// insertion-ordered, same as order, so MatchForTemplate's "first match
+	// wins" behavior is unchanged from the pre-index scan it replaces.
+	byTemplate map[string][]string
 }
 
 // NewRegistry creates an empty registry.
 func NewRegistry() Registry {
 	return &registry{
-		providers: make(map[string]Backend),
+		providers:  make(map[string]Backend),
+		byTemplate: make(map[string][]string),
 	}
 }
 
@@ -49,6 +57,11 @@ func (r *registry) Register(ctx context.Context, p Backend) error {
 	}
 	r.providers[name] = p
 	r.order = append(r.order, name)
+	if sp, ok := p.(interface{ SupportedAlgorithms() []string }); ok {
+		for _, alg := range sp.SupportedAlgorithms() {
+			r.byTemplate[alg] = append(r.byTemplate[alg], name)
+		}
+	}
 	return nil
 }
 
@@ -90,7 +103,8 @@ func (r *registry) Remove(ctx context.Context, name string) error {
 	const op errors.Op = "provider.(registry).Remove"
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.providers[name]; !ok {
+	p, ok := r.providers[name]
+	if !ok {
 		return errors.New(ctx, op, errors.CodeProviderNotFound, "provider not found: "+name)
 	}
 	delete(r.providers, name)
@@ -99,6 +113,23 @@ func (r *registry) Remove(ctx context.Context, name string) error {
 		if n == name {
 			r.order = append(r.order[:i], r.order[i+1:]...)
 			break
+		}
+	}
+	// Evict name from every template entry it was indexed under.
+	if sp, ok := p.(interface{ SupportedAlgorithms() []string }); ok {
+		for _, alg := range sp.SupportedAlgorithms() {
+			names := r.byTemplate[alg]
+			for i, n := range names {
+				if n == name {
+					names = append(names[:i], names[i+1:]...)
+					break
+				}
+			}
+			if len(names) == 0 {
+				delete(r.byTemplate, alg)
+			} else {
+				r.byTemplate[alg] = names
+			}
 		}
 	}
 	return nil
@@ -113,21 +144,12 @@ func (r *registry) MatchForTemplate(ctx context.Context, templateID string) (Bac
 		return nil, errors.New(ctx, op, errors.CodeProviderNotFound, "no providers registered")
 	}
 
-	for _, name := range r.order {
-		p := r.providers[name]
-		// for now check if provider supports the template via SupportedAlgorithms type assertion.
-		// TODO: use a capability index built at registration time.
-		if sp, ok := p.(interface{ SupportedAlgorithms() []string }); ok {
-			for _, alg := range sp.SupportedAlgorithms() {
-				if alg == templateID {
-					return p, nil
-				}
-			}
-		}
+	names := r.byTemplate[templateID]
+	if len(names) == 0 {
+		return nil, errors.New(ctx, op, errors.CodeProviderNotFound,
+			"no provider supports template: "+templateID)
 	}
-
-	return nil, errors.New(ctx, op, errors.CodeProviderNotFound,
-		"no provider supports template: "+templateID)
+	return r.providers[names[0]], nil
 }
 
 // MatchForScope for now delegates to GetDefault.

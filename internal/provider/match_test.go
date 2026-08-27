@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider"
 )
 
@@ -142,6 +143,56 @@ func TestRegistry_MatchForTemplate_providerWithoutSupportedAlgorithms_skipped(t 
 	}
 	if got.Name() != "good" {
 		t.Errorf("expected to skip provider without SupportedAlgorithms, got %q", got.Name())
+	}
+}
+
+func TestRegistry_MatchForTemplate_afterRemove_evictsIndex(t *testing.T) {
+	r := provider.NewRegistry()
+
+	// A second, unrelated provider stays registered throughout, so r.order
+	// never empties out — this forces MatchForTemplate through the
+	// byTemplate lookup instead of short-circuiting on the "no providers
+	// registered" empty-registry case, which would mask a broken eviction.
+	other := &capableProvider{
+		name:       "openssl",
+		algorithms: []string{"aes-256-gcm-128-96"},
+	}
+	if err := r.Register(t.Context(), other); err != nil {
+		t.Fatalf("Register other: %v", err)
+	}
+
+	p := &capableProvider{
+		name:       "software",
+		algorithms: []string{"ecdsa-p256-sha256", "ml-dsa-65"},
+	}
+	if err := r.Register(t.Context(), p); err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	if _, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256"); err != nil {
+		t.Fatalf("MatchForTemplate before Remove: %v", err)
+	}
+
+	if err := r.Remove(t.Context(), "software"); err != nil {
+		t.Fatalf("Remove: %v", err)
+	}
+
+	_, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256")
+	if err == nil {
+		t.Fatal("expected error: provider was removed, template should no longer match")
+	}
+	if !errors.IsProviderNotFound(err) {
+		t.Errorf("expected CodeProviderNotFound, got: %v", err)
+	}
+
+	// The unrelated provider's own template must still match — proves Remove
+	// evicted exactly "software"'s entries, not the whole index.
+	got, err := r.MatchForTemplate(t.Context(), "aes-256-gcm-128-96")
+	if err != nil {
+		t.Fatalf("MatchForTemplate for surviving provider: %v", err)
+	}
+	if got.Name() != "openssl" {
+		t.Errorf("expected surviving provider %q, got %q", "openssl", got.Name())
 	}
 }
 
