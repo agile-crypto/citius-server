@@ -14,6 +14,9 @@ import (
 // Compile-time assertion: Provider implements provider.Backend.
 var _ provider.Backend = (*openssl.Provider)(nil)
 
+// Compile-time assertion: Provider implements ImplementationDescriber.
+var _ provider.ImplementationDescriber = (*openssl.Provider)(nil)
+
 func ecdsaP256Details() *types.AlgorithmDetails {
 	return &types.AlgorithmDetails{
 		Algorithm: &types.AlgorithmDetails_Ecdsa{
@@ -231,6 +234,31 @@ func TestProvider_SupportedAlgorithms_includesAllKeygenFamilies(t *testing.T) {
 		if !want[id] {
 			t.Errorf("unexpected algorithm %q in SupportedAlgorithms", id)
 		}
+	}
+}
+
+// TestProvider_ImplementationProperties_defaultMode checks the properties
+// that don't depend on FIPS mode — the FIPS-varying half is covered by
+// fips_test.go, which needs the FIPS module installed and skips otherwise.
+func TestProvider_ImplementationProperties_defaultMode(t *testing.T) {
+	p, err := openssl.New(context.Background())
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	props := p.ImplementationProperties()
+	if got := props.GetImplementationLanguage(); got != "c" {
+		t.Errorf("ImplementationLanguage: got %q want %q", got, "c")
+	}
+	if props.GetMemorySafeLanguage() {
+		t.Error("MemorySafeLanguage: got true, want false (OpenSSL libcrypto is C)")
+	}
+	if !props.GetHardwareAccelerated() {
+		t.Error("HardwareAccelerated: got false, want true")
+	}
+	if props.GetFips_140() != nil {
+		t.Errorf("Fips_140: got %v, want nil for a default-mode (non-FIPS) instance", props.GetFips_140())
 	}
 }
 

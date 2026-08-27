@@ -588,3 +588,6 @@ var _ provider.Cipher = (*Provider)(nil)
 
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.
 var _ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
+
+// Compile-time assertion: Provider implements ImplementationDescriber.
+var _ provider.ImplementationDescriber = (*Provider)(nil)

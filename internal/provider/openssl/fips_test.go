@@ -66,6 +66,24 @@ func TestNew_withFIPS_activatesFIPS(t *testing.T) {
 	}
 }
 
+func TestNew_withFIPS_reportsFIPSApproved(t *testing.T) {
+	cfgPath := activatingFIPSConfig(t)
+
+	p, err := openssl.New(context.Background(), openssl.WithName("openssl-fips"), openssl.WithFIPS(cfgPath))
+	if err != nil {
+		t.Fatalf("openssl.New with WithFIPS: %v", err)
+	}
+	defer p.Close()
+
+	fips := p.ImplementationProperties().GetFips_140()
+	if fips == nil {
+		t.Fatal("Fips_140: got nil, want non-nil for a WithFIPS instance")
+	}
+	if !fips.GetCertified() {
+		t.Error("Fips_140.Certified: got false, want true")
+	}
+}
+
 func TestNew_withoutFIPS_notEnabled(t *testing.T) {
 	p, err := openssl.New(context.Background())
 	if err != nil {

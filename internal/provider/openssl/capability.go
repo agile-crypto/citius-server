@@ -6,7 +6,9 @@ import (
 
 	"github.com/agile-crypto/ossl-go/ossl"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/agile-crypto/citius-server/internal/errors"
+	"google.golang.org/protobuf/proto"
 )
 
 // catalog maps a template ID — matching the standard algorithm catalog's
@@ -138,4 +140,28 @@ func (p *Provider) VerifyCapabilities(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// ImplementationProperties reports this instance's implementation-security
+// properties. C (OpenSSL libcrypto), so not memory-safe; hardware
+// acceleration is a property of libcrypto's engine dispatch, shared by every
+// mode instance. FIPS status is the one property that genuinely varies
+// per instance — it is read from this instance's own context via
+// FIPSEnabled rather than hardcoded, so the default-mode and FIPS-mode
+// instances (which share this same method) report correctly and
+// differently despite calling identical code.
+//
+// Only the FIPS provider's activation state is substantiated here — no
+// certificate number, module name, or validation date is fabricated; this
+// reports what libctx can prove about itself, nothing more.
+func (p *Provider) ImplementationProperties() *types.ImplementationProperties {
+	props := &types.ImplementationProperties{
+		ImplementationLanguage: "c",
+		MemorySafeLanguage:     proto.Bool(false),
+		HardwareAccelerated:    proto.Bool(true),
+	}
+	if p.FIPSEnabled() {
+		props.Fips_140 = &types.Fips140Certification{Certified: true}
+	}
+	return props
 }
