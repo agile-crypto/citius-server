@@ -4,9 +4,12 @@ import (
 	"context"
 	"testing"
 
+	types "github.com/agile-crypto/citius-server/gen/go/api/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider"
+	"google.golang.org/protobuf/proto"
 )
 
 // capableProvider is a stub ProviderInstance that supports a set of algorithm IDs.
@@ -50,6 +53,20 @@ func (c *capableProvider) Decrypt(_ context.Context, _ *providerpb.DecryptReques
 func (c *capableProvider) SupportedAlgorithms() []string { return c.algorithms }
 
 var _ provider.Backend = (*capableProvider)(nil)
+
+// describingProvider adds ImplementationDescriber to capableProvider, so
+// Match tests can exercise the hard filter and soft score against a
+// Backend, not just score's own unit tests in match_internal_test.go.
+type describingProvider struct {
+	capableProvider
+	props *types.ImplementationProperties
+}
+
+func (d *describingProvider) ImplementationProperties() *types.ImplementationProperties {
+	return d.props
+}
+
+var _ provider.ImplementationDescriber = (*describingProvider)(nil)
 
 // ============================================================================
 // MatchForTemplate Tests
@@ -233,18 +250,141 @@ func (m *minimalProvider) Decrypt(_ context.Context, _ *providerpb.DecryptReques
 var _ provider.Backend = (*minimalProvider)(nil)
 
 // ============================================================================
-// MatchForScope Tests
+// Match Tests
 // ============================================================================
 
-func TestRegistry_MatchForScope_M1_returnsDefault(t *testing.T) {
+func TestRegistry_Match_pinnedProvider_honoured(t *testing.T) {
 	r := provider.NewRegistry()
-	_ = r.Register(t.Context(), &capableProvider{name: "sw", algorithms: []string{"ecdsa-p256-sha256"}})
+	loopback := &capableProvider{name: "loopback", algorithms: []string{"ecdsa-p256-sha256"}}
+	software := &capableProvider{name: "software", algorithms: []string{"ecdsa-p256-sha256"}}
+	_ = r.Register(t.Context(), loopback)
+	_ = r.Register(t.Context(), software)
 
-	got, err := r.MatchForScope(t.Context(), nil)
+	got, err := r.Match(t.Context(), provider.Requirements{
+		TemplateID:   "ecdsa-p256-sha256",
+		ProviderName: "software",
+	})
 	if err != nil {
-		t.Fatalf("MatchForScope: %v", err)
+		t.Fatalf("Match: %v", err)
 	}
-	if got == nil {
-		t.Fatal("MatchForScope returned nil")
+	if got.Name() != "software" {
+		t.Errorf("expected pinned provider %q, got %q — a pin must not silently fall back", "software", got.Name())
+	}
+}
+
+func TestRegistry_Match_pinnedProvider_notRegistered_errors(t *testing.T) {
+	r := provider.NewRegistry()
+
+	_, err := r.Match(t.Context(), provider.Requirements{
+		TemplateID:   "ecdsa-p256-sha256",
+		ProviderName: "nonexistent",
+	})
+	if err == nil {
+		t.Fatal("expected error for a pinned provider that was never registered")
+	}
+	if !errors.IsProviderNotFound(err) {
+		t.Errorf("expected CodeProviderNotFound, got: %v", err)
+	}
+}
+
+func TestRegistry_Match_pinnedProvider_doesNotSupportTemplate_errors(t *testing.T) {
+	r := provider.NewRegistry()
+	_ = r.Register(t.Context(), &capableProvider{name: "software", algorithms: []string{"ml-dsa-65"}})
+
+	_, err := r.Match(t.Context(), provider.Requirements{
+		TemplateID:   "ecdsa-p256-sha256", // not in "software"'s algorithms
+		ProviderName: "software",
+	})
+	if err == nil {
+		t.Fatal("expected error: pinned provider does not advertise the requested template, must not fall back to another provider")
+	}
+	if !errors.IsProviderNotFound(err) {
+		t.Errorf("expected CodeProviderNotFound, got: %v", err)
+	}
+}
+
+func TestRegistry_Match_pinnedProvider_failsHardFilter_errors(t *testing.T) {
+	r := provider.NewRegistry()
+	nonFIPS := &describingProvider{
+		capableProvider: capableProvider{name: "software", algorithms: []string{"aes-256-gcm-128-96"}},
+		props:           &types.ImplementationProperties{MemorySafeLanguage: proto.Bool(true)},
+	}
+	_ = r.Register(t.Context(), nonFIPS)
+
+	_, err := r.Match(t.Context(), provider.Requirements{
+		TemplateID:   "aes-256-gcm-128-96",
+		ProviderName: "software",
+		Security:     &core.SecurityProperties{FipsApproved: true},
+	})
+	if err == nil {
+		t.Fatal("expected error: pinned provider cannot substantiate FIPS, must not silently succeed anyway")
+	}
+	if !errors.IsFailedPrecondition(err) {
+		t.Errorf("expected CodeFailedPrecondition, got: %v", err)
+	}
+}
+
+func TestRegistry_Match_templateOnly_sameAsMatchForTemplate(t *testing.T) {
+	r := provider.NewRegistry()
+	loopback := &capableProvider{name: "loopback", algorithms: []string{"ecdsa-p256-sha256"}}
+	software := &capableProvider{name: "software", algorithms: []string{"ecdsa-p256-sha256"}}
+	_ = r.Register(t.Context(), loopback)
+	_ = r.Register(t.Context(), software)
+
+	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
+	if err != nil {
+		t.Fatalf("Match: %v", err)
+	}
+	if got.Name() != "loopback" {
+		t.Errorf("expected first-registered provider %q, got %q", "loopback", got.Name())
+	}
+}
+
+// TestRegistry_Match_fipsRequired_flipsSelectionToFIPSInstance is the
+// scenario this whole matching mechanism exists for: software is registered
+// first (as wire.go does) and would win a plain first-match scan, but when
+// the caller requires FIPS, only the FIPS-mode instance can serve — and it
+// must win even though it registered second.
+func TestRegistry_Match_fipsRequired_flipsSelectionToFIPSInstance(t *testing.T) {
+	r := provider.NewRegistry()
+
+	software := &describingProvider{
+		capableProvider: capableProvider{name: "software", algorithms: []string{"aes-256-gcm-128-96"}},
+		props:           &types.ImplementationProperties{MemorySafeLanguage: proto.Bool(true)},
+	}
+	opensslFIPS := &describingProvider{
+		capableProvider: capableProvider{name: "openssl-fips", algorithms: []string{"aes-256-gcm-128-96"}},
+		props: &types.ImplementationProperties{
+			Fips_140:            &types.Fips140Certification{Certified: true},
+			HardwareAccelerated: proto.Bool(true),
+		},
+	}
+
+	if err := r.Register(t.Context(), software); err != nil {
+		t.Fatalf("Register software: %v", err)
+	}
+	if err := r.Register(t.Context(), opensslFIPS); err != nil {
+		t.Fatalf("Register openssl-fips: %v", err)
+	}
+
+	// No security requirement: registration order wins, same as before.
+	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "aes-256-gcm-128-96"})
+	if err != nil {
+		t.Fatalf("Match (no requirement): %v", err)
+	}
+	if got.Name() != "software" {
+		t.Fatalf("Match (no requirement): expected first-registered %q, got %q", "software", got.Name())
+	}
+
+	// FIPS required: selection flips to the second-registered FIPS instance.
+	got, err = r.Match(t.Context(), provider.Requirements{
+		TemplateID: "aes-256-gcm-128-96",
+		Security:   &core.SecurityProperties{FipsApproved: true},
+	})
+	if err != nil {
+		t.Fatalf("Match (FIPS required): %v", err)
+	}
+	if got.Name() != "openssl-fips" {
+		t.Errorf("Match (FIPS required): expected %q, got %q", "openssl-fips", got.Name())
 	}
 }

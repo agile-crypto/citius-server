@@ -8,6 +8,19 @@ import (
 	"github.com/agile-crypto/citius-server/internal/errors"
 )
 
+// Requirements narrows a Match call to a template, optionally a specific
+// pinned provider, and optionally required security properties.
+//
+// There is deliberately no Capability field: app.ValidateProviderCapabilities
+// (internal/app/validate.go) already makes "provider P advertises template T
+// but cannot serve it" impossible to register, so re-filtering by capability
+// per request would be dead code dressed as a safety net.
+type Requirements struct {
+	TemplateID   string
+	ProviderName string
+	Security     *core.SecurityProperties
+}
+
 // Registry manages the set of available Backend implementations.
 type Registry interface {
 	Register(ctx context.Context, p Backend) error
@@ -16,7 +29,7 @@ type Registry interface {
 	List(ctx context.Context) []Backend
 	Remove(ctx context.Context, name string) error
 	MatchForTemplate(ctx context.Context, templateID string) (Backend, error)
-	MatchForScope(ctx context.Context, scope *core.ScopeSpecification) (Backend, error)
+	Match(ctx context.Context, req Requirements) (Backend, error)
 }
 
 // registry is a thread-safe in-memory registry of provider backends.
@@ -135,32 +148,99 @@ func (r *registry) Remove(ctx context.Context, name string) error {
 	return nil
 }
 
+// MatchForTemplate matches on template ID alone — equivalent to
+// Match(ctx, Requirements{TemplateID: templateID}).
 func (r *registry) MatchForTemplate(ctx context.Context, templateID string) (Backend, error) {
-	const op errors.Op = "provider.(Registry).MatchForTemplate"
+	return r.Match(ctx, Requirements{TemplateID: templateID})
+}
+
+// Match resolves the Backend that should serve req.
+//
+// If req.ProviderName is set, that exact provider is used: verified to
+// advertise req.TemplateID and satisfy req.Security's hard filter, but never
+// silently substituted for another provider if it does not. A caller that
+// pinned a provider gets that provider or an error, not a surprise fallback.
+//
+// Otherwise, with req.Security nil (the template-only case — this is what
+// MatchForTemplate now delegates to), the first provider registered under
+// req.TemplateID wins outright, matching the original first-match scan
+// exactly: no ranking happens on properties nobody asked about.
+//
+// With req.Security non-nil, every provider indexed under req.TemplateID is
+// scored against it (see score in match.go) instead: a provider that fails
+// the hard filter is excluded, and the highest-scoring survivor wins. Ties
+// are broken by registration order — names is byTemplate's insertion-ordered
+// slice, and only a strictly-greater score replaces the current best, so
+// among equal scores the first-registered provider wins here too.
+func (r *registry) Match(ctx context.Context, req Requirements) (Backend, error) {
+	const op errors.Op = "provider.(Registry).Match"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
+
+	if req.ProviderName != "" {
+		p, ok := r.providers[req.ProviderName]
+		if !ok {
+			return nil, errors.New(ctx, op, errors.CodeProviderNotFound,
+				"provider not found: "+req.ProviderName)
+		}
+		if !advertisesTemplate(p, req.TemplateID) {
+			return nil, errors.New(ctx, op, errors.CodeProviderNotFound,
+				"provider "+req.ProviderName+" does not support template: "+req.TemplateID)
+		}
+		if _, ok := scoreProvider(p, req.Security); !ok {
+			return nil, errors.New(ctx, op, errors.CodeFailedPrecondition,
+				"provider "+req.ProviderName+" does not satisfy required security properties")
+		}
+		return p, nil
+	}
 
 	if len(r.order) == 0 {
 		return nil, errors.New(ctx, op, errors.CodeProviderNotFound, "no providers registered")
 	}
 
-	names := r.byTemplate[templateID]
+	names := r.byTemplate[req.TemplateID]
 	if len(names) == 0 {
 		return nil, errors.New(ctx, op, errors.CodeProviderNotFound,
-			"no provider supports template: "+templateID)
+			"no provider supports template: "+req.TemplateID)
 	}
-	return r.providers[names[0]], nil
+
+	if req.Security == nil {
+		return r.providers[names[0]], nil
+	}
+
+	best := ""
+	bestScore := -1
+	for _, name := range names {
+		s, ok := scoreProvider(r.providers[name], req.Security)
+		if !ok {
+			continue
+		}
+		if s > bestScore {
+			bestScore = s
+			best = name
+		}
+	}
+	if best == "" {
+		return nil, errors.New(ctx, op, errors.CodeProviderNotFound,
+			"no provider satisfies required security properties for template: "+req.TemplateID)
+	}
+	return r.providers[best], nil
 }
 
-// MatchForScope for now delegates to GetDefault.
-// TODO: inspect provider capabilities and match on scope.
-func (r *registry) MatchForScope(ctx context.Context, scope *core.ScopeSpecification) (Backend, error) {
-	const op errors.Op = "provider.(Registry).MatchForScope"
-	p, err := r.GetDefault(ctx)
-	if err != nil {
-		return nil, errors.Wrap(ctx, op, err)
+// advertisesTemplate reports whether p declares templateID via
+// AlgorithmCapabilityProvider.SupportedAlgorithms(). Same anonymous
+// interface style as Register/Remove use to build byTemplate.
+func advertisesTemplate(p Backend, templateID string) bool {
+	sp, ok := p.(interface{ SupportedAlgorithms() []string })
+	if !ok {
+		return false
 	}
-	return p, nil
+	for _, alg := range sp.SupportedAlgorithms() {
+		if alg == templateID {
+			return true
+		}
+	}
+	return false
 }
 
 // compile-time check

@@ -56,3 +56,15 @@ func score(props *types.ImplementationProperties, required *core.SecurityPropert
 	}
 	return s, true
 }
+
+// scoreProvider extracts p's ImplementationProperties — nil if p does not
+// implement ImplementationDescriber — and scores them against required.
+// The one place Registry.Match needs to know about ImplementationDescriber
+// at all; score itself stays independent of Backend.
+func scoreProvider(p Backend, required *core.SecurityProperties) (int, bool) {
+	var props *types.ImplementationProperties
+	if id, ok := p.(ImplementationDescriber); ok {
+		props = id.ImplementationProperties()
+	}
+	return score(props, required)
+}
