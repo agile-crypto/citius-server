@@ -10,6 +10,7 @@ import (
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-server/internal/provider/loopback"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/require"
@@ -158,6 +159,48 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error when no provider supports the template")
+	}
+}
+
+func TestCreateKey_providerID_honoured(t *testing.T) {
+	orch, _, provReg, _, _ := setupOrchestratorFull(t)
+	ctx := context.Background()
+
+	// setupOrchestratorFull already registers "software" (first, so it would
+	// win a plain first-match scan). Register "loopback" too — it advertises
+	// ml-dsa-65 as well — and pin the request to it explicitly.
+	if err := provReg.Register(ctx, loopback.New()); err != nil {
+		t.Fatalf("Register loopback: %v", err)
+	}
+
+	created, err := orch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:               "pinned-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           testPolicyName,
+		ProviderInstanceID: "loopback",
+		ScopeSpecification: defaultScopeSpec(t),
+	})
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	if created.Provider != "loopback" {
+		t.Errorf("Provider: got %q, want %q — provider_id must be honoured, not silently overridden by registration order", created.Provider, "loopback")
+	}
+}
+
+func TestCreateKey_providerID_unsatisfiable_returnsError(t *testing.T) {
+	orch, _, _, _, _ := setupOrchestratorFull(t)
+	ctx := context.Background()
+
+	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:               "impossible-key",
+		TemplateID:         "ml-dsa-65",
+		PolicyID:           testPolicyName,
+		ProviderInstanceID: "nonexistent-provider",
+		ScopeSpecification: defaultScopeSpec(t),
+	})
+	if err == nil {
+		t.Fatal("expected error: a provider_id that cannot serve the template must error, not silently fall back to \"software\"")
 	}
 }
 

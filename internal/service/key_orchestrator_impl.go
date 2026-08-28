@@ -197,8 +197,15 @@ func (r *keyOrchestrator) generateAndPersistKey(
 	tmpl *template.Template,
 	scopeSpec *core.ScopeSpecification,
 ) (*KeyMetadata, error) {
-	// 1. Find a provider that supports this template.
-	prov, err := r.providers.MatchForTemplate(ctx, tmpl.TemplateID())
+	// 1. Find a provider that supports this template — honouring an explicit
+	// provider_id pin (req.ProviderInstanceID) and the scope's security
+	// requirements (e.g. FIPS), rather than just the first provider that
+	// advertises the template.
+	prov, err := r.providers.Match(ctx, provider.Requirements{
+		TemplateID:   tmpl.TemplateID(),
+		ProviderName: req.ProviderInstanceID,
+		Security:     scopeSpec.SecurityProps,
+	})
 	if err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
