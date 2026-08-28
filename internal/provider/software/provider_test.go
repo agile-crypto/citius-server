@@ -119,7 +119,7 @@ func standardCatalogPath() string {
 // real provider, and (c) complete a real Sign+Verify or Encrypt+Decrypt
 // round trip through that same key — not just compile, and not just
 // generate a key that then has no working operation. Before GenerateKey
-// coverage existed, provider.Registry.MatchForTemplate could route CreateKey
+// coverage existed, provider.Registry.Match could route CreateKey
 // to this provider for a template whose algorithm the dispatch switches
 // didn't actually implement — or the reverse, silently blocking CreateKey
 // for an algorithm that fully works once a key exists. The round-trip

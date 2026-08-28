@@ -18,8 +18,8 @@ import (
 // This is an application-layer coordination function that bridges the
 // provider and template bounded contexts - neither imports the other.
 // It is called at provider registration time to catch configuration errors
-// early (fail-fast) rather than at operation time when MatchForTemplate()
-// silently fails, or - for the capability check - when a request-time type
+// early (fail-fast) rather than at operation time when Match() silently
+// fails, or - for the capability check - when a request-time type
 // assertion in the orchestrator returns CodeNotImplemented. A provider that
 // advertises a template but cannot serve it is a static misconfiguration,
 // not something that should surface per-request.

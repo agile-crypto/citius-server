@@ -334,7 +334,7 @@ func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadat
 
 func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, keyID string, providers provider.Registry, templates template.Registry, keys key.Repository,
 	policyName string, initTemplateID string, initVersion uint32, scopeSpec *core.ScopeSpecification) (*key.Key, *key.Version) {
-	provider0, err := providers.MatchForTemplate(ctx, initTemplateID)
+	provider0, err := providers.Match(ctx, provider.Requirements{TemplateID: initTemplateID})
 	require.NoError(t, err)
 	templateInfo0, err := templates.Get(ctx, initTemplateID)
 	require.NoError(t, err)

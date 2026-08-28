@@ -69,10 +69,13 @@ func (d *describingProvider) ImplementationProperties() *types.ImplementationPro
 var _ provider.ImplementationDescriber = (*describingProvider)(nil)
 
 // ============================================================================
-// MatchForTemplate Tests
+// Match (template-only) Tests
 // ============================================================================
+//
+// Requirements{TemplateID: id} with nothing else set — the shape the deleted
+// MatchForTemplate wrapper used to build internally.
 
-func TestRegistry_MatchForTemplate_found(t *testing.T) {
+func TestRegistry_Match_templateOnly_found(t *testing.T) {
 	r := provider.NewRegistry()
 
 	p := &capableProvider{
@@ -81,19 +84,19 @@ func TestRegistry_MatchForTemplate_found(t *testing.T) {
 	}
 	_ = r.Register(t.Context(), p)
 
-	got, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256")
+	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
 	if err != nil {
-		t.Fatalf("MatchForTemplate: %v", err)
+		t.Fatalf("Match: %v", err)
 	}
 	if got == nil {
-		t.Fatal("MatchForTemplate returned nil provider")
+		t.Fatal("Match returned nil provider")
 	}
 	if got.Name() != "software" {
-		t.Errorf("MatchForTemplate: got provider %q want %q", got.Name(), "software")
+		t.Errorf("Match: got provider %q want %q", got.Name(), "software")
 	}
 }
 
-func TestRegistry_MatchForTemplate_notFound(t *testing.T) {
+func TestRegistry_Match_templateOnly_notFound(t *testing.T) {
 	r := provider.NewRegistry()
 
 	p := &capableProvider{
@@ -102,21 +105,21 @@ func TestRegistry_MatchForTemplate_notFound(t *testing.T) {
 	}
 	_ = r.Register(t.Context(), p)
 
-	_, err := r.MatchForTemplate(t.Context(), "ml-dsa-65") // not in capabilities
+	_, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ml-dsa-65"}) // not in capabilities
 	if err == nil {
 		t.Fatal("expected error for unmatched template")
 	}
 }
 
-func TestRegistry_MatchForTemplate_noProviders_returnsError(t *testing.T) {
+func TestRegistry_Match_templateOnly_noProviders_returnsError(t *testing.T) {
 	r := provider.NewRegistry()
-	_, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256")
+	_, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
 	if err == nil {
 		t.Fatal("expected error when no providers registered")
 	}
 }
 
-func TestRegistry_MatchForTemplate_multipleProviders_firstMatchReturned(t *testing.T) {
+func TestRegistry_Match_templateOnly_multipleProviders_firstMatchReturned(t *testing.T) {
 	r := provider.NewRegistry()
 
 	p1 := &capableProvider{
@@ -131,18 +134,18 @@ func TestRegistry_MatchForTemplate_multipleProviders_firstMatchReturned(t *testi
 	_ = r.Register(t.Context(), p2)
 
 	// Both match; loopback was registered first
-	got, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256")
+	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
 	if err != nil {
-		t.Fatalf("MatchForTemplate: %v", err)
+		t.Fatalf("Match: %v", err)
 	}
 	if got.Name() != "loopback" {
 		t.Errorf("expected first-registered provider, got %q", got.Name())
 	}
 }
 
-func TestRegistry_MatchForTemplate_providerWithoutSupportedAlgorithms_skipped(t *testing.T) {
+func TestRegistry_Match_templateOnly_providerWithoutSupportedAlgorithms_skipped(t *testing.T) {
 	// A provider that doesn't implement SupportedAlgorithms() should be skipped,
-	// not cause MatchForTemplate to fail.
+	// not cause Match to fail.
 	r := provider.NewRegistry()
 
 	// minimalProvider doesn't have SupportedAlgorithms() — should be skipped
@@ -154,22 +157,22 @@ func TestRegistry_MatchForTemplate_providerWithoutSupportedAlgorithms_skipped(t 
 	_ = r.Register(t.Context(), minimal)
 	_ = r.Register(t.Context(), good)
 
-	got, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256")
+	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
 	if err != nil {
-		t.Fatalf("MatchForTemplate: %v", err)
+		t.Fatalf("Match: %v", err)
 	}
 	if got.Name() != "good" {
 		t.Errorf("expected to skip provider without SupportedAlgorithms, got %q", got.Name())
 	}
 }
 
-func TestRegistry_MatchForTemplate_afterRemove_evictsIndex(t *testing.T) {
+func TestRegistry_Match_templateOnly_afterRemove_evictsIndex(t *testing.T) {
 	r := provider.NewRegistry()
 
 	// A second, unrelated provider stays registered throughout, so r.order
-	// never empties out — this forces MatchForTemplate through the
-	// byTemplate lookup instead of short-circuiting on the "no providers
-	// registered" empty-registry case, which would mask a broken eviction.
+	// never empties out — this forces Match through the byTemplate lookup
+	// instead of short-circuiting on the "no providers registered"
+	// empty-registry case, which would mask a broken eviction.
 	other := &capableProvider{
 		name:       "openssl",
 		algorithms: []string{"aes-256-gcm-128-96"},
@@ -186,15 +189,15 @@ func TestRegistry_MatchForTemplate_afterRemove_evictsIndex(t *testing.T) {
 		t.Fatalf("Register: %v", err)
 	}
 
-	if _, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256"); err != nil {
-		t.Fatalf("MatchForTemplate before Remove: %v", err)
+	if _, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"}); err != nil {
+		t.Fatalf("Match before Remove: %v", err)
 	}
 
 	if err := r.Remove(t.Context(), "software"); err != nil {
 		t.Fatalf("Remove: %v", err)
 	}
 
-	_, err := r.MatchForTemplate(t.Context(), "ecdsa-p256-sha256")
+	_, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
 	if err == nil {
 		t.Fatal("expected error: provider was removed, template should no longer match")
 	}
@@ -204,9 +207,9 @@ func TestRegistry_MatchForTemplate_afterRemove_evictsIndex(t *testing.T) {
 
 	// The unrelated provider's own template must still match — proves Remove
 	// evicted exactly "software"'s entries, not the whole index.
-	got, err := r.MatchForTemplate(t.Context(), "aes-256-gcm-128-96")
+	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "aes-256-gcm-128-96"})
 	if err != nil {
-		t.Fatalf("MatchForTemplate for surviving provider: %v", err)
+		t.Fatalf("Match for surviving provider: %v", err)
 	}
 	if got.Name() != "openssl" {
 		t.Errorf("expected surviving provider %q, got %q", "openssl", got.Name())
@@ -214,7 +217,7 @@ func TestRegistry_MatchForTemplate_afterRemove_evictsIndex(t *testing.T) {
 }
 
 // minimalProvider is a ProviderInstance without SupportedAlgorithms().
-// Used to test that MatchForTemplate gracefully skips such providers.
+// Used to test that Match gracefully skips such providers.
 type minimalProvider struct{ provName string }
 
 func (m *minimalProvider) Name() string { return m.provName }
@@ -321,22 +324,6 @@ func TestRegistry_Match_pinnedProvider_failsHardFilter_errors(t *testing.T) {
 	}
 	if !errors.IsFailedPrecondition(err) {
 		t.Errorf("expected CodeFailedPrecondition, got: %v", err)
-	}
-}
-
-func TestRegistry_Match_templateOnly_sameAsMatchForTemplate(t *testing.T) {
-	r := provider.NewRegistry()
-	loopback := &capableProvider{name: "loopback", algorithms: []string{"ecdsa-p256-sha256"}}
-	software := &capableProvider{name: "software", algorithms: []string{"ecdsa-p256-sha256"}}
-	_ = r.Register(t.Context(), loopback)
-	_ = r.Register(t.Context(), software)
-
-	got, err := r.Match(t.Context(), provider.Requirements{TemplateID: "ecdsa-p256-sha256"})
-	if err != nil {
-		t.Fatalf("Match: %v", err)
-	}
-	if got.Name() != "loopback" {
-		t.Errorf("expected first-registered provider %q, got %q", "loopback", got.Name())
 	}
 }
 

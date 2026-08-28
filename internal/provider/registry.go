@@ -28,7 +28,6 @@ type Registry interface {
 	GetDefault(ctx context.Context) (Backend, error)
 	List(ctx context.Context) []Backend
 	Remove(ctx context.Context, name string) error
-	MatchForTemplate(ctx context.Context, templateID string) (Backend, error)
 	Match(ctx context.Context, req Requirements) (Backend, error)
 }
 
@@ -41,8 +40,8 @@ type registry struct {
 	// byTemplate indexes provider names by the template IDs they advertise
 	// via AlgorithmCapabilityProvider.SupportedAlgorithms(), built once at
 	// Register time and kept in sync by Remove. Each slice is
-	// insertion-ordered, same as order, so MatchForTemplate's "first match
-	// wins" behavior is unchanged from the pre-index scan it replaces.
+	// insertion-ordered, same as order, so Match's template-only "first
+	// match wins" behavior is unchanged from the pre-index scan it replaces.
 	byTemplate map[string][]string
 }
 
@@ -148,12 +147,6 @@ func (r *registry) Remove(ctx context.Context, name string) error {
 	return nil
 }
 
-// MatchForTemplate matches on template ID alone — equivalent to
-// Match(ctx, Requirements{TemplateID: templateID}).
-func (r *registry) MatchForTemplate(ctx context.Context, templateID string) (Backend, error) {
-	return r.Match(ctx, Requirements{TemplateID: templateID})
-}
-
 // Match resolves the Backend that should serve req.
 //
 // If req.ProviderName is set, that exact provider is used: verified to
@@ -161,10 +154,11 @@ func (r *registry) MatchForTemplate(ctx context.Context, templateID string) (Bac
 // silently substituted for another provider if it does not. A caller that
 // pinned a provider gets that provider or an error, not a surprise fallback.
 //
-// Otherwise, with req.Security nil (the template-only case — this is what
-// MatchForTemplate now delegates to), the first provider registered under
-// req.TemplateID wins outright, matching the original first-match scan
-// exactly: no ranking happens on properties nobody asked about.
+// Otherwise, with req.Security nil (the template-only case —
+// Requirements{TemplateID: id} with nothing else set), the first provider
+// registered under req.TemplateID wins outright, matching the original
+// first-match scan this replaced: no ranking happens on properties nobody
+// asked about.
 //
 // With req.Security non-nil, every provider indexed under req.TemplateID is
 // scored against it (see score in match.go) instead: a provider that fails

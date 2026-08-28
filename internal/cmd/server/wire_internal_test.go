@@ -63,7 +63,7 @@ activate = 1
 
 // TestBuildProviderRegistry_registersBothProviders
 // buildProviderRegistry registers both the software and
-// openssl providers, not just software. MatchForTemplate's
+// openssl providers, not just software. Match's
 // registration-order-first-match behavior means the existing
 // TestSmoke_CreateKey_Sign_Verify (server_test package) alone would not
 // catch openssl silently failing to register -- software, registered
