@@ -8,13 +8,18 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
+	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
+	"github.com/agile-crypto/ossl-go/ossl"
+
 	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
 	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/agile-crypto/citius-server/internal/cmd/server"
+	"google.golang.org/protobuf/proto"
 )
 
 // catalogPath returns the absolute path to standard_algorithms.json.
@@ -37,6 +42,47 @@ func buildServer(t *testing.T) *server.TestableHandler {
 		t.Fatalf("NewTestableServer: %v", err)
 	}
 	return h
+}
+
+// activatingFIPSConfig writes a wrapper config that .includes this
+// machine's fipsmodule.cnf and activates the fips provider -- the same
+// helper internal/provider/openssl's fips_test.go and
+// internal/cmd/server's wire_internal_test.go use (duplicated here per
+// this codebase's established pattern for this small, unexported,
+// per-package helper).
+//
+// Skips the test if fipsmodule.cnf is absent -- the FIPS module is an
+// optional, separately-installed artifact, not something every environment
+// running this suite is expected to have.
+func activatingFIPSConfig(t *testing.T) string {
+	t.Helper()
+
+	moduleConfig := ossl.DefaultFIPSModuleConfig()
+	if _, err := os.Stat(moduleConfig); err != nil {
+		t.Skipf("FIPS module config not present at %s (openssl fipsinstall not run on this machine): %v", moduleConfig, err)
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "fips_activate.cnf")
+	content := fmt.Sprintf(`openssl_conf = openssl_init
+
+.include %s
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+default = default_sect
+fips = fips_sect
+
+[default_sect]
+activate = 1
+`, moduleConfig)
+
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatalf("writing FIPS activation config: %v", err)
+	}
+	return path
 }
 
 // seedPolicy creates a policy permitting templates and operations via the
@@ -272,4 +318,95 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 	}
 
 	t.Log("ECDSA digest sign/verify round trip PASSED")
+}
+
+// TestSmoke_CreateKey_providerID_pinned_honoured proves an explicit
+// provider_id on CreateKeyRequest is honoured end-to-end through the real
+// gRPC handler and proto (de)serialization -- not just at the
+// KeyOrchestrator layer (internal/service/key_create_test.go's provider_id
+// tests) or the Registry layer (internal/provider/match_test.go's
+// fake-provider tests). buildProviderRegistry registers "software" before
+// "openssl", so this fails if the pin is silently dropped and registration
+// order wins instead.
+func TestSmoke_CreateKey_providerID_pinned_honoured(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+
+	policyName := seedPolicy(t, ctx, h, "aead-allow", []string{"aes-256-gcm-128-96"},
+		[]string{"create_key"})
+
+	templateID := "aes-256-gcm-128-96"
+	const providerID = "openssl"
+	resp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name:       "pinned-key",
+		Policy:     policyName,
+		ProviderId: providerID,
+		ScopeSpec: &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Aead{
+				Aead: &typespb.AeadScopeSpec{
+					Scope: typespb.AeadScope_AEAD_SCOPE_STANDARD,
+				},
+			},
+		},
+		TemplateId: &templateID,
+	})
+	if err != nil {
+		t.Fatalf("CreateKey (pinned to %q): %v", providerID, err)
+	}
+	if !resp.GetSuccess() {
+		t.Fatal("CreateKey: success=false")
+	}
+	if got := resp.GetKeyMetadata().GetProvider(); got != providerID {
+		t.Errorf("CreateKey: provider = %q, want %q — provider_id must be honoured, not overridden by registration order", got, providerID)
+	}
+}
+
+// TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance proves a scope that
+// requires FIPS approval correctly selects the real openssl-fips instance
+// over "software" (registered first) through the real gRPC handler — the
+// end-to-end path match_test.go's fake-provider FIPS test and
+// wire_internal_test.go's direct-Backend-call FIPS test don't individually
+// cover, since neither goes through CreateKey -> Match with a real
+// multi-provider registry.
+func TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance(t *testing.T) {
+	ctx := context.Background()
+	fipsCfgPath := activatingFIPSConfig(t)
+
+	h, err := server.NewTestableServer(ctx, server.Config{
+		CatalogPath:    catalogPath(),
+		FIPSConfigPath: fipsCfgPath,
+	})
+	if err != nil {
+		t.Fatalf("NewTestableServer: %v", err)
+	}
+
+	policyName := seedPolicy(t, ctx, h, "aead-fips-allow", []string{"aes-256-gcm-128-96"},
+		[]string{"create_key"})
+
+	templateID := "aes-256-gcm-128-96"
+	resp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name:   "fips-key",
+		Policy: policyName,
+		ScopeSpec: &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Aead{
+				Aead: &typespb.AeadScopeSpec{
+					Scope: typespb.AeadScope_AEAD_SCOPE_STANDARD,
+					Security: &typespb.UniversalSecurityProperties{
+						FipsApproved: proto.Bool(true),
+					},
+				},
+			},
+		},
+		TemplateId: &templateID,
+	})
+	if err != nil {
+		t.Fatalf("CreateKey (FIPS required): %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Fatal("CreateKey: success=false")
+	}
+	const wantProvider = "openssl-fips"
+	if got := resp.GetKeyMetadata().GetProvider(); got != wantProvider {
+		t.Errorf("CreateKey: provider = %q, want %q — a FIPS-required scope must select the FIPS instance, not the first-registered provider", got, wantProvider)
+	}
 }
