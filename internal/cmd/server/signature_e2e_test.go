@@ -62,7 +62,7 @@ func assertCreateKeySignVerifyRoundTrip(t *testing.T, ctx context.Context, templ
 	policyName := seedPolicy(t, ctx, h, "e2e-allow-"+templateID, []string{templateID})
 
 	tmplID := templateID
-	createResp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	createResp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   "e2e-key",
 		Policy: policyName,
 		ScopeSpec: &typespb.ScopeSpecification{
@@ -84,7 +84,7 @@ func assertCreateKeySignVerifyRoundTrip(t *testing.T, ctx context.Context, templ
 	}
 
 	payload := []byte("end-to-end signature round-trip payload: " + templateID)
-	signResp, err := h.Handler.Sign(ctx, &messagespb.SignRequest{
+	signResp, err := h.CryptoHandler.Sign(ctx, &messagespb.SignRequest{
 		KeyName:     keyName,
 		Input:       payload,
 		ScopeParams: &messagespb.SignRequest_NoContext{NoContext: &typespb.NoParams{}},
@@ -96,7 +96,7 @@ func assertCreateKeySignVerifyRoundTrip(t *testing.T, ctx context.Context, templ
 		t.Fatal("Sign returned empty signature")
 	}
 
-	verifyResp, err := h.Handler.Verify(ctx, &messagespb.VerifyRequest{
+	verifyResp, err := h.CryptoHandler.Verify(ctx, &messagespb.VerifyRequest{
 		KeyName:     keyName,
 		Input:       payload,
 		Signature:   signResp.GetSignature(),

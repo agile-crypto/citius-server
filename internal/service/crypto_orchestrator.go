@@ -25,3 +25,7 @@ type CryptoOrchestrator interface {
 	Digest(ctx context.Context, req crypto.DigestRequest) (crypto.DigestResult, error)
 	GenerateRandom(ctx context.Context, length int) ([]byte, error)
 }
+
+// CryptoOrchestratorFactory builds the cryptographic-operation orchestrator for
+// one request, under the same rules as KeyOrchestratorFactory.
+type CryptoOrchestratorFactory func(ctx context.Context) (CryptoOrchestrator, error)

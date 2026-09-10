@@ -118,7 +118,7 @@ func createAEADKey(t *testing.T, ctx context.Context, h *server.TestableHandler,
 	t.Helper()
 
 	templateID := "aes-256-gcm-128-96"
-	resp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   name,
 		Policy: policyName,
 		ScopeSpec: &typespb.ScopeSpecification{
@@ -144,7 +144,7 @@ func createECDSAKey(t *testing.T, ctx context.Context, h *server.TestableHandler
 	t.Helper()
 
 	templateID := "ecdsa-p256-sha256-der"
-	resp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   name,
 		Policy: policyName,
 		ScopeSpec: &typespb.ScopeSpecification{
@@ -178,7 +178,7 @@ func TestSmoke_Encrypt_Decrypt_AESGCM_RoundTrip(t *testing.T) {
 	keyName := createAEADKey(t, ctx, h, "smoke-aead-key", policyName)
 
 	plaintext := []byte("M1 smoke test payload - AES-256-GCM")
-	encResp, err := h.Handler.Encrypt(ctx, &messagespb.EncryptRequest{
+	encResp, err := h.CryptoHandler.Encrypt(ctx, &messagespb.EncryptRequest{
 		KeyName:   keyName,
 		Plaintext: plaintext,
 		ScopeParams: &messagespb.EncryptRequest_AeadParams{
@@ -192,7 +192,7 @@ func TestSmoke_Encrypt_Decrypt_AESGCM_RoundTrip(t *testing.T) {
 		t.Fatal("Encrypt returned empty ciphertext")
 	}
 
-	decResp, err := h.Handler.Decrypt(ctx, &messagespb.DecryptRequest{
+	decResp, err := h.CryptoHandler.Decrypt(ctx, &messagespb.DecryptRequest{
 		KeyName:    keyName,
 		Ciphertext: encResp.GetCiphertext(),
 		Metadata:   encResp.GetMetadata(),
@@ -222,7 +222,7 @@ func TestSmoke_Decrypt_AESGCM_TamperedCiphertext_Fails(t *testing.T) {
 		[]string{"create_key", "encrypt", "decrypt"})
 	keyName := createAEADKey(t, ctx, h, "smoke-aead-key", policyName)
 
-	encResp, err := h.Handler.Encrypt(ctx, &messagespb.EncryptRequest{
+	encResp, err := h.CryptoHandler.Encrypt(ctx, &messagespb.EncryptRequest{
 		KeyName:   keyName,
 		Plaintext: []byte("M1 smoke test payload - AES-256-GCM"),
 		ScopeParams: &messagespb.EncryptRequest_AeadParams{
@@ -237,7 +237,7 @@ func TestSmoke_Decrypt_AESGCM_TamperedCiphertext_Fails(t *testing.T) {
 	copy(tampered, encResp.GetCiphertext())
 	tampered[0] ^= 0xFF // flip first byte
 
-	_, err = h.Handler.Decrypt(ctx, &messagespb.DecryptRequest{
+	_, err = h.CryptoHandler.Decrypt(ctx, &messagespb.DecryptRequest{
 		KeyName:    keyName,
 		Ciphertext: tampered,
 		Metadata:   encResp.GetMetadata(),
@@ -266,7 +266,7 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 
 	digest := sha256.Sum256([]byte("M1 smoke test payload - ECDSA-P256-SHA256 digest sign"))
 
-	digestSignResp, err := h.Handler.DigestSign(ctx, &messagespb.DigestSignRequest{
+	digestSignResp, err := h.CryptoHandler.DigestSign(ctx, &messagespb.DigestSignRequest{
 		KeyName:       keyName,
 		Digest:        digest[:],
 		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
@@ -281,7 +281,7 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 		t.Fatal("DigestSign returned empty signature")
 	}
 
-	digestVerifyResp, err := h.Handler.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
+	digestVerifyResp, err := h.CryptoHandler.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
 		KeyName:       keyName,
 		Digest:        digest[:],
 		Signature:     digestSignResp.GetSignature(),
@@ -300,7 +300,7 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 
 	// Negative control: a digest over different data must fail verification.
 	wrongDigest := sha256.Sum256([]byte("a different message entirely"))
-	digestVerifyBad, err := h.Handler.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
+	digestVerifyBad, err := h.CryptoHandler.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
 		KeyName:       keyName,
 		Digest:        wrongDigest[:],
 		Signature:     digestSignResp.GetSignature(),
@@ -337,7 +337,7 @@ func TestSmoke_CreateKey_providerID_pinned_honoured(t *testing.T) {
 
 	templateID := "aes-256-gcm-128-96"
 	const providerID = "openssl"
-	resp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:       "pinned-key",
 		Policy:     policyName,
 		ProviderId: providerID,
@@ -384,7 +384,7 @@ func TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance(t *testing.T) {
 		[]string{"create_key"})
 
 	templateID := "aes-256-gcm-128-96"
-	resp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   "fips-key",
 		Policy: policyName,
 		ScopeSpec: &typespb.ScopeSpecification{

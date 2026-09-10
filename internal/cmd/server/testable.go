@@ -7,8 +7,11 @@ import (
 
 	"github.com/agile-crypto/citius-server/internal/core"
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
-	grpchandler "github.com/agile-crypto/citius-server/internal/grpc"
+	cryptohandler "github.com/agile-crypto/citius-server/internal/grpc/crypto"
+	keymgmthandler "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
+	policyhandler "github.com/agile-crypto/citius-server/internal/grpc/policy"
 	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
 )
 
@@ -19,9 +22,14 @@ import (
 // Exported for use from the _test package (server_test); not intended for
 // production code.
 type TestableHandler struct {
-	Handler *grpchandler.Handler
-	store   storage.Storage
-	svc     *appServiceAdapter
+	CryptoHandler *cryptohandler.CryptoHandler
+	KeysHandler   *keymgmthandler.KeyManagementHandler
+	PolicyHandler *policyhandler.CryptoPolicyHandler
+
+	store                storage.Storage
+	keyOrchestratorFn    service.KeyOrchestratorFactory
+	cryptoOrchestratorFn service.CryptoOrchestratorFactory
+	policyEngineFn       policy.EngineFactory
 }
 
 // NewTestableServer is like NewServer but returns a TestableHandler that
@@ -29,34 +37,35 @@ type TestableHandler struct {
 // policy-seeding calls.  This ensures policies created by the test are
 // visible to the handler's factory closures.
 func NewTestableServer(ctx context.Context, cfg Config) (*TestableHandler, error) {
-	bootstrapStorage := &logical.InmemStorage{}
-	templateReg, err := buildTemplateRegistry(ctx, bootstrapStorage, cfg.CatalogPath)
-	if err != nil {
-		return nil, err
-	}
-
-	providerReg, err := buildProviderRegistry(ctx, templateReg, cfg.FIPSConfigPath)
-	if err != nil {
-		return nil, err
-	}
-
+	const op engerr.Op = "server.NewTestableServer"
 	// Both the handler's storageFactory and SeedPolicy use the SAME
 	// InmemStorage so that policies seeded before an RPC are visible.
 	sharedStore := &logical.InmemStorage{}
 
-	svc, err := buildAppService(ctx, templateReg, providerReg, sharedStore)
+	fns, err := wireFactoriesWithStorage(ctx, cfg, sharedStore, op)
 	if err != nil {
 		return nil, err
 	}
-
-	gateway := &appServiceAdapter{svc: svc}
-	storageFactory := func() storage.Storage { return sharedStore }
-	handler := grpchandler.New(gateway, storageFactory)
-
+	cryptoHandler, err := cryptohandler.New(ctx, fns.Crypto, fns.AuthorizeKey)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	keysHandler, err := keymgmthandler.New(ctx, fns.Keys, fns.AuthorizeKey, fns.AuthorizePolicy)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	policyHandler, err := policyhandler.New(ctx, fns.Policy, fns.AuthorizePolicy)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
 	return &TestableHandler{
-		Handler: handler,
-		store:   sharedStore,
-		svc:     gateway,
+		CryptoHandler:        cryptoHandler,
+		KeysHandler:          keysHandler,
+		PolicyHandler:        policyHandler,
+		keyOrchestratorFn:    fns.Keys,
+		cryptoOrchestratorFn: fns.Crypto,
+		policyEngineFn:       fns.Policy,
+		store:                sharedStore,
 	}, nil
 }
 
@@ -64,26 +73,12 @@ func NewTestableServer(ctx context.Context, cfg Config) (*TestableHandler, error
 // shared test storage, making it available to subsequent handler calls.
 func (th *TestableHandler) SeedPolicy(ctx context.Context, name string, rulesJSON []byte) error {
 	const op engerr.Op = "server.TestableHandler.SeedPolicy"
-
-	scope, err := th.svc.ForStorage(ctx, th.store)
+	engine, err := th.policyEngineFn(ctx)
 	if err != nil {
 		return engerr.Wrap(ctx, op, err)
 	}
-
-	// scope is a ScopeGateway — we need the policy engine.
-	// *app.RequestScope satisfies ScopeGateway AND has a Policy() method,
-	// but ScopeGateway itself doesn't expose Policy().
-	// We use a type assertion to access the full RequestScope.
-	type policyAccess interface {
-		Policy() policy.Engine
-	}
-	pa, ok := scope.(policyAccess)
-	if !ok {
-		return engerr.New(ctx, op, engerr.CodeInternal, "scope does not implement policyAccess")
-	}
-
 	p := policy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
-	if _, err := pa.Policy().CreatePolicy(ctx, p); err != nil {
+	if _, err := engine.CreatePolicy(ctx, p); err != nil {
 		return engerr.Wrap(ctx, op, err)
 	}
 	return nil

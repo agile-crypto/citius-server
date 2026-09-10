@@ -74,7 +74,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 
 	templateID := "ecdsa-p256-sha256-der"
 	// CreateKey
-	createResp, err := h.Handler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+	createResp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   "smoke-key",
 		Policy: policyName,
 		ScopeSpec: &typespb.ScopeSpecification{
@@ -100,7 +100,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 
 	// Sign
 	payload := []byte("M1 smoke test payload - ECDSA-P256-SHA256")
-	signResp, err := h.Handler.Sign(ctx, &messagespb.SignRequest{
+	signResp, err := h.CryptoHandler.Sign(ctx, &messagespb.SignRequest{
 		KeyName: keyName,
 		Input:   payload,
 		ScopeParams: &messagespb.SignRequest_NoContext{
@@ -116,7 +116,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 	t.Logf("Signature length: %d bytes", len(signResp.GetSignature()))
 
 	// Verify (valid)
-	verifyResp, err := h.Handler.Verify(ctx, &messagespb.VerifyRequest{
+	verifyResp, err := h.CryptoHandler.Verify(ctx, &messagespb.VerifyRequest{
 		KeyName:   keyName,
 		Input:     payload,
 		Signature: signResp.GetSignature(),
@@ -137,7 +137,7 @@ func TestSmoke_CreateKey_Sign_Verify(t *testing.T) {
 	copy(tampered, payload)
 	tampered[0] ^= 0xFF // flip first byte
 
-	verifyBad, err := h.Handler.Verify(ctx, &messagespb.VerifyRequest{
+	verifyBad, err := h.CryptoHandler.Verify(ctx, &messagespb.VerifyRequest{
 		KeyName:   keyName,
 		Input:     tampered,
 		Signature: signResp.GetSignature(),

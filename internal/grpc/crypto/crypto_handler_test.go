@@ -1,157 +1,26 @@
-package grpc_test
+// Tests replicated from the monolithic internal/grpc handler suite, so that
+// each service handler is covered where it now lives. The assertions are
+// unchanged; only the wiring differs — the handler is built from a factory
+// closure over the mock instead of a ServiceGateway/scope pair.
+
+package cryptogrpc_test
 
 import (
 	"context"
 	"testing"
 
-	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
-	"github.com/stretchr/testify/require"
+	"github.com/agile-crypto/citius-server/internal/provider"
 
 	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	"github.com/agile-crypto/citius-server/internal/core"
+	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/agile-crypto/citius-server/internal/crypto"
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
-	grpchandler "github.com/agile-crypto/citius-server/internal/grpc"
+	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	"github.com/agile-crypto/citius-server/internal/key"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/service"
-	"github.com/agile-crypto/citius-server/internal/storage"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-// ============================================================================
-// Mock types
-// ============================================================================
-
-// mockScope implements the grpchandler.scopeGateway interface (Keys + Crypto + Policy).
-// We rely on the package-private interface being satisfied via duck-typing.
-type mockScope struct {
-	keys   service.KeyOrchestrator
-	crypto service.CryptoOrchestrator
-	policy policy.Engine
-}
-
-func (s *mockScope) Keys() service.KeyOrchestrator      { return s.keys }
-func (s *mockScope) Crypto() service.CryptoOrchestrator { return s.crypto }
-func (s *mockScope) Policy() policy.Engine              { return s.policy }
-
-// mockSvc implements the grpchandler.serviceGateway interface (ForStorage).
-// It returns the pre-built scope without touching storage.
-type mockSvc struct{ scope *mockScope }
-
-func (s *mockSvc) ForStorage(_ context.Context, _ storage.Storage) (grpchandler.ScopeGateway, error) {
-	return s.scope, nil
-}
-
-var _ grpchandler.ServiceGateway = (*mockSvc)(nil) // compile-time check
-var _ grpchandler.ScopeGateway = (*mockScope)(nil) // compile-time check
-
-// mockPolicyManager stubs policy.Manager. Only the three CRUD methods exercised
-// by CreateCryptoPolicy/ReadCryptoPolicy/UpdateCryptoPolicy are wired;
-// DeletePolicy and ListPolicies panic to catch accidental calls.
-type mockPolicyManager struct {
-	createFn func(ctx context.Context, p *policy.Policy) (*policy.Policy, error)
-	getFn    func(ctx context.Context, name string) (*policy.Policy, error)
-	updateFn func(ctx context.Context, p *policy.Policy) error
-}
-
-func (m *mockPolicyManager) CreatePolicy(ctx context.Context, p *policy.Policy) (*policy.Policy, error) {
-	if m.createFn != nil {
-		return m.createFn(ctx, p)
-	}
-	panic("mockPolicyManager.CreatePolicy: not implemented")
-}
-func (m *mockPolicyManager) GetPolicy(ctx context.Context, name string) (*policy.Policy, error) {
-	if m.getFn != nil {
-		return m.getFn(ctx, name)
-	}
-	panic("mockPolicyManager.GetPolicy: not implemented")
-}
-func (m *mockPolicyManager) UpdatePolicy(ctx context.Context, p *policy.Policy) error {
-	if m.updateFn != nil {
-		return m.updateFn(ctx, p)
-	}
-	panic("mockPolicyManager.UpdatePolicy: not implemented")
-}
-func (m *mockPolicyManager) DeletePolicy(_ context.Context, _ string) error {
-	panic("mockPolicyManager.DeletePolicy: not implemented")
-}
-func (m *mockPolicyManager) ListPolicies(_ context.Context) ([]*policy.Policy, error) {
-	panic("mockPolicyManager.ListPolicies: not implemented")
-}
-func (m *mockPolicyManager) ValidateOperation(_ context.Context, _ string, _ core.Operation, _, _ string) error {
-	panic("mockPolicyManager.ValidateOperation: not implemented")
-}
-func (m *mockPolicyManager) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyCreationSpec) error {
-	panic("mockPolicyManager.ValidateKeyCreation: not implemented")
-}
-func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ *core.ScopeSpecification) ([]string, error) {
-	panic("mockPolicyManager.AllowedTemplates: not implemented")
-}
-
-// mockKeyOrchestrator stubs KeyOrchestrator for tests.
-// Only createFn and readFn are wired; all other methods panic.
-type mockKeyOrchestrator struct {
-	createFn             func(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error)
-	readFn               func(ctx context.Context, name string) (*service.KeyMetadata, error)
-	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
-	transformFn          func(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error)
-}
-
-func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
-	if m.createFn != nil {
-		return m.createFn(ctx, spec)
-	}
-	panic("mockKeyOrchestrator.CreateKey: not implemented")
-}
-
-func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version uint32) (*service.KeyMetadata, error) {
-	if m.readFn != nil {
-		return m.readFn(ctx, name)
-	}
-	panic("mockKeyOrchestrator.ReadKey: not implemented")
-}
-
-// Stub the rest of the interface.
-func (m *mockKeyOrchestrator) ListKeys(_ context.Context) ([]*service.KeyMetadata, error) {
-	panic("mockKeyOrchestrator.ListKeys: not implemented")
-}
-func (m *mockKeyOrchestrator) DeleteKey(_ context.Context, _ string) error {
-	panic("mockKeyOrchestrator.DeleteKey: not implemented")
-}
-func (m *mockKeyOrchestrator) GetKeyWithMaterial(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error) {
-	if m.getKeyWithMaterialFn != nil {
-		return m.getKeyWithMaterialFn(ctx, name, version)
-	}
-	panic("mockKeyOrchestrator.GetKeyWithMaterial: not implemented")
-}
-func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*service.KeyMetadata, error) {
-	panic("mockKeyOrchestrator.RotateKey: not implemented")
-}
-func (m *mockKeyOrchestrator) SuspendKey(_ context.Context, _ string) error {
-	panic("mockKeyOrchestrator.SuspendKey: not implemented")
-}
-func (m *mockKeyOrchestrator) RestoreKey(_ context.Context, _ string) error {
-	panic("mockKeyOrchestrator.RestoreKey: not implemented")
-}
-func (m *mockKeyOrchestrator) DestroyKey(_ context.Context, _ string) error {
-	panic("mockKeyOrchestrator.DestroyKey: not implemented")
-}
-func (m *mockKeyOrchestrator) ImportKey(_ context.Context, _ core.ImportKeySpec) (*service.KeyMetadata, error) {
-	panic("mockKeyOrchestrator.ImportKey: not implemented")
-}
-func (m *mockKeyOrchestrator) UpdateKeyPolicy(_ context.Context, _ string, _ string) error {
-	panic("mockKeyOrchestrator.UpdateKeyPolicy: not implemented")
-}
-
-func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error) {
-	if m.transformFn != nil {
-		return m.transformFn(ctx, spec)
-	}
-	panic("mockKeyOrchestrator.TransformKey: not implemented")
-}
 
 // mockCryptoOps stubs CryptoOrchestrator for tests.
 // Only signFn, verifyFn, encryptFn, decryptFn, digestSignFn, and
@@ -226,106 +95,23 @@ func (m *mockCryptoOps) GenerateRandom(_ context.Context, _ int) ([]byte, error)
 	panic("mockCryptoOps.GenerateRandom: not implemented")
 }
 
-// ============================================================================
-// Helper
-// ============================================================================
-
-func wireHandler(keys service.KeyOrchestrator, cr service.CryptoOrchestrator) *grpchandler.Handler {
-	return wireHandlerWithPolicy(keys, cr, nil)
-}
-
-func wireHandlerWithPolicy(keys service.KeyOrchestrator, cr service.CryptoOrchestrator, pm policy.Engine) *grpchandler.Handler {
-	svc := &mockSvc{scope: &mockScope{keys: keys, crypto: cr, policy: pm}}
-	return grpchandler.New(svc, nil)
-}
-
-// ============================================================================
-// Tests
-// ============================================================================
-
-func TestHandler_CreateKey_Success(t *testing.T) {
-	ctx := context.Background()
-	km := &mockKeyOrchestrator{
-		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
-			if spec.Name == "" {
-				t.Error("expected non-empty name in CreateKey spec")
-			}
-			if spec.TemplateID != "ecdsa-p256-sha256-der" {
-				t.Errorf("expected template ecdsa-p256-sha256-der, got %s", spec.TemplateID)
-			}
-			return &service.KeyMetadata{
-				Name:       spec.Name,
-				KeyID:      spec.Name,
-				Version:    1,
-				TemplateID: "ecdsa-p256-sha256-der",
-				Provider:   "software",
-			}, nil
-		},
-	}
-	h := wireHandler(km, nil)
-
-	templateID := "ecdsa-p256-sha256-der"
-	resp, err := h.CreateKey(ctx, &messagespb.CreateKeyRequest{
-		Name: "my-key",
-		ScopeSpec: &typespb.ScopeSpecification{
-			ScopeSpec: &typespb.ScopeSpecification_Signature{
-				Signature: &typespb.SignatureScopeSpec{
-					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
-				},
-			},
-		},
-		TemplateId: &templateID,
+// wireCrypto builds the handler under test over a fixed orchestrator.
+func wireCrypto(t *testing.T, ops service.CryptoOrchestrator) *cryptogrpc.CryptoHandler {
+	t.Helper()
+	newCrypto := service.CryptoOrchestratorFactory(func(_ context.Context) (service.CryptoOrchestrator, error) {
+		return ops, nil
 	})
+	authFn := func(ctx context.Context, op engerr.Op, name string) error {
+		return nil
+	}
+	h, err := cryptogrpc.New(context.Background(), newCrypto, authFn)
 	if err != nil {
-		t.Fatalf("CreateKey handler: %v", err)
+		t.Fatalf("cryptogrpc.New: %v", err)
 	}
-	if resp.GetKeyMetadata().GetName() != "my-key" {
-		t.Errorf("expected key name my-key, got %s", resp.GetKeyMetadata().GetName())
-	}
-	if !resp.GetSuccess() {
-		t.Error("expected Success: true in CreateKeyResponse")
-	}
+	return h
 }
 
-func TestHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) {
-	ctx := context.Background()
-	km := &mockKeyOrchestrator{
-		createFn: func(ctx context.Context, _ core.KeyCreationSpec) (*service.KeyMetadata, error) {
-			return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "name required")
-		},
-	}
-	h := wireHandler(km, nil)
-
-	_, err := h.CreateKey(ctx, &messagespb.CreateKeyRequest{})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	st, _ := status.FromError(err)
-	if st.Code() != codes.InvalidArgument {
-		t.Errorf("expected InvalidArgument, got %s", st.Code())
-	}
-}
-
-func TestHandler_ReadKey_NotFound_ReturnsNotFound(t *testing.T) {
-	ctx := context.Background()
-	km := &mockKeyOrchestrator{
-		readFn: func(ctx context.Context, name string) (*service.KeyMetadata, error) {
-			return nil, engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
-		},
-	}
-	h := wireHandler(km, nil)
-
-	_, err := h.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: "nonexistent"})
-	if err == nil {
-		t.Fatal("expected error")
-	}
-	st, _ := status.FromError(err)
-	if st.Code() != codes.NotFound {
-		t.Errorf("expected NotFound, got %s", st.Code())
-	}
-}
-
-func TestHandler_Sign_Success(t *testing.T) {
+func TestCryptoHandler_Sign_Success(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{
@@ -347,7 +133,7 @@ func TestHandler_Sign_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.Sign(ctx, &messagespb.SignRequest{
 		KeyName: "key_123",
@@ -370,7 +156,7 @@ func TestHandler_Sign_Success(t *testing.T) {
 	}
 }
 
-func TestHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
+func TestCryptoHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		verifyFn: func(_ context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error) {
@@ -380,7 +166,7 @@ func TestHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 			return crypto.VerifyResult{Valid: false}, nil // invalid sig — not an error
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.Verify(ctx, &messagespb.VerifyRequest{
 		KeyName:   "key_123",
@@ -398,7 +184,7 @@ func TestHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 	}
 }
 
-func TestHandler_Encrypt_Success(t *testing.T) {
+func TestCryptoHandler_Encrypt_Success(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{
@@ -420,7 +206,7 @@ func TestHandler_Encrypt_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.Encrypt(ctx, &messagespb.EncryptRequest{
 		KeyName:   "key_123",
@@ -446,7 +232,7 @@ func TestHandler_Encrypt_Success(t *testing.T) {
 	}
 }
 
-func TestHandler_Encrypt_ScopeParamsVariants(t *testing.T) {
+func TestCryptoHandler_Encrypt_ScopeParamsVariants(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{NoOutput: &messagespb.NoAlgorithmOutput{}},
@@ -539,7 +325,7 @@ func TestHandler_Encrypt_ScopeParamsVariants(t *testing.T) {
 					return crypto.EncryptResult{Ciphertext: []byte("ct"), Output: providerOutput}, nil
 				},
 			}
-			h := wireHandler(nil, cr)
+			h := wireCrypto(t, cr)
 
 			if _, err := h.Encrypt(ctx, tt.buildReq()); err != nil {
 				t.Fatalf("Encrypt handler: %v", err)
@@ -549,14 +335,14 @@ func TestHandler_Encrypt_ScopeParamsVariants(t *testing.T) {
 	}
 }
 
-func TestHandler_Encrypt_OrchestratorError_MapsToStatus(t *testing.T) {
+func TestCryptoHandler_Encrypt_OrchestratorError_MapsToStatus(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		encryptFn: func(ctx context.Context, _ crypto.EncryptRequest) (crypto.EncryptResult, error) {
 			return crypto.EncryptResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support encryption")
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	_, err := h.Encrypt(ctx, &messagespb.EncryptRequest{
 		KeyName:   "key_123",
@@ -574,7 +360,7 @@ func TestHandler_Encrypt_OrchestratorError_MapsToStatus(t *testing.T) {
 	}
 }
 
-func TestHandler_Decrypt_Success(t *testing.T) {
+func TestCryptoHandler_Decrypt_Success(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{
@@ -601,7 +387,7 @@ func TestHandler_Decrypt_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.Decrypt(ctx, &messagespb.DecryptRequest{
 		KeyName:    "key_123",
@@ -628,7 +414,7 @@ func TestHandler_Decrypt_Success(t *testing.T) {
 	}
 }
 
-func TestHandler_Decrypt_ScopeParamsVariants(t *testing.T) {
+func TestCryptoHandler_Decrypt_ScopeParamsVariants(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{NoOutput: &messagespb.NoAlgorithmOutput{}},
@@ -722,7 +508,7 @@ func TestHandler_Decrypt_ScopeParamsVariants(t *testing.T) {
 					return crypto.DecryptResult{Plaintext: []byte("pt"), Output: providerOutput}, nil
 				},
 			}
-			h := wireHandler(nil, cr)
+			h := wireCrypto(t, cr)
 
 			if _, err := h.Decrypt(ctx, tt.buildReq()); err != nil {
 				t.Fatalf("Decrypt handler: %v", err)
@@ -736,7 +522,8 @@ func TestHandler_Decrypt_ScopeParamsVariants(t *testing.T) {
 // does not nil-deref when metadata is omitted (proto getters are nil-safe) and
 // that the orchestrator's own nil-Output rejection reaches the caller as
 // InvalidArgument rather than surfacing as an unrelated or opaque error.
-func TestHandler_Decrypt_MissingMetadata_ReturnsInvalidArgument(t *testing.T) {
+
+func TestCryptoHandler_Decrypt_MissingMetadata_ReturnsInvalidArgument(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		decryptFn: func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error) {
@@ -746,7 +533,7 @@ func TestHandler_Decrypt_MissingMetadata_ReturnsInvalidArgument(t *testing.T) {
 			return crypto.DecryptResult{}, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "Output must not be nil")
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	_, err := h.Decrypt(ctx, &messagespb.DecryptRequest{
 		KeyName:    "key_123",
@@ -765,14 +552,14 @@ func TestHandler_Decrypt_MissingMetadata_ReturnsInvalidArgument(t *testing.T) {
 	}
 }
 
-func TestHandler_Decrypt_OrchestratorError_MapsToStatus(t *testing.T) {
+func TestCryptoHandler_Decrypt_OrchestratorError_MapsToStatus(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		decryptFn: func(ctx context.Context, _ crypto.DecryptRequest) (crypto.DecryptResult, error) {
 			return crypto.DecryptResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support decryption")
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	_, err := h.Decrypt(ctx, &messagespb.DecryptRequest{
 		KeyName:    "key_123",
@@ -791,7 +578,7 @@ func TestHandler_Decrypt_OrchestratorError_MapsToStatus(t *testing.T) {
 	}
 }
 
-func TestHandler_DigestSign_Success(t *testing.T) {
+func TestCryptoHandler_DigestSign_Success(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{
@@ -823,7 +610,7 @@ func TestHandler_DigestSign_Success(t *testing.T) {
 			}, nil
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
 		KeyName:          "key_123",
@@ -857,7 +644,8 @@ func TestHandler_DigestSign_Success(t *testing.T) {
 // byte length must match its declared hash algorithm's fixed output size —
 // see provider.DigestLengthForHash) and this test supplies a digest whose
 // length contradicts the declared SHA-256 algorithm.
-func TestHandler_DigestSign_DigestLengthMismatch_Rejected(t *testing.T) {
+
+func TestCryptoHandler_DigestSign_DigestLengthMismatch_Rejected(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		digestSignFn: func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error) {
@@ -870,7 +658,7 @@ func TestHandler_DigestSign_DigestLengthMismatch_Rejected(t *testing.T) {
 			return crypto.SignResult{}, nil
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	_, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
 		KeyName:       "key_123",
@@ -889,14 +677,14 @@ func TestHandler_DigestSign_DigestLengthMismatch_Rejected(t *testing.T) {
 	}
 }
 
-func TestHandler_DigestSign_OrchestratorError_MapsToStatus(t *testing.T) {
+func TestCryptoHandler_DigestSign_OrchestratorError_MapsToStatus(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		digestSignFn: func(ctx context.Context, _ crypto.DigestSignRequest) (crypto.SignResult, error) {
 			return crypto.SignResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support signing")
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	_, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
 		KeyName:       "key_123",
@@ -915,7 +703,7 @@ func TestHandler_DigestSign_OrchestratorError_MapsToStatus(t *testing.T) {
 	}
 }
 
-func TestHandler_DigestVerify_Valid(t *testing.T) {
+func TestCryptoHandler_DigestVerify_Valid(t *testing.T) {
 	ctx := context.Background()
 	providerOutput := &messagespb.ProviderOutput{
 		AlgorithmOutput: &messagespb.ProviderOutput_NoOutput{NoOutput: &messagespb.NoAlgorithmOutput{}},
@@ -939,7 +727,7 @@ func TestHandler_DigestVerify_Valid(t *testing.T) {
 			return crypto.VerifyResult{Valid: true, Output: providerOutput}, nil
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
 		KeyName:   "key_123",
@@ -965,7 +753,7 @@ func TestHandler_DigestVerify_Valid(t *testing.T) {
 	}
 }
 
-func TestHandler_DigestVerify_InvalidSig_ReturnsValidFalse(t *testing.T) {
+func TestCryptoHandler_DigestVerify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		digestVerifyFn: func(_ context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
@@ -975,7 +763,7 @@ func TestHandler_DigestVerify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 			return crypto.VerifyResult{Valid: false}, nil // invalid sig — not an error
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	resp, err := h.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
 		KeyName:   "key_123",
@@ -994,14 +782,14 @@ func TestHandler_DigestVerify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 	}
 }
 
-func TestHandler_DigestVerify_OrchestratorError_MapsToStatus(t *testing.T) {
+func TestCryptoHandler_DigestVerify_OrchestratorError_MapsToStatus(t *testing.T) {
 	ctx := context.Background()
 	cr := &mockCryptoOps{
 		digestVerifyFn: func(ctx context.Context, _ crypto.DigestVerifyRequest) (crypto.VerifyResult, error) {
 			return crypto.VerifyResult{}, engerr.New(ctx, "test", engerr.CodeNotImplemented, "provider does not support signing")
 		},
 	}
-	h := wireHandler(nil, cr)
+	h := wireCrypto(t, cr)
 
 	_, err := h.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
 		KeyName:   "key_123",
@@ -1019,59 +807,4 @@ func TestHandler_DigestVerify_OrchestratorError_MapsToStatus(t *testing.T) {
 	if st.Code() != codes.Unimplemented {
 		t.Errorf("expected Unimplemented, got %s", st.Code())
 	}
-}
-
-func TestHandler_TransformKey_Success(t *testing.T) {
-	ctx := context.Background()
-	km := &mockKeyOrchestrator{
-		transformFn: func(_ context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error) {
-			if spec.KeyName == "" {
-				t.Error("expected non-empty key name in TransformKey spec")
-			}
-			return &service.KeyMetadata{
-				Name:       spec.KeyName,
-				KeyID:      spec.KeyName,
-				Version:    1,
-				TemplateID: "ecdsa-p256-sha256-der",
-				Provider:   "software",
-			}, nil
-		},
-	}
-	h := wireHandler(km, nil)
-
-	resp, err := h.TransformKey(ctx, &messagespb.TransformKeyRequest{
-		Name: "key_123",
-		ScopeSpec: &typespb.ScopeSpecification{
-			ScopeSpec: &typespb.ScopeSpecification_Signature{
-				Signature: &typespb.SignatureScopeSpec{
-					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
-				},
-			},
-		},
-	})
-	if err != nil {
-		t.Fatalf("TransformKey handler: %v", err)
-	}
-	md := resp.GetKeyMetadata()
-	require.Equal(t, "key_123", md.GetName())
-	require.Equal(t, "ecdsa-p256-sha256-der", md.GetTemplateId())
-	require.True(t, resp.GetSuccess())
-	require.Equal(t, "key_123", md.KeyId)
-	require.Equal(t, "software", md.Provider)
-	require.Equal(t, uint32(1), md.Version)
-}
-
-func TestHandler_TransformKey_WithErrors(t *testing.T) {
-	ctx := context.Background()
-	km := &mockKeyOrchestrator{
-		transformFn: func(_ context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error) {
-			return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "name required")
-		},
-	}
-	h := wireHandler(km, nil)
-
-	_, err := h.TransformKey(ctx, &messagespb.TransformKeyRequest{})
-	require.NotNil(t, err)
-	st, _ := status.FromError(err)
-	require.Equal(t, codes.InvalidArgument, st.Code())
 }

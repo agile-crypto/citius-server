@@ -11,11 +11,9 @@ import (
 	"context"
 	"log"
 
-	"github.com/hashicorp/vault/sdk/logical"
-
 	"github.com/agile-crypto/citius-server/internal/app"
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
-	grpchandler "github.com/agile-crypto/citius-server/internal/grpc"
+	"github.com/agile-crypto/citius-server/internal/grpc/authz"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/provider"
@@ -24,6 +22,7 @@ import (
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
 	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // Config carries the small number of knobs for NewServer.
@@ -42,51 +41,104 @@ type Config struct {
 	FIPSConfigPath string
 }
 
-// NewServer assembles the full dependency graph and returns a ready-to-use
-// [grpchandler.Handler].
-func NewServer(ctx context.Context, cfg Config) (*grpchandler.Handler, error) {
-	// Template registry + catalog
-	bootstrapStorage := &logical.InmemStorage{}
-	templateReg, err := buildTemplateRegistry(ctx, bootstrapStorage, cfg.CatalogPath)
+// WireFactorySet assembles the dependency graph for the deployment of the gRPC server over an in-memory
+// [logical.Storage]. This method wires the per-request factory functions used the per-request
+// to build orchestrators, registries, and policy engine.
+//
+// It mirrors today's deployment exactly:
+//
+//   - The template catalogue is built at startup from the catalogue JSON, and fixed afterwards.
+//     Only a reference to it is threaded through per request, so that the catalogue is shared across all requests.
+//   - The provider registry is built at startup and fixed afterwards. Only a reference to it is threaded through
+//     per request, so that the registry is shared across all requests.
+//   - Everything else gets its own factory, for a per-request construction.
+//   - All share the same underlying storage.
+//
+// Authorization is enabled by default: the checks come from
+// internal/grpc/authz, which allows every request when no claims are attached
+// to the context. A deployment that means to run without per-resource
+// authorization should use AllowAllKeyNames() / AllowAllPolicyNames() instead.
+//
+// A change to SQL or remote storage would be a change to the wiring here, not to the gRPC handlers or the domain services.
+func WireFactorySet(ctx context.Context, cfg Config) (FactorySet, error) {
+	const op engerr.Op = "server.WireFactorySet"
+	store := &logical.InmemStorage{}
+	return wireFactoriesWithStorage(ctx, cfg, store, op)
+}
+
+func wireFactoriesWithStorage(ctx context.Context, cfg Config, store storage.Storage, op engerr.Op) (FactorySet, error) {
+	templateReg, err := buildTemplateRegistry(ctx, store, cfg.CatalogPath)
 	if err != nil {
-		return nil, err
+		return FactorySet{}, engerr.Wrap(ctx, op, err)
+	}
+	templatesFn := func(context.Context) (template.Registry, error) {
+		return templateReg, nil
 	}
 
-	// Provider registry + validation
 	providerReg, err := buildProviderRegistry(ctx, templateReg, cfg.FIPSConfigPath)
 	if err != nil {
-		return nil, err
+		return FactorySet{}, engerr.Wrap(ctx, op, err)
+	}
+	providersFn := func(context.Context) (provider.Registry, error) {
+		return providerReg, nil
 	}
 
-	// app.Service
-	//
-	// Use a shared in-memory store across both bootstrap (templates) and
-	// the per-request scope so that policies/keys created via one RPC are
-	// visible to subsequent RPCs. Without this, every getScope() call
-	// would receive a fresh empty store and policies would vanish
-	// between CreateCryptoPolicy and CreateKey.
-	sharedStore := &logical.InmemStorage{}
-	svc, err := buildAppService(ctx, templateReg, providerReg, sharedStore)
-	if err != nil {
-		return nil, err
+	keysFn := func(context.Context) (service.KeyOrchestrator, error) {
+		return buildVaultKeyOrchestrator(ctx, store, templateReg, providerReg)
+	}
+	cryptoFn := func(context.Context) (service.CryptoOrchestrator, error) {
+		return buildVaultCryptoOrchestrator(ctx, store, templateReg, providerReg)
+	}
+	policyFn := func(context.Context) (policy.Engine, error) {
+		return buildVaultPolicyEngine(ctx, store)
 	}
 
-	// Adapter => Handler
-	gateway := &appServiceAdapter{svc: svc}
-	storageFactory := func() storage.Storage { return sharedStore }
+	// TODO: provider instance management is not implemented yet; the stub keeps
+	// ProviderService registrable without pretending to persist.
+	instanceFn := func(context.Context) (provider.InstanceManager, error) {
+		return &noopInstanceManager{}, nil
+	}
 
-	return grpchandler.New(gateway, storageFactory), nil
+	keyAuthz := authz.AuthorizeKeyName()
+	policyAuthz := authz.AuthorizePolicyName()
+
+	return FactorySet{
+		Keys:      keysFn,
+		Crypto:    cryptoFn,
+		Policy:    policyFn,
+		Instances: instanceFn,
+		Templates: templatesFn,
+		Catalog:   providersFn,
+
+		AuthorizeKey:    keyAuthz,
+		AuthorizePolicy: policyAuthz,
+	}, nil
+}
+
+// AllServices returns a Services with every service enabled, for a deployment
+// that serves everything. A deployment that serves only a subset of services
+// should construct its own Services value instead.
+func AllServices() Services {
+	return Services{
+		KeyManagement:    true,
+		Crypto:           true,
+		CryptoPolicy:     true,
+		Discovery:        true,
+		Provider:         true,
+		KeyEstablishment: true,
+		Streaming:        true,
+	}
 }
 
 // ============================================================================
-// Shared bootstrap helpers (used by both NewServer and NewTestableServer)
+// Shared bootstrap helpers (used by both WireFactorySet and NewTestableServer)
 // ============================================================================
 
 // buildTemplateRegistry creates a VaultRegistry and optionally loads the
 // standard algorithm catalog from disk.
 func buildTemplateRegistry(
 	ctx context.Context,
-	bootstrapStorage *logical.InmemStorage,
+	bootstrapStorage storage.Storage,
 	catalogPath string,
 ) (template.Registry, error) {
 	const op engerr.Op = "server.buildTemplateRegistry"
@@ -162,57 +214,11 @@ func registerFIPSProvider(ctx context.Context, providerReg provider.Registry, fi
 	log.Printf("openssl-fips: FIPS provider registered (config: %s)", fipsConfigPath)
 }
 
-// buildAppService constructs an app.Service from the shared registries.
-// The optional overrideStore, when non-nil, makes every factory closure use
-// that fixed storage instead of its argument - this is used by
-// NewTestableServer to share state between policy seeding and handler calls.
-func buildAppService(
-	ctx context.Context,
-	templateReg template.Registry,
-	providerReg provider.Registry,
-	overrideStore ...storage.Storage,
-) (*app.Service, error) {
-	const op engerr.Op = "server.buildAppService"
-
-	// When an override is provided, factories ignore their argument and use it.
-	resolve := func(s storage.Storage) storage.Storage { return s }
-	if len(overrideStore) > 0 && overrideStore[0] != nil {
-		fixed := overrideStore[0]
-		resolve = func(_ storage.Storage) storage.Storage { return fixed }
-	}
-
-	keyFactory := func(s storage.Storage) (service.KeyOrchestrator, error) {
-		return buildKeyOrchestrator(ctx, resolve(s), templateReg, providerReg)
-	}
-	cryptoFactory := func(s storage.Storage) (service.CryptoOrchestrator, error) {
-		return buildCryptoOrchestrator(ctx, resolve(s), templateReg, providerReg)
-	}
-	policyFactory := func(s storage.Storage) (policy.Engine, error) {
-		return buildPolicyEngine(ctx, resolve(s))
-	}
-	instanceFactory := func(_ storage.Storage) (provider.InstanceManager, error) {
-		return &noopInstanceManager{}, nil
-	}
-
-	svc, err := app.NewService(
-		app.WithKeyOrchestratorFactory(keyFactory),
-		app.WithCryptoOrchestratorFactory(cryptoFactory),
-		app.WithPolicyEngineFactory(policyFactory),
-		app.WithProviderInstanceManagerFactory(instanceFactory),
-		app.WithTemplateRegistry(templateReg),
-		app.WithProviderRegistry(providerReg),
-	)
-	if err != nil {
-		return nil, engerr.Wrap(ctx, op, err)
-	}
-	return svc, nil
-}
-
 // ============================================================================
 // Factory builders — same pattern as integration tests
 // ============================================================================
 
-func buildKeyOrchestrator(
+func buildVaultKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
 	templateReg template.Registry, providerReg provider.Registry,
 ) (service.KeyOrchestrator, error) {
@@ -231,7 +237,7 @@ func buildKeyOrchestrator(
 	return service.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
 }
 
-func buildCryptoOrchestrator(
+func buildVaultCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
 	templateReg template.Registry, providerReg provider.Registry,
 ) (service.CryptoOrchestrator, error) {
@@ -250,7 +256,7 @@ func buildCryptoOrchestrator(
 	return service.NewCryptoOrchestrator(s, repo, pol, providerReg, templateReg)
 }
 
-func buildPolicyEngine(
+func buildVaultPolicyEngine(
 	ctx context.Context, s storage.Storage,
 ) (policy.Engine, error) {
 	policyRepo, err := policy.NewVaultRepository(ctx, s)
@@ -258,23 +264,6 @@ func buildPolicyEngine(
 		return nil, err
 	}
 	return policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
-}
-
-// ============================================================================
-// Adapters & stubs
-// ============================================================================
-
-// appServiceAdapter bridges *app.Service (concrete ForStorage returning
-// *RequestScope) to grpchandler.ServiceGateway (interface returning
-// ScopeGateway).  *app.RequestScope already satisfies ScopeGateway
-// (it has Keys() and Crypto() methods), so the adapter just converts
-// the return type.
-type appServiceAdapter struct {
-	svc *app.Service
-}
-
-func (a *appServiceAdapter) ForStorage(ctx context.Context, store storage.Storage) (grpchandler.ScopeGateway, error) {
-	return a.svc.ForStorage(ctx, store)
 }
 
 // noopInstanceManager satisfies provider.InstanceManager.

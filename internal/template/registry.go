@@ -49,3 +49,6 @@ type Registry interface {
 	// It is a startup/configuration concern implemented as a package-level function
 	// in the template package: template.LoadStandardCatalog(path string, r Registry) error
 }
+
+// RegistryFactory builds the algorithm-template registry for one request.
+type RegistryFactory func(ctx context.Context) (Registry, error)

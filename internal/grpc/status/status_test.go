@@ -1,4 +1,4 @@
-package grpc_test
+package status
 
 import (
 	"context"
@@ -8,11 +8,10 @@ import (
 	"google.golang.org/grpc/status"
 
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
-	grpchandler "github.com/agile-crypto/citius-server/internal/grpc"
 )
 
 func TestToStatusError_Nil(t *testing.T) {
-	if err := grpchandler.ToStatusError(nil); err != nil {
+	if err := ToStatusError(nil); err != nil {
 		t.Errorf("ToStatusError(nil) = %v; want nil", err)
 	}
 }
@@ -20,7 +19,7 @@ func TestToStatusError_Nil(t *testing.T) {
 func TestToStatusError_KeyNotFound(t *testing.T) {
 	ctx := context.Background()
 	err := engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
-	st, ok := status.FromError(grpchandler.ToStatusError(err))
+	st, ok := status.FromError(ToStatusError(err))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}
@@ -32,7 +31,7 @@ func TestToStatusError_KeyNotFound(t *testing.T) {
 func TestToStatusError_TemplateNotFound(t *testing.T) {
 	ctx := context.Background()
 	err := engerr.New(ctx, "test", engerr.CodeTemplateNotFound, "template not found")
-	st, ok := status.FromError(grpchandler.ToStatusError(err))
+	st, ok := status.FromError(ToStatusError(err))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}
@@ -44,7 +43,7 @@ func TestToStatusError_TemplateNotFound(t *testing.T) {
 func TestToStatusError_PolicyViolation(t *testing.T) {
 	ctx := context.Background()
 	err := engerr.New(ctx, "test", engerr.CodePolicyViolation, "denied by policy")
-	st, ok := status.FromError(grpchandler.ToStatusError(err))
+	st, ok := status.FromError(ToStatusError(err))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}
@@ -56,7 +55,7 @@ func TestToStatusError_PolicyViolation(t *testing.T) {
 func TestToStatusError_AlreadyExists(t *testing.T) {
 	ctx := context.Background()
 	err := engerr.New(ctx, "test", engerr.CodeAlreadyExists, "already exists")
-	st, ok := status.FromError(grpchandler.ToStatusError(err))
+	st, ok := status.FromError(ToStatusError(err))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}
@@ -68,7 +67,7 @@ func TestToStatusError_AlreadyExists(t *testing.T) {
 func TestToStatusError_NotImplemented(t *testing.T) {
 	ctx := context.Background()
 	err := engerr.New(ctx, "test", engerr.CodeNotImplemented, "not implemented")
-	st, ok := status.FromError(grpchandler.ToStatusError(err))
+	st, ok := status.FromError(ToStatusError(err))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}
@@ -80,7 +79,7 @@ func TestToStatusError_NotImplemented(t *testing.T) {
 func TestToStatusError_InvalidArgument(t *testing.T) {
 	ctx := context.Background()
 	err := engerr.New(ctx, "test", engerr.CodeInvalidArgument, "bad input")
-	st, ok := status.FromError(grpchandler.ToStatusError(err))
+	st, ok := status.FromError(ToStatusError(err))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}
@@ -92,7 +91,7 @@ func TestToStatusError_InvalidArgument(t *testing.T) {
 func TestToStatusError_UnknownError_ReturnsInternal(t *testing.T) {
 	// A plain Go error (not *engerr.Error) must map to codes.Internal.
 	plain := &plainError{"something unexpected"}
-	st, ok := status.FromError(grpchandler.ToStatusError(plain))
+	st, ok := status.FromError(ToStatusError(plain))
 	if !ok {
 		t.Fatal("expected gRPC status error")
 	}

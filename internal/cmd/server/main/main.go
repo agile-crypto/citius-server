@@ -21,7 +21,6 @@ import (
 	"runtime"
 	"syscall"
 
-	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
 	"github.com/agile-crypto/citius-server/internal/auth"
 	"github.com/agile-crypto/citius-server/internal/cmd/server"
 	"google.golang.org/grpc"
@@ -29,6 +28,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+//nolint:cyclop
 func main() {
 	addr := flag.String("addr", ":50051", "gRPC listen address")
 	catalog := flag.String("catalog", defaultCatalogPath(), "path to standard_algorithms.json")
@@ -87,12 +87,18 @@ func main() {
 		log.Printf("TLS enabled (cert=%s)", *tlsCert) //nolint:gosec // cert path from operator-controlled flag
 	}
 
-	handler, err := server.NewServer(ctx, server.Config{
+	factorySet, err := server.WireFactorySet(ctx, server.Config{
 		CatalogPath:    *catalog,
 		FIPSConfigPath: *fipsConfig,
 	})
 	if err != nil {
-		log.Fatalf("failed to initialise server: %v", err)
+		log.Fatalf("wiring failed: %v", err)
+	}
+	// set up crypto, crypto-policy, and key-management services
+	services := server.Services{
+		Crypto:        true,
+		CryptoPolicy:  true,
+		KeyManagement: true,
 	}
 
 	lis, err := net.Listen("tcp", *addr)
@@ -102,9 +108,10 @@ func main() {
 	defer lis.Close()
 
 	srv := grpc.NewServer(serverOpts...)
-	servicespb.RegisterCryptoServiceServer(srv, handler)
-	servicespb.RegisterKeyManagementServiceServer(srv, handler)
-	servicespb.RegisterCryptoPolicyServiceServer(srv, handler)
+	err = server.RegisterAll(ctx, srv, services, factorySet)
+	if err != nil {
+		log.Fatalf("failed to register all services: %v", err)
+	}
 	if *enableReflection {
 		reflection.Register(srv)
 		log.Println("gRPC reflection registered")

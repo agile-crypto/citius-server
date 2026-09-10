@@ -1,4 +1,6 @@
-package app
+//go:build vault_plugin
+
+package vault
 
 import (
 	"context"

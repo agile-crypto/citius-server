@@ -1,4 +1,4 @@
-package grpc
+package authz
 
 import (
 	"context"
@@ -12,6 +12,16 @@ import (
 )
 
 const testOp engerr.Op = "grpc.authz.test"
+
+func authorizeKeyName(ctx context.Context, op engerr.Op, name string) error {
+	fn := AuthorizeKeyName()
+	return fn(ctx, op, name)
+}
+
+func authorizePolicyName(ctx context.Context, op engerr.Op, name string) error {
+	fn := AuthorizePolicyName()
+	return fn(ctx, op, name)
+}
 
 func ctxWithClaims(allow []string) context.Context {
 	raw := map[string]any{"sub": "svc-tester"}

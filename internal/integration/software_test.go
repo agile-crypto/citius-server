@@ -1,6 +1,8 @@
+//go:build vault_plugin
+
 // Package integration_test — software_test.go exercises the software provider
 // with real ECDSA-P256 and ML-DSA-65 crypto through the full orchestration
-// stack: app.Service => RequestScope => CryptoOrchestrator => KeyOrchestrator =>
+// stack: vault.Service => RequestScope => CryptoOrchestrator => KeyOrchestrator =>
 // ProviderRegistry => software.Provider.
 //
 // Unlike the loopback tests (deterministic echo), these tests validate
@@ -16,6 +18,7 @@ import (
 
 	api "github.com/agile-crypto/citius-server/gen/go/api/types"
 	"github.com/agile-crypto/citius-server/internal/app"
+	"github.com/agile-crypto/citius-server/internal/app/vault"
 	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/crypto"
 	"github.com/agile-crypto/citius-server/internal/policy"
@@ -30,9 +33,9 @@ import (
 // Wiring Helper — Software Provider
 // ============================================================================
 
-// wireWithSoftwareProvider builds a fully wired app.Service backed by the real software
+// wireWithSoftwareProvider builds a fully wired vault.Service backed by the real software
 // provider. Templates are loaded from the standard catalog.
-func wireWithSoftwareProvider(t *testing.T) *app.Service {
+func wireWithSoftwareProvider(t *testing.T) *vault.Service {
 	t.Helper()
 	ctx := context.Background()
 
@@ -74,13 +77,13 @@ func wireWithSoftwareProvider(t *testing.T) *app.Service {
 		return &noopInstanceManager{}, nil
 	}
 
-	svc, err := app.NewService(
-		app.WithKeyOrchestratorFactory(keyFactory),
-		app.WithCryptoOrchestratorFactory(cryptoFactory),
-		app.WithPolicyEngineFactory(policyFactory),
-		app.WithProviderInstanceManagerFactory(instanceFactory),
-		app.WithTemplateRegistry(reg),
-		app.WithProviderRegistry(provReg),
+	svc, err := vault.NewService(
+		vault.WithKeyOrchestratorFactory(keyFactory),
+		vault.WithCryptoOrchestratorFactory(cryptoFactory),
+		vault.WithPolicyEngineFactory(policyFactory),
+		vault.WithProviderInstanceManagerFactory(instanceFactory),
+		vault.WithTemplateRegistry(reg),
+		vault.WithProviderRegistry(provReg),
 	)
 	if err != nil {
 		t.Fatalf("NewService (software): %v", err)

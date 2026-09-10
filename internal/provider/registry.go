@@ -31,6 +31,14 @@ type Registry interface {
 	Match(ctx context.Context, req Requirements) (Backend, error)
 }
 
+// RegistryFactory resolves the registry of crypto providers for one request.
+//
+// The registry is never remoted: it stays local and holds a mix of local and
+// remote Backend values. So this factory normally returns a registry built once
+// at startup; it is fallible and per-request only so that the read-only
+// provider RPCs have the same shape as every other capability.
+type RegistryFactory func(ctx context.Context) (Registry, error)
+
 // registry is a thread-safe in-memory registry of provider backends.
 type registry struct {
 	mu        sync.RWMutex

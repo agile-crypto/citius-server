@@ -1,3 +1,5 @@
+//go:build vault_plugin
+
 package integration_test
 
 import (
@@ -14,7 +16,7 @@ import (
 )
 
 // cipherE2ETemplates lists every cipher template this test exercises through
-// the full orchestration stack (app.Service -> RequestScope ->
+// the full orchestration stack (vault.Service -> RequestScope ->
 // CryptoOrchestrator -> KeyOrchestrator -> ProviderRegistry ->
 // software.Provider), paired with the scope its catalog entry declares and
 // whether that scope requires AeadParams (GCM, ChaCha20-Poly1305/XChaCha20)

@@ -19,3 +19,11 @@ type InstanceManager interface {
 	List(ctx context.Context) ([]*Instance, error)
 	Delete(ctx context.Context, publicID string) error
 }
+
+// InstanceManagerFactory builds the manager for configured provider instances
+// for one request.
+//
+// Unlike the registry, provider instances are persisted, so this factory is
+// genuinely storage-backed: it closes over a Vault request's storage, a SQL
+// pool, or a remote client. See policy.EngineFactory for the memoisation rule.
+type InstanceManagerFactory func(ctx context.Context) (InstanceManager, error)

@@ -42,6 +42,16 @@ type KeyOrchestrator interface {
 	TransformKey(ctx context.Context, spec TransformKeySpec) (*KeyMetadata, error)
 }
 
+// KeyOrchestratorFactory builds the key-lifecycle orchestrator for one request.
+//
+// The orchestrator is always local to the process serving the request: what
+// varies with deployment mode is its dependencies — a key repository that is
+// Vault-backed, SQL-backed or a remote-custody client; a policy engine that is
+// local or remote. All of that is captured by the closure, so this signature is
+// identical in every mode. See policy.EngineFactory for the rules a factory
+// must follow.
+type KeyOrchestratorFactory func(ctx context.Context) (KeyOrchestrator, error)
+
 type TransformKeySpec struct {
 	KeyName            string
 	ScopeSpecification *core.ScopeSpecification

@@ -36,6 +36,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
 	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -219,12 +220,18 @@ func TestAdminCanCreateAndRead(t *testing.T) {
 		t.Fatalf("CreateCryptoPolicy as admin: %v", err)
 	}
 
+	templateID := "ecdsa-p256-sha256-der"
 	createResp, err := kmCli.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   keyName,
 		Policy: "default",
-		KeySpecification: &messagespb.CreateKeyRequest_TemplateId{
-			TemplateId: "ecdsa-p256-sha256-der",
+		ScopeSpec: &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Signature{
+				Signature: &typespb.SignatureScopeSpec{
+					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+				},
+			},
 		},
+		TemplateId: &templateID,
 	})
 	if err != nil {
 		t.Fatalf("CreateKey as admin: %v", err)
