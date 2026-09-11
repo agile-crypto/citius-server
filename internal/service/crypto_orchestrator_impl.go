@@ -12,7 +12,6 @@ import (
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/provider"
-	"github.com/agile-crypto/citius-server/internal/storage"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"google.golang.org/protobuf/proto"
 )
@@ -21,7 +20,6 @@ import (
 // It coordinates key retrieval, policy validation, and provider dispatch
 // for cryptographic operations.
 type cryptoOrchestrator struct {
-	store     storage.Storage
 	keys      key.ReadOnlyRepository
 	policy    policy.Engine
 	providers provider.Registry
@@ -29,9 +27,8 @@ type cryptoOrchestrator struct {
 }
 
 // NewCryptoOrchestrator creates a new CryptoOrchestrator.
-// All five dependencies are required; returns an error if any is nil.
+// All four dependencies are required; returns an error if any is nil.
 func NewCryptoOrchestrator(
-	s storage.Storage,
 	kr key.ReadOnlyRepository,
 	pe policy.Engine,
 	pr provider.Registry,
@@ -40,10 +37,6 @@ func NewCryptoOrchestrator(
 	const op errors.Op = "service.NewCryptoOrchestrator"
 	ctx := context.Background()
 
-	if s == nil {
-		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
-			"storage must not be nil")
-	}
 	if kr == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument,
 			"key reader must not be nil")
@@ -62,7 +55,6 @@ func NewCryptoOrchestrator(
 	}
 
 	return &cryptoOrchestrator{
-		store:     s,
 		keys:      kr,
 		policy:    pe,
 		providers: pr,

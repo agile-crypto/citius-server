@@ -118,7 +118,7 @@ func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator
 	if err != nil {
 		t.Fatalf("NewKeyOrchestrator: %v", err)
 	}
-	ops, err := NewCryptoOrchestrator(storage, repo, pol, provReg, reg)
+	ops, err := NewCryptoOrchestrator(repo, pol, provReg, reg)
 	if err != nil {
 		t.Fatalf("NewCryptoOrchestrator: %v", err)
 	}

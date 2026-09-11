@@ -253,7 +253,7 @@ func buildVaultCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewCryptoOrchestrator(s, repo, pol, providerReg, templateReg)
+	return service.NewCryptoOrchestrator(repo, pol, providerReg, templateReg)
 }
 
 func buildVaultPolicyEngine(

@@ -193,7 +193,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewCryptoOrchestrator(s, repo, pol, provReg, reg)
+	return service.NewCryptoOrchestrator(repo, pol, provReg, reg)
 }
 
 func buildPolicyEngine(
