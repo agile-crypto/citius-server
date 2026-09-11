@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	metapb "github.com/agile-crypto/citius-api-go/gen/go/messages"
-	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-core/provider"
 	"google.golang.org/protobuf/proto"
 )
 

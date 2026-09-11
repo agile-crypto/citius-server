@@ -8,9 +8,12 @@ import (
 	"testing"
 
 	core "github.com/agile-crypto/citius-core"
+	corekey "github.com/agile-crypto/citius-core/key"
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+	coreprovider "github.com/agile-crypto/citius-core/provider"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/hashicorp/vault/sdk/logical"
 
@@ -38,12 +41,12 @@ func scopeSpecWithScope(t *testing.T, scope core.Scope) *core.ScopeSpecification
 
 // seedPermissivePolicy creates a policy that allows the ml-dsa-65 template and
 // the create_key operation. Used by setupOrchestrator and inline test setups.
-func seedPermissivePolicy(t *testing.T, ctx context.Context, pol policy.Engine) {
+func seedPermissivePolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine) {
 	t.Helper()
-	rules := &policy.Rules{
+	rules := &corepolicy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ml-dsa-65"},
-		AllowedOperations: &policy.OperationRule{
+		AllowedOperations: &corepolicy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	}
@@ -51,7 +54,7 @@ func seedPermissivePolicy(t *testing.T, ctx context.Context, pol policy.Engine) 
 	if err != nil {
 		t.Fatalf("marshal rules: %v", err)
 	}
-	p := policy.NewPolicy("pol_testperm", testPolicyName, rulesJSON)
+	p := corepolicy.NewPolicy("pol_testperm", testPolicyName, rulesJSON)
 	_, err = pol.CreatePolicy(ctx, p)
 	if err != nil {
 		t.Fatalf("seed policy: %v", err)
@@ -75,7 +78,7 @@ func catalogPath() string {
 //
 // A permissive policy (testPolicyName) is pre-seeded that allows ml-dsa-65 and
 // the create_key operation.
-func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, key.Repository, provider.Registry, policy.Engine, template.Registry) {
+func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, corekey.Repository, coreprovider.Registry, corepolicy.Engine, coretemplate.Registry) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -92,12 +95,12 @@ func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, key.Repository, provi
 	}
 
 	// Load the standard algorithm catalog — includes "ml-dsa-65".
-	err = template.LoadStandardCatalog(ctx, catalogPath(), reg)
+	err = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
 
-	provReg := provider.NewRegistry()
+	provReg := coreprovider.NewRegistry()
 	sw := software.New()
 	err = provReg.Register(ctx, sw)
 	if err != nil {
@@ -108,8 +111,8 @@ func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, key.Repository, provi
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, err := policy.NewEnforcer(policyRepo, eval)
+	eval := corepolicy.NewSimpleRulesEvaluator()
+	pol, err := corepolicy.NewEnforcer(policyRepo, eval)
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -126,7 +129,7 @@ func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, key.Repository, provi
 // setupOrchestratorWithPolicy is a convenience wrapper that returns the
 // orchestrator and policy engine (without the repo). Use setupOrchestratorFull
 // when you also need the underlying key.Repository for lifecycle mutation.
-func setupOrchestratorWithPolicy(t *testing.T) (KeyOrchestrator, policy.Engine) {
+func setupOrchestratorWithPolicy(t *testing.T) (KeyOrchestrator, corepolicy.Engine) {
 	t.Helper()
 	orch, _, _, pol, _ := setupOrchestratorFull(t)
 	return orch, pol

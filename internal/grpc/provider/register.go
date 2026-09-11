@@ -12,7 +12,7 @@ import (
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-core/provider"
 
 	"google.golang.org/grpc"
 )

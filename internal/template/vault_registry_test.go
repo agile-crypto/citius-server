@@ -7,12 +7,17 @@ import (
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func ecdsaTemplate() *template.Template {
-	return template.NewTemplate(&api.TemplateInfo{
+// boolPtr mirrors core/template's private test helper of the same name —
+// duplicated here since it's unexported and this is a different package now.
+func boolPtr(v bool) *bool { return &v }
+
+func ecdsaTemplate() *coretemplate.Template {
+	return coretemplate.NewTemplate(&api.TemplateInfo{
 		TemplateId: "ecdsa-p256-sha256",
 		Algorithm: &api.AlgorithmDetails{
 			Algorithm: &api.AlgorithmDetails_Ecdsa{
@@ -43,8 +48,8 @@ func ecdsaTemplate() *template.Template {
 	})
 }
 
-func mldsaTemplate() *template.Template {
-	return template.NewTemplate(&api.TemplateInfo{
+func mldsaTemplate() *coretemplate.Template {
+	return coretemplate.NewTemplate(&api.TemplateInfo{
 		TemplateId: "ml-dsa-65",
 		Algorithm: &api.AlgorithmDetails{
 			Algorithm: &api.AlgorithmDetails_MlDsa{
@@ -74,7 +79,7 @@ func mldsaTemplate() *template.Template {
 	})
 }
 
-var registryFn = func() template.Registry {
+var registryFn = func() coretemplate.Registry {
 	storage := &logical.InmemStorage{}
 	r, err := template.NewVaultRegistry(context.Background(), storage)
 	if err != nil {
@@ -103,7 +108,7 @@ func TestVaultRegistry_Register_nil_returnsError(t *testing.T) {
 
 func TestVaultRegistry_Register_emptyID_returnsError(t *testing.T) {
 	r := registryFn()
-	tmpl := template.NewTemplate(&api.TemplateInfo{TemplateId: ""})
+	tmpl := coretemplate.NewTemplate(&api.TemplateInfo{TemplateId: ""})
 	if err := r.Register(context.Background(), tmpl); err == nil {
 		t.Fatal("expected error for empty template ID")
 	}
@@ -112,7 +117,7 @@ func TestVaultRegistry_Register_emptyID_returnsError(t *testing.T) {
 func TestVaultRegistry_Register_duplicate_overwrite(t *testing.T) {
 	r := registryFn()
 	_ = r.Register(context.Background(), ecdsaTemplate())
-	updated := template.NewTemplate(&api.TemplateInfo{
+	updated := coretemplate.NewTemplate(&api.TemplateInfo{
 		TemplateId:  "ecdsa-p256-sha256",
 		DisplayName: "Updated ECDSA",
 		Algorithm: &api.AlgorithmDetails{
@@ -212,7 +217,7 @@ func TestVaultRegistry_List_empty(t *testing.T) {
 // ============================================================================
 
 // registryWithBothTemplates is a helper that registers both templates.
-func registryWithBothTemplates(t *testing.T) template.Registry {
+func registryWithBothTemplates(t *testing.T) coretemplate.Registry {
 	t.Helper()
 	ctx := context.Background()
 	r := registryFn()
@@ -233,7 +238,7 @@ func TestVaultRegistry_Select_byScope_noSecurityFilter(t *testing.T) {
 	// No security filter and all templates eligible — both match scope.
 	// Should return one of the two (deterministic).
 	ctx := context.Background()
-	got, err := r.Select(ctx, signatureScope, template.AllTemplates())
+	got, err := r.Select(ctx, signatureScope, coretemplate.AllTemplates())
 	if err != nil {
 		t.Fatalf("Select: %v", err)
 	}
@@ -250,7 +255,7 @@ func TestVaultRegistry_Select_requireQuantumSafe(t *testing.T) {
 		SecurityProps: &core.SecurityProperties{
 			QuantumSafe: true,
 		},
-	}, template.AllTemplates())
+	}, coretemplate.AllTemplates())
 	if err != nil {
 		t.Fatalf("Select with quantum_safe: %v", err)
 	}
@@ -267,7 +272,7 @@ func TestVaultRegistry_Select_requireFIPSApproved(t *testing.T) {
 		SecurityProps: &core.SecurityProperties{
 			FipsApproved: true,
 		},
-	}, template.AllTemplates())
+	}, coretemplate.AllTemplates())
 	if err != nil {
 		t.Fatalf("Select with fips_approved: %v", err)
 	}
@@ -280,7 +285,7 @@ func TestVaultRegistry_Select_allowedTemplates_restrictsCandidates(t *testing.T)
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
 	// Only ecdsa is allowed by policy
-	got, err := r.Select(ctx, signatureScope, template.OnlyTemplates("ecdsa-p256-sha256"))
+	got, err := r.Select(ctx, signatureScope, coretemplate.OnlyTemplates("ecdsa-p256-sha256"))
 	if err != nil {
 		t.Fatalf("Select with OnlyTemplates: %v", err)
 	}
@@ -293,7 +298,7 @@ func TestVaultRegistry_Select_allowedTemplates_emptyCandidates(t *testing.T) {
 	r := registryWithBothTemplates(t)
 	// Policy only allows a template that isn't registered
 	ctx := context.Background()
-	_, err := r.Select(ctx, signatureScope, template.OnlyTemplates("nonexistent-template"))
+	_, err := r.Select(ctx, signatureScope, coretemplate.OnlyTemplates("nonexistent-template"))
 	if err == nil {
 		t.Fatal("expected error when no candidates match AllowedTemplates")
 	}
@@ -311,7 +316,7 @@ func TestVaultRegistry_Select_securityFilter_noMatch(t *testing.T) {
 			QuantumSafe:  true,
 			FipsApproved: true,
 		},
-	}, template.AllTemplates())
+	}, coretemplate.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error — no template is both quantum_safe and fips_approved")
 	}
@@ -323,7 +328,7 @@ func TestVaultRegistry_Select_securityFilter_noMatch(t *testing.T) {
 func TestVaultRegistry_Select_emptyRegistry(t *testing.T) {
 	r := registryFn()
 	ctx := context.Background()
-	_, err := r.Select(ctx, signatureScope, template.AllTemplates())
+	_, err := r.Select(ctx, signatureScope, coretemplate.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error for empty registry")
 	}
@@ -336,7 +341,7 @@ func TestVaultRegistry_Select_explicitTemplateID_bypasses(t *testing.T) {
 	// When AllowedTemplates has exactly one entry and scope is nil, return it directly.
 	r := registryWithBothTemplates(t)
 	ctx := context.Background()
-	got, err := r.Select(ctx, nil, template.OnlyTemplates("ecdsa-p256-sha256"))
+	got, err := r.Select(ctx, nil, coretemplate.OnlyTemplates("ecdsa-p256-sha256"))
 	if err != nil {
 		t.Fatalf("Select explicit: %v", err)
 	}
@@ -351,7 +356,7 @@ func TestVaultRegistry_Select_scopeVariantMismatch(t *testing.T) {
 	// Templates have signature/standard; ask for prehashed — should find no match.
 	_, err := r.Select(ctx, &core.ScopeSpecification{
 		Scope: core.ScopeSignaturePrehashed,
-	}, template.AllTemplates())
+	}, coretemplate.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error for scope variant mismatch")
 	}
@@ -366,7 +371,7 @@ func TestVaultRegistry_Select_primitiveMismatch(t *testing.T) {
 	// Templates are signature-scoped; ask for AEAD.
 	_, err := r.Select(ctx, &core.ScopeSpecification{
 		Scope: core.ScopeAeadStandard,
-	}, template.AllTemplates())
+	}, coretemplate.AllTemplates())
 	if err == nil {
 		t.Fatal("expected error for primitive mismatch")
 	}

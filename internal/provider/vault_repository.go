@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	coreprovider "github.com/agile-crypto/citius-core/provider"
+
 	"github.com/agile-crypto/citius-core/errors"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -12,26 +14,26 @@ import (
 
 const providerInstanceStoragePrefix = "provider_instance/"
 
-var _ InstanceRepository = (*VaultRepository)(nil)
+var _ coreprovider.InstanceRepository = (*VaultRepository)(nil)
 
 type VaultRepository struct {
 	mu        *sync.RWMutex
 	instances logical.Storage
 }
 
-func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRepository, error) {
+func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...coreprovider.Option) (*VaultRepository, error) {
 	const op errors.Op = "provider.NewVaultRepository"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
-	opts := getOpts(opt...)
+	opts := coreprovider.GetVaultOptions(opt...)
 	return &VaultRepository{
-		mu:        opts.withLock,
+		mu:        opts.Lock,
 		instances: logical.NewStorageView(storage, providerInstanceStoragePrefix),
 	}, nil
 }
 
-func (r *VaultRepository) PutProviderInstance(ctx context.Context, instance *Instance) error {
+func (r *VaultRepository) PutProviderInstance(ctx context.Context, instance *coreprovider.Instance) error {
 	const op errors.Op = "provider.(VaultRepository).PutProviderInstance"
 	if instance == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "instance must not be nil")
@@ -39,7 +41,7 @@ func (r *VaultRepository) PutProviderInstance(ctx context.Context, instance *Ins
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	b, err := proto.Marshal(instance.stored)
+	b, err := proto.Marshal(instance.StoredProviderInstance())
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -50,7 +52,7 @@ func (r *VaultRepository) PutProviderInstance(ctx context.Context, instance *Ins
 	return nil
 }
 
-func (r *VaultRepository) GetProviderInstance(ctx context.Context, publicID string) (*Instance, error) {
+func (r *VaultRepository) GetProviderInstance(ctx context.Context, publicID string) (*coreprovider.Instance, error) {
 	const op errors.Op = "provider.(VaultRepository).GetProviderInstance"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -66,7 +68,7 @@ func (r *VaultRepository) GetProviderInstance(ctx context.Context, publicID stri
 	if err := proto.Unmarshal(entry.Value, stored); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return NewInstance(stored), nil
+	return coreprovider.NewInstance(stored), nil
 }
 
 func (r *VaultRepository) DeleteProviderInstance(ctx context.Context, publicID string) error {

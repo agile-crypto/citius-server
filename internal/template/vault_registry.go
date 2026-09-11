@@ -7,13 +7,14 @@ import (
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/hashicorp/vault/sdk/logical"
 	"google.golang.org/protobuf/proto"
 )
 
 const templateStoragePrefix = "template/"
 
-var _ Registry = (*VaultRegistry)(nil)
+var _ coretemplate.Registry = (*VaultRegistry)(nil)
 
 // VaultRegistry is a Vault-backed implementation of the Registry interface.
 // Uses logical.Storage (typically logical.InmemStorage) with proto serialization,
@@ -25,21 +26,21 @@ type VaultRegistry struct {
 
 // NewVaultRegistry creates a VaultRegistry backed by the given storage.
 // For in-memory usage, pass &logical.InmemStorage{}.
-func NewVaultRegistry(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRegistry, error) {
+func NewVaultRegistry(ctx context.Context, storage logical.Storage, opt ...coretemplate.Option) (*VaultRegistry, error) {
 	const op errors.Op = "template.NewVaultRegistry"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
-	opts := getOpts(opt...)
+	opts := coretemplate.GetVaultOptions(opt...)
 	return &VaultRegistry{
-		mu:        opts.withLock,
+		mu:        opts.Lock,
 		templates: logical.NewStorageView(storage, templateStoragePrefix),
 	}, nil
 }
 
 // Register stores a template. If a template with the same ID already exists,
 // it is overwritten (permits startup re-loading).
-func (r *VaultRegistry) Register(ctx context.Context, t *Template) error {
+func (r *VaultRegistry) Register(ctx context.Context, t *coretemplate.Template) error {
 	const op errors.Op = "template.(VaultRegistry).Register"
 	if t == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "template must not be nil")
@@ -50,7 +51,7 @@ func (r *VaultRegistry) Register(ctx context.Context, t *Template) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	b, err := proto.Marshal(t.stored)
+	b, err := proto.Marshal(t.Proto())
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -63,7 +64,7 @@ func (r *VaultRegistry) Register(ctx context.Context, t *Template) error {
 
 // Get returns the template with the given ID, or a CodeTemplateNotFound error.
 // Returns an independent copy via proto round-trip (marshal on Register, unmarshal on Get).
-func (r *VaultRegistry) Get(ctx context.Context, templateID string) (*Template, error) {
+func (r *VaultRegistry) Get(ctx context.Context, templateID string) (*coretemplate.Template, error) {
 	const op errors.Op = "template.(VaultRegistry).Get"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -80,19 +81,19 @@ func (r *VaultRegistry) Get(ctx context.Context, templateID string) (*Template, 
 	if err := proto.Unmarshal(entry.Value, stored); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return NewTemplate(stored), nil
+	return coretemplate.NewTemplate(stored), nil
 }
 
 // List returns all registered templates.
-func (r *VaultRegistry) List(ctx context.Context) []*Template {
+func (r *VaultRegistry) List(ctx context.Context) []*coretemplate.Template {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	ids, err := r.templates.List(ctx, "")
 	if err != nil {
-		return []*Template{}
+		return []*coretemplate.Template{}
 	}
-	out := make([]*Template, 0, len(ids))
+	out := make([]*coretemplate.Template, 0, len(ids))
 	for _, id := range ids {
 		entry, err := r.templates.Get(ctx, id)
 		if err != nil || entry == nil {
@@ -102,7 +103,7 @@ func (r *VaultRegistry) List(ctx context.Context) []*Template {
 		if err := proto.Unmarshal(entry.Value, stored); err != nil {
 			continue
 		}
-		out = append(out, NewTemplate(stored))
+		out = append(out, coretemplate.NewTemplate(stored))
 	}
 	return out
 }
@@ -110,9 +111,9 @@ func (r *VaultRegistry) List(ctx context.Context) []*Template {
 // Get all the templates with the given IDs, applying the filter function to each.
 // Returns a slice of matching templates, or an error if any filterFn call fails.
 // If a template ID is not found, it is skipped (not an error).
-func (r *VaultRegistry) selectTemplatesWithIDs(ctx context.Context, ids []string, filterFn func(t *Template) (bool, error)) ([]*Template, error) {
+func (r *VaultRegistry) selectTemplatesWithIDs(ctx context.Context, ids []string, filterFn func(t *coretemplate.Template) (bool, error)) ([]*coretemplate.Template, error) {
 	const op = "template.(VaultRegistry).getAllTemplatesWithIDs"
-	candidates := []*Template{}
+	candidates := []*coretemplate.Template{}
 	for _, id := range ids {
 		entry, err := r.templates.Get(ctx, id)
 		if err != nil || entry == nil {
@@ -122,7 +123,7 @@ func (r *VaultRegistry) selectTemplatesWithIDs(ctx context.Context, ids []string
 		if err = proto.Unmarshal(entry.Value, stored); err != nil {
 			continue
 		}
-		t := NewTemplate(stored)
+		t := coretemplate.NewTemplate(stored)
 		ok, err := filterFn(t)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
@@ -152,7 +153,7 @@ func (r *VaultRegistry) selectTemplatesWithIDs(ctx context.Context, ids []string
 // calling r.Get()/r.List(), because those methods also acquire r.mu.RLock()
 // and Go's sync.RWMutex is NOT reentrant.
 // TODO: Optimize with caching instead of full storage scan with serialization and deserialization
-func (r *VaultRegistry) Select(ctx context.Context, scopeSpec *core.ScopeSpecification, cs CandidateSet) (*Template, error) {
+func (r *VaultRegistry) Select(ctx context.Context, scopeSpec *core.ScopeSpecification, cs coretemplate.CandidateSet) (*coretemplate.Template, error) {
 	const op errors.Op = "template.(VaultRegistry).Select"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -171,7 +172,7 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec *core.ScopeSpecifi
 		if err := proto.Unmarshal(entry.Value, stored); err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		return NewTemplate(stored), nil
+		return coretemplate.NewTemplate(stored), nil
 	}
 
 	// Step 1: determine the candidate ID set.
@@ -190,8 +191,8 @@ func (r *VaultRegistry) Select(ctx context.Context, scopeSpec *core.ScopeSpecifi
 	}
 
 	// Step 2: deserialize each candidate and apply scope + security filter.
-	filterFn := func(t *Template) (bool, error) {
-		ok, err := MatchesScope(ctx, t, scopeSpec)
+	filterFn := func(t *coretemplate.Template) (bool, error) {
+		ok, err := coretemplate.MatchesScope(ctx, t, scopeSpec)
 		if err != nil {
 			return false, errors.Wrap(ctx, op, err)
 		}

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
-	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-core/provider"
 )
 
 // ProviderHandler serves services.ProviderService — both the read-only provider

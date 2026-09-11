@@ -39,3 +39,15 @@ func WithLabels(labels map[string]string) Option {
 		o.withLabels = labels
 	}
 }
+
+// VaultOptions is the subset of resolved options needed by Vault-backed
+// adapters that live outside this package (see internal/policy).
+type VaultOptions struct {
+	Lock *sync.RWMutex
+}
+
+// GetVaultOptions resolves Option values for use by out-of-package Vault adapters.
+func GetVaultOptions(opt ...Option) VaultOptions {
+	opts := getOpts(opt...)
+	return VaultOptions{Lock: opts.withLock}
+}

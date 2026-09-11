@@ -6,8 +6,7 @@ import (
 	"testing"
 
 	core "github.com/agile-crypto/citius-core"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-core/policy"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,8 +19,7 @@ import (
 
 func TestAllowedTemplates_noPolicy_returnsNil(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	// No policy name => bypass (no restrictions)
@@ -79,8 +77,7 @@ func TestAllowedTemplates_withAllowList_returnsIDs(t *testing.T) {
 
 func TestAllowedTemplates_policyNotFound_returnsError(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	_, err := enforcer.AllowedTemplates(ctx, "nonexistent", &core.ScopeSpecification{})
@@ -98,8 +95,7 @@ func TestAllowedTemplates_scopeSpecIgnored_M1(t *testing.T) {
 	}
 	rulesJSON, _ := json.Marshal(rules)
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	p := policy.NewPolicy("pol_scope", "scope-test", rulesJSON)

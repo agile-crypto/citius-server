@@ -8,8 +8,7 @@ import (
 	"testing"
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-core/template"
 )
 
 // catalogPath returns the absolute path to the standard_algorithms.json catalog.
@@ -28,14 +27,10 @@ func readCatalog(t *testing.T) []byte {
 	return data
 }
 
-// newTestRegistry creates a VaultRegistry backed by in-memory storage for tests.
+// newTestRegistry creates an in-memory fakeRegistry for tests.
 func newTestRegistry(t *testing.T) template.Registry {
 	t.Helper()
-	r, err := template.NewVaultRegistry(context.Background(), &logical.InmemStorage{})
-	if err != nil {
-		t.Fatalf("NewVaultRegistry: %v", err)
-	}
-	return r
+	return newFakeRegistry()
 }
 
 func verifyEcdsaP256Template(t *testing.T, r template.Registry, ctx context.Context) {

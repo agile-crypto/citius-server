@@ -9,14 +9,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-core/provider"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
+	"github.com/agile-crypto/citius-core/crypto"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/crypto"
+	"github.com/agile-crypto/citius-core/key"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
-	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

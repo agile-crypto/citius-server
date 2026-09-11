@@ -9,10 +9,10 @@ import (
 
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/key"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
-	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	"github.com/agile-crypto/citius-core/template"
 	"google.golang.org/protobuf/proto"
 )
 

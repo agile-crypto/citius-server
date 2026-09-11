@@ -7,11 +7,13 @@ import (
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
+	"github.com/agile-crypto/citius-core/crypto"
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/crypto"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -72,7 +74,7 @@ func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
-	if err = template.LoadStandardCatalog(ctx, catalogPath(), reg); err != nil {
+	if err = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg); err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
 
@@ -86,15 +88,15 @@ func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}
-	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
 
-	rules := &policy.Rules{
+	rules := &corepolicy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ecdsa-p256-sha256-der", "aes-256-gcm-128-96"},
-		AllowedOperations: &policy.OperationRule{
+		AllowedOperations: &corepolicy.OperationRule{
 			KeyOperations: []string{
 				string(core.OperationCreateKey),
 				string(core.OperationSign),
@@ -109,7 +111,7 @@ func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator
 		t.Fatalf("marshal rules: %v", err)
 	}
 	const policyName = "test-key-output-allow"
-	p := policy.NewPolicy("pol_keyoutput", policyName, rulesJSON)
+	p := corepolicy.NewPolicy("pol_keyoutput", policyName, rulesJSON)
 	if _, err = pol.CreatePolicy(ctx, p); err != nil {
 		t.Fatalf("seed policy: %v", err)
 	}

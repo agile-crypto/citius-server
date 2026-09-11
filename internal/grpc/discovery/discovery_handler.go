@@ -4,7 +4,7 @@ import (
 	"context"
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
-	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/agile-crypto/citius-core/template"
 )
 
 // AlgorithmDiscoveryHandler serves services.AlgorithmDiscoveryService — the

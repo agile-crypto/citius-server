@@ -7,10 +7,10 @@ import (
 
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-core/policy"
 	cryptohandler "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	keymgmthandler "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	policyhandler "github.com/agile-crypto/citius-server/internal/grpc/policy"
-	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
 )

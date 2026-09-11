@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+
 	"github.com/agile-crypto/citius-core/errors"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -12,26 +14,26 @@ import (
 
 const policyStoragePrefix = "policy/"
 
-var _ Repository = (*VaultRepository)(nil)
+var _ corepolicy.Repository = (*VaultRepository)(nil)
 
 type VaultRepository struct {
 	mu       *sync.RWMutex
 	policies logical.Storage
 }
 
-func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRepository, error) {
+func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...corepolicy.Option) (*VaultRepository, error) {
 	const op errors.Op = "policy.NewVaultRepository"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
-	opts := getOpts(opt...)
+	opts := corepolicy.GetVaultOptions(opt...)
 	return &VaultRepository{
-		mu:       opts.withLock,
+		mu:       opts.Lock,
 		policies: logical.NewStorageView(storage, policyStoragePrefix),
 	}, nil
 }
 
-func (r *VaultRepository) PutPolicy(ctx context.Context, p *Policy) error {
+func (r *VaultRepository) PutPolicy(ctx context.Context, p *corepolicy.Policy) error {
 	const op errors.Op = "policy.(VaultRepository).PutPolicy"
 	if p == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "policy must not be nil")
@@ -39,7 +41,7 @@ func (r *VaultRepository) PutPolicy(ctx context.Context, p *Policy) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	b, err := proto.Marshal(p.stored)
+	b, err := proto.Marshal(p.StoredPolicy())
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
@@ -50,7 +52,7 @@ func (r *VaultRepository) PutPolicy(ctx context.Context, p *Policy) error {
 	return nil
 }
 
-func (r *VaultRepository) GetPolicy(ctx context.Context, name string) (*Policy, error) {
+func (r *VaultRepository) GetPolicy(ctx context.Context, name string) (*corepolicy.Policy, error) {
 	const op errors.Op = "policy.(VaultRepository).GetPolicy"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -66,7 +68,7 @@ func (r *VaultRepository) GetPolicy(ctx context.Context, name string) (*Policy, 
 	if err := proto.Unmarshal(entry.Value, stored); err != nil {
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return New(stored), nil
+	return corepolicy.New(stored), nil
 }
 
 func (r *VaultRepository) DeletePolicy(ctx context.Context, name string) error {

@@ -5,16 +5,13 @@ import (
 	"testing"
 
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-core/policy"
 )
 
-// setupEnforcer creates an Enforcer backed by a VaultRepository over InmemStorage.
+// setupEnforcer creates an Enforcer backed by an in-memory fakeRepository.
 func setupEnforcer(t *testing.T) *policy.Enforcer {
 	t.Helper()
-	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
@@ -38,9 +35,7 @@ func TestNewEnforcer_nilStorage_returnsError(t *testing.T) {
 }
 
 func TestNewEnforcer_nilEvaluator_returnsError(t *testing.T) {
-	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	_, err := policy.NewEnforcer(policyRepo, nil)
 	if err == nil {
 		t.Fatal("expected error for nil evaluator")

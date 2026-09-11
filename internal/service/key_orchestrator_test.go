@@ -9,10 +9,13 @@ import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
+	corekey "github.com/agile-crypto/citius-core/key"
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/require"
@@ -23,7 +26,7 @@ import (
 // ============================================================================
 
 // allDeps creates a full set of valid dependencies for the constructor.
-func allDeps(t *testing.T) (key.Repository, template.Registry, provider.Registry, policy.Engine) {
+func allDeps(t *testing.T) (corekey.Repository, coretemplate.Registry, provider.Registry, corepolicy.Engine) {
 	t.Helper()
 	ctx := context.Background()
 	storage := &logical.InmemStorage{}
@@ -40,8 +43,8 @@ func allDeps(t *testing.T) (key.Repository, template.Registry, provider.Registry
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, err := policy.NewEnforcer(policyRepo, eval)
+	eval := corepolicy.NewSimpleRulesEvaluator()
+	pol, err := corepolicy.NewEnforcer(policyRepo, eval)
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -108,7 +111,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 		wantErr          bool
 		errCode          errors.Code
 		transformSpec    TransformKeySpec
-		policyRules      *policy.Rules
+		policyRules      *corepolicy.Rules
 	}{
 		{
 			name:    "missing key name",
@@ -169,10 +172,10 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 				KeyName:    "test-key-5",
 				TemplateID: "ml-dsa-65", // not allowed by policy
 			},
-			policyRules: &policy.Rules{
+			policyRules: &corepolicy.Rules{
 				Version:          "1",
 				AllowedTemplates: []string{"ecdsa-p256-sha256-der"},
-				AllowedOperations: &policy.OperationRule{
+				AllowedOperations: &corepolicy.OperationRule{
 					KeyOperations: []string{string(core.OperationCreateKey)},
 				},
 			},
@@ -230,7 +233,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 	}
 }
 
-func assertMatchTransformSpec(t *testing.T, expectedSpec TransformKeySpec, v *key.Version, k *key.Key, oldVersion *key.Version) {
+func assertMatchTransformSpec(t *testing.T, expectedSpec TransformKeySpec, v *corekey.Version, k *corekey.Key, oldVersion *corekey.Version) {
 	if expectedSpec.TemplateID != "" {
 		require.Equal(t, expectedSpec.TemplateID, v.TemplateId)
 	}
@@ -244,7 +247,7 @@ func assertMatchTransformSpec(t *testing.T, expectedSpec TransformKeySpec, v *ke
 		require.Equal(t, oldVersion.KeyMaterial, v.KeyMaterial)
 	}
 }
-func assertVersionConsistent(t *testing.T, expectedVersion uint32, k *key.Key, v *key.Version, md *KeyMetadata) {
+func assertVersionConsistent(t *testing.T, expectedVersion uint32, k *corekey.Key, v *corekey.Version, md *KeyMetadata) {
 	require.Equal(t, expectedVersion, k.CurrentVersion)
 	require.Equal(t, expectedVersion, md.Version)
 	require.Equal(t, expectedVersion, v.Version)
@@ -305,21 +308,21 @@ func TestKeyOrchestrator_TransformKey_SuccessiveTransforms(t *testing.T) {
 	}
 }
 
-func seedPolicy(t *testing.T, ctx context.Context, engine policy.Engine, name string, rules *policy.Rules) {
+func seedPolicy(t *testing.T, ctx context.Context, engine corepolicy.Engine, name string, rules *corepolicy.Rules) {
 	if rules != nil {
 		_ = seedScopePolicy(t, ctx, engine, name, rules)
 	} else {
-		defaultRules := &policy.Rules{
+		defaultRules := &corepolicy.Rules{
 			Version:          "1",
 			AllowedTemplates: []string{"ecdsa-p256-sha256-der", "ml-dsa-65"},
-			AllowedOperations: &policy.OperationRule{
+			AllowedOperations: &corepolicy.OperationRule{
 				KeyOperations: []string{string(core.OperationCreateKey)},
 			},
 		}
 		_ = seedScopePolicy(t, ctx, engine, name, defaultRules)
 	}
 }
-func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadata *KeyMetadata, k *key.Key, v *key.Version) {
+func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadata *KeyMetadata, k *corekey.Key, v *corekey.Version) {
 	specBytes, err := metadata.ScopeSpec.Serialize(ctx)
 	require.NoError(t, err)
 	require.Equal(t, k.ScopeSpecification, specBytes)
@@ -332,8 +335,8 @@ func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadat
 	require.Equal(t, v.ProviderId, metadata.Provider)
 }
 
-func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, keyID string, providers provider.Registry, templates template.Registry, keys key.Repository,
-	policyName string, initTemplateID string, initVersion uint32, scopeSpec *core.ScopeSpecification) (*key.Key, *key.Version) {
+func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, keyID string, providers provider.Registry, templates coretemplate.Registry, keys corekey.Repository,
+	policyName string, initTemplateID string, initVersion uint32, scopeSpec *core.ScopeSpecification) (*corekey.Key, *corekey.Version) {
 	provider0, err := providers.Match(ctx, provider.Requirements{TemplateID: initTemplateID})
 	require.NoError(t, err)
 	templateInfo0, err := templates.Get(ctx, initTemplateID)
@@ -346,9 +349,9 @@ func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, key
 
 	// Create a key to transform
 	versionID := fmt.Sprintf("%s:%d", keyName, initVersion)
-	k0, err := key.NewKey(ctx, keyID, policyName, scopeSpec, initVersion, key.WithName(keyName))
+	k0, err := corekey.NewKey(ctx, keyID, policyName, scopeSpec, initVersion, corekey.WithName(keyName))
 	require.NoError(t, err)
-	v0, err := key.NewVersion(ctx, versionID, keyID, initTemplateID, provider0.Name(), initVersion, keyMaterial, key.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	v0, err := corekey.NewVersion(ctx, versionID, keyID, initTemplateID, provider0.Name(), initVersion, keyMaterial, corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(t, err)
 	err = keys.CreateKey(ctx, k0, v0)
 	require.NoError(t, err)
@@ -357,7 +360,7 @@ func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, key
 
 // Check that the static fields of both keys are equal. Static fields are those that should not change
 // after initial creation of the key: Name, PolicyId, Primitive, PublicId, and Labels.
-func assertKeyStaticFieldsUnchanged(t *testing.T, k0, k1 *key.Key) {
+func assertKeyStaticFieldsUnchanged(t *testing.T, k0, k1 *corekey.Key) {
 	require.Equal(t, k0.Name, k1.Name)
 	require.Equal(t, k0.PolicyId, k1.PolicyId)
 	require.Equal(t, k0.Primitive, k1.Primitive)

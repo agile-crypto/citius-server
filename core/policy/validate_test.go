@@ -7,8 +7,7 @@ import (
 
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-core/policy"
 )
 
 // setupWithRulesPolicy creates an Enforcer with a SimpleRulesEvaluator and one policy
@@ -16,8 +15,7 @@ import (
 func setupWithRulesPolicy(t *testing.T, policyName string, rules *policy.Rules) *policy.Enforcer {
 	t.Helper()
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	var rulesJSON []byte
@@ -43,8 +41,7 @@ func setupWithRulesPolicy(t *testing.T, policyName string, rules *policy.Rules) 
 
 func TestValidateOperation_noPolicy_defaultAllow(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	// Empty policy name = no restrictions (open default)
 	err := enforcer.ValidateOperation(ctx, "", core.OperationSign, "ecdsa-p256-sha256", "")
@@ -152,8 +149,7 @@ func TestValidateOperation_templateAndOperationBothChecked(t *testing.T) {
 
 func TestValidateOperation_policyNotFound_returnsError(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	err := enforcer.ValidateOperation(ctx, "nonexistent", core.OperationSign, "ecdsa-p256-sha256", "")
 	if err == nil {
@@ -183,8 +179,7 @@ func TestValidateOperation_emptyTemplateID_skipsTemplateCheck(t *testing.T) {
 
 func TestValidateKeyCreation_M1_alwaysAllowed(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	spec := &core.KeyCreationSpec{
 		TemplateID: "ecdsa-p256-sha256",
@@ -202,8 +197,7 @@ func TestValidateKeyCreation_M1_alwaysAllowed(t *testing.T) {
 
 func TestCreatePolicy_invalidRulesJSON_rejected(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	p := policy.NewPolicy("pol_bad", "bad-rules", []byte(`{not valid json}`))
@@ -215,8 +209,7 @@ func TestCreatePolicy_invalidRulesJSON_rejected(t *testing.T) {
 
 func TestCreatePolicy_unknownOperation_rejected(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	rulesJSON := []byte(`{"version":"1","allowed_operations":{"key_operations":["teleport"]}}`)
@@ -229,8 +222,7 @@ func TestCreatePolicy_unknownOperation_rejected(t *testing.T) {
 
 func TestCreatePolicy_validRulesJSON_accepted(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	rulesJSON := []byte(`{"version":"1","allowed_templates":["ecdsa-p256-sha256"],"allowed_operations":{"key_operations":["sign","verify"]}}`)
@@ -243,8 +235,7 @@ func TestCreatePolicy_validRulesJSON_accepted(t *testing.T) {
 
 func TestCreatePolicy_emptyRulesJSON_accepted(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	p := policy.NewPolicy("pol_empty", "empty-rules", nil) // no rules = deny-by-default (valid policy, denies everything)
@@ -260,8 +251,7 @@ func TestCreatePolicy_emptyRulesJSON_accepted(t *testing.T) {
 
 func TestUpdatePolicy_invalidRulesJSON_rejected(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo := newFakeRepository()
 	enforcer, _ := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 
 	// Create valid policy first

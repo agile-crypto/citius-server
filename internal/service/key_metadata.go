@@ -7,7 +7,7 @@ import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/agile-crypto/citius-core/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

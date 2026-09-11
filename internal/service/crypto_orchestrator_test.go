@@ -4,9 +4,11 @@ import (
 	"context"
 	"testing"
 
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
@@ -20,7 +22,7 @@ import (
 // by in-memory storage, the software provider, and the standard algorithm
 // catalog. It returns the CryptoOrchestrator, KeyOrchestrator (for creating
 // keys in tests), and policy.Engine (for seeding custom policies).
-func setupCryptoOrchestratorFull(t *testing.T) (CryptoOrchestrator, KeyOrchestrator, policy.Engine) {
+func setupCryptoOrchestratorFull(t *testing.T) (CryptoOrchestrator, KeyOrchestrator, corepolicy.Engine) {
 	t.Helper()
 	ctx := context.Background()
 	storage := &logical.InmemStorage{}
@@ -35,7 +37,7 @@ func setupCryptoOrchestratorFull(t *testing.T) (CryptoOrchestrator, KeyOrchestra
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
 
-	err = template.LoadStandardCatalog(ctx, catalogPath(), reg)
+	err = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -51,8 +53,8 @@ func setupCryptoOrchestratorFull(t *testing.T) (CryptoOrchestrator, KeyOrchestra
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, err := policy.NewEnforcer(policyRepo, eval)
+	eval := corepolicy.NewSimpleRulesEvaluator()
+	pol, err := corepolicy.NewEnforcer(policyRepo, eval)
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -96,8 +98,8 @@ func TestNewCryptoOrchestrator_nilKeyReader_returnsError(t *testing.T) {
 	reg, _ := template.NewVaultRegistry(ctx, storage)
 	provReg := provider.NewRegistry()
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, _ := policy.NewEnforcer(policyRepo, eval)
+	eval := corepolicy.NewSimpleRulesEvaluator()
+	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 
 	_, err := NewCryptoOrchestrator(nil, pol, provReg, reg)
 	if err == nil {
@@ -126,8 +128,8 @@ func TestNewCryptoOrchestrator_nilProviderRegistry_returnsError(t *testing.T) {
 	repo, _ := key.NewVaultRepository(ctx, storage)
 	reg, _ := template.NewVaultRegistry(ctx, storage)
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, _ := policy.NewEnforcer(policyRepo, eval)
+	eval := corepolicy.NewSimpleRulesEvaluator()
+	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 
 	_, err := NewCryptoOrchestrator(repo, pol, nil, reg)
 	if err == nil {
@@ -142,8 +144,8 @@ func TestNewCryptoOrchestrator_nilTemplateRegistry_returnsError(t *testing.T) {
 	repo, _ := key.NewVaultRepository(ctx, storage)
 	provReg := provider.NewRegistry()
 	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
-	eval := policy.NewSimpleRulesEvaluator()
-	pol, _ := policy.NewEnforcer(policyRepo, eval)
+	eval := corepolicy.NewSimpleRulesEvaluator()
+	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 
 	_, err := NewCryptoOrchestrator(repo, pol, provReg, nil)
 	if err == nil {

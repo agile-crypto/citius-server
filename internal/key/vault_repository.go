@@ -8,6 +8,7 @@ import (
 
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
+	corekey "github.com/agile-crypto/citius-core/key"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"github.com/hashicorp/vault/sdk/logical"
 	"google.golang.org/protobuf/proto"
@@ -30,23 +31,23 @@ const keyVersionStoragePrefix string = "key_version/"
 const keyNameToIDStoragePrefix string = "key_name_to_id/"
 const versionSep string = ":"
 
-var _ Repository = (*VaultRepository)(nil)
-var _ ReadOnlyRepository = (*VaultRepository)(nil)
-var _ WriteOnlyRepository = (*VaultRepository)(nil)
+var _ corekey.Repository = (*VaultRepository)(nil)
+var _ corekey.ReadOnlyRepository = (*VaultRepository)(nil)
+var _ corekey.WriteOnlyRepository = (*VaultRepository)(nil)
 
 // Key repositories can share the same lock, provided as option. This allows to create per-request
 // repositories that share the same lock, so that they can be used concurrently.
 // By default, a single instance of VaultRepository is thread-safe (has its own lock).
 //
 // Available options:
-//   - withLock (optional): defaults to a new RWMutex. Supply a shared lock to coordinate with other repositories.
-//   - withKeyNameToIDFunc (optional): overwrites the default name to id mapping behavior.
+//   - WithLock (optional): defaults to a new RWMutex. Supply a shared lock to coordinate with other repositories.
+//   - WithKeyNameToIDFunc (optional): overwrites the default name to id mapping behavior.
 //     By default, the repository stores a mapping from key name to public ID in vault, and uses that for name-based lookups.
 //     If this function is provided, it is used to resolve key names to IDs instead, and the repository does not store the mapping in vault.
 //     This can be used to integrate with an external system of record for key name to ID mapping, for example.
-//   - withKeyNameToIDCacheSize (optional): cache size for name to id mapping; only used if withKeyNameToIDFunc is nil.
-//   - withCacheFactoryFunc (optional): factory function for creating the name to id cache. Defaults to an in-memory LRU
-//     cache. Only used if withKeyNameToIDFunc is nil.
+//   - WithKeyNameToIDCacheSize (optional): cache size for name to id mapping; only used if WithKeyNameToIDFunc is nil.
+//   - WithCacheFactoryFunc (optional): factory function for creating the name to id cache. Defaults to an in-memory LRU
+//     cache. Only used if WithKeyNameToIDFunc is nil.
 //
 // Note about name to id mapping storage and caching:
 //   - Mapping is cached when it is stored for the first time.
@@ -54,30 +55,30 @@ var _ WriteOnlyRepository = (*VaultRepository)(nil)
 //   - Mapping is deleted from cache and storage when key is deleted.
 //   - Mapping is cached only upon mapping storage lookup (ie. when a name is resolved to an ID). No caching happens when the storage is
 //     not hit (ie. when key fetched by ID).
-func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...Option) (*VaultRepository, error) {
+func NewVaultRepository(ctx context.Context, storage logical.Storage, opt ...VaultRepositoryOption) (*VaultRepository, error) {
 	const op errors.Op = "key.NewVaultRepository"
 	if storage == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
 	keys := logical.NewStorageView(storage, keyStoragePrefix)
 	keyVersions := logical.NewStorageView(storage, keyVersionStoragePrefix)
-	opts := getOpts(opt...)
+	opts := getVaultRepositoryOpts(opt...)
 
-	if opts.withKeyNameToIDFunc != nil {
+	if opts.keyNameToIDFunc != nil {
 		return &VaultRepository{
-			mu:               opts.withLock,
+			mu:               opts.lock,
 			keys:             keys,
 			keyVersions:      keyVersions,
-			keyNameToIDFunc:  opts.withKeyNameToIDFunc,
+			keyNameToIDFunc:  opts.keyNameToIDFunc,
 			keyNameToID:      nil,
 			keyNameToIDCache: nil,
 		}, nil
 	}
 
-	cache := opts.withCacheFactoryFunc(opts.withKeyNameToIDCacheSize)
+	cache := opts.cacheFactoryFunc(opts.keyNameToIDCacheSize)
 	keyNameToIDStorage := logical.NewStorageView(storage, keyNameToIDStoragePrefix)
 	return &VaultRepository{
-		mu:               opts.withLock,
+		mu:               opts.lock,
 		keys:             keys,
 		keyVersions:      keyVersions,
 		keyNameToIDFunc:  nil,
@@ -199,7 +200,7 @@ func get(ctx context.Context, view logical.Storage, key string, result proto.Mes
 	return nil
 }
 
-func (r *VaultRepository) getKey(ctx context.Context, id string) (*Key, error) {
+func (r *VaultRepository) getKey(ctx context.Context, id string) (*corekey.Key, error) {
 	const op errors.Op = "key.(VaultRepository).getKey"
 	// Store objects are persisted in memory
 	storedKey := &storepb.Key{}
@@ -211,10 +212,10 @@ func (r *VaultRepository) getKey(ctx context.Context, id string) (*Key, error) {
 			return nil, errors.Wrap(ctx, op, err)
 		}
 	}
-	return &Key{Key: storedKey}, nil
+	return &corekey.Key{Key: storedKey}, nil
 }
 
-func (r *VaultRepository) getKeyVersion(ctx context.Context, keyID string, version uint32) (*Version, error) {
+func (r *VaultRepository) getKeyVersion(ctx context.Context, keyID string, version uint32) (*corekey.Version, error) {
 	const op errors.Op = "key.(VaultRepository).getKeyVersion"
 	storedVersion := &storepb.KeyVersion{}
 	err := get(ctx, r.keyVersions, versionKey(keyID, version), storedVersion)
@@ -225,13 +226,13 @@ func (r *VaultRepository) getKeyVersion(ctx context.Context, keyID string, versi
 		}
 		return nil, errors.Wrap(ctx, op, err)
 	}
-	return &Version{KeyVersion: storedVersion}, nil
+	return &corekey.Version{KeyVersion: storedVersion}, nil
 }
 
 // Set create and update time.
 // Handles storing name to id mapping.
 // Returns CodeAlreadyExists if a key with the same PublicID already exists.
-func (r *VaultRepository) putKey(ctx context.Context, value *Key, vetForWrite bool) error {
+func (r *VaultRepository) putKey(ctx context.Context, value *corekey.Key, vetForWrite bool) error {
 	const op = "key.(VaultRepository).putKey"
 	if vetForWrite {
 		if err := value.VetForWrite(ctx, core.OpCreate); err != nil {
@@ -262,7 +263,7 @@ func (r *VaultRepository) putKey(ctx context.Context, value *Key, vetForWrite bo
 // Set update time but not create time.
 // Returns CodeKeyNotFound if the key does not already exist.
 // Returns CodeInvalidArgument if the key name is being updated to a different value, as name updates are not allowed.
-func (r *VaultRepository) updateKey(ctx context.Context, value *Key, vetForWrite bool) error {
+func (r *VaultRepository) updateKey(ctx context.Context, value *corekey.Key, vetForWrite bool) error {
 	const op = "key.(VaultRepository).updateKey"
 	if vetForWrite {
 		if err := value.VetForWrite(ctx, core.OpUpdate); err != nil {
@@ -314,7 +315,7 @@ func versionPrefix(keyID string) string {
 
 // set create and update time
 // fails if version already exists
-func (r *VaultRepository) putKeyVersion(ctx context.Context, value *Version, vetForWrite bool) error {
+func (r *VaultRepository) putKeyVersion(ctx context.Context, value *corekey.Version, vetForWrite bool) error {
 	const op = "key.(VaultRepository).putKeyVersion"
 	if vetForWrite {
 		if err := value.VetForWrite(ctx, core.OpCreate); err != nil {
@@ -334,7 +335,7 @@ func (r *VaultRepository) putKeyVersion(ctx context.Context, value *Version, vet
 	return put(ctx, r.keyVersions, versionKey(value.KeyId, value.Version), value.KeyVersion)
 }
 
-func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersion *Version, opt ...Option) error {
+func (r *VaultRepository) CreateKey(ctx context.Context, key *corekey.Key, initialVersion *corekey.Version, opt ...corekey.Option) error {
 	const op errors.Op = "key.(VaultRepository).CreateKey"
 	if key == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "key must not be nil")
@@ -345,19 +346,19 @@ func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersio
 	if key.PublicId != initialVersion.KeyId {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "key PublicId and initialVersion KeyId must match")
 	}
-	opts := getOpts(opt...)
-	if initialVersion.Version != opts.withInitialVersion {
+	opts := corekey.GetVaultOptions(opt...)
+	if initialVersion.Version != opts.InitialVersion {
 		return errors.New(ctx, op, errors.CodeInvalidArgument,
-			fmt.Sprintf("invalid initial version number (expected: %d, got: %d)", opts.withInitialVersion, initialVersion.Version))
+			fmt.Sprintf("invalid initial version number (expected: %d, got: %d)", opts.InitialVersion, initialVersion.Version))
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if err := r.putKey(ctx, key, opts.withVetForWrite); err != nil {
+	if err := r.putKey(ctx, key, opts.VetForWrite); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	if err := r.putKeyVersion(ctx, initialVersion, opts.withVetForWrite); err != nil {
+	if err := r.putKeyVersion(ctx, initialVersion, opts.VetForWrite); err != nil {
 		_ = r.deleteKey(ctx, key.PublicId) // best effort cleanup
 		return errors.Wrap(ctx, op, err)
 	}
@@ -366,7 +367,7 @@ func (r *VaultRepository) CreateKey(ctx context.Context, key *Key, initialVersio
 
 // ── Key metadata reads ──
 
-func (r *VaultRepository) GetKeyByID(ctx context.Context, publicID string) (*Key, error) {
+func (r *VaultRepository) GetKeyByID(ctx context.Context, publicID string) (*corekey.Key, error) {
 	const op errors.Op = "key.(VaultRepository).GetKey"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -382,7 +383,7 @@ func (r *VaultRepository) GetKeyByID(ctx context.Context, publicID string) (*Key
 	return k.Clone(), nil
 }
 
-func (r *VaultRepository) GetKeyByName(ctx context.Context, name string) (*Key, error) {
+func (r *VaultRepository) GetKeyByName(ctx context.Context, name string) (*corekey.Key, error) {
 	const op errors.Op = "key.(VaultRepository).GetKeyByName"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -394,7 +395,7 @@ func (r *VaultRepository) GetKeyByName(ctx context.Context, name string) (*Key, 
 	return r.GetKeyByID(ctx, id)
 }
 
-func (r *VaultRepository) ListKeys(ctx context.Context) ([]*Key, error) {
+func (r *VaultRepository) ListKeys(ctx context.Context) ([]*corekey.Key, error) {
 	const op errors.Op = "key.(VaultRepository).ListKeys"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -404,7 +405,7 @@ func (r *VaultRepository) ListKeys(ctx context.Context) ([]*Key, error) {
 		return nil, errors.Wrap(ctx, op, err)
 	}
 
-	out := make([]*Key, 0, len(ids))
+	out := make([]*corekey.Key, 0, len(ids))
 	for _, id := range ids {
 		k, err := r.getKey(ctx, id)
 		if err != nil {
@@ -417,18 +418,18 @@ func (r *VaultRepository) ListKeys(ctx context.Context) ([]*Key, error) {
 
 // ── Key metadata updates ──
 
-func (r *VaultRepository) UpdateKey(ctx context.Context, k *Key, opt ...Option) error {
+func (r *VaultRepository) UpdateKey(ctx context.Context, k *corekey.Key, opt ...corekey.Option) error {
 	//TODO: Validation needed to prevent invalid state? For example, disallow updating current_version to a non-existent version number?
 	// Or should that be the orchestrator's responsibility?
 	const op errors.Op = "key.(VaultRepository).UpdateKey"
 	if k == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "key must not be nil")
 	}
-	opts := getOpts(opt...)
+	opts := corekey.GetVaultOptions(opt...)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if err := r.updateKey(ctx, k, opts.withVetForWrite); err != nil {
+	if err := r.updateKey(ctx, k, opts.VetForWrite); err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
 	return nil
@@ -460,13 +461,13 @@ func (r *VaultRepository) DeleteKey(ctx context.Context, id string) error {
 // ── Version operations ──
 
 // fails if the version number does not match the current version + 1, or if the parent key does not exist
-func (r *VaultRepository) AddVersion(ctx context.Context, version *Version, opt ...Option) error {
+func (r *VaultRepository) AddVersion(ctx context.Context, version *corekey.Version, opt ...corekey.Option) error {
 	const op errors.Op = "key.(VaultRepository).AddVersion"
 	if version.KeyId == "" {
 		return errors.New(ctx, op, errors.CodeInvalidArgument,
 			"keyId is required")
 	}
-	opts := getOpts(opt...)
+	opts := corekey.GetVaultOptions(opt...)
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -483,11 +484,11 @@ func (r *VaultRepository) AddVersion(ctx context.Context, version *Version, opt 
 	newKey := k.Clone()
 	newKey.CurrentVersion += 1
 
-	err = r.putKeyVersion(ctx, version, opts.withVetForWrite)
+	err = r.putKeyVersion(ctx, version, opts.VetForWrite)
 	if err != nil {
 		return errors.Wrap(ctx, op, err)
 	}
-	err = r.updateKey(ctx, newKey, opts.withVetForWrite)
+	err = r.updateKey(ctx, newKey, opts.VetForWrite)
 	if err != nil {
 		_ = r.keyVersions.Delete(ctx, versionKey(version.KeyId, version.Version)) // best-effort cleanup
 		return errors.Wrap(ctx, op, err)
@@ -496,7 +497,7 @@ func (r *VaultRepository) AddVersion(ctx context.Context, version *Version, opt 
 	return nil
 }
 
-func (r *VaultRepository) getCurrentVersionInternal(ctx context.Context, keyID string) (*Version, error) {
+func (r *VaultRepository) getCurrentVersionInternal(ctx context.Context, keyID string) (*corekey.Version, error) {
 	const op errors.Op = "key.(VaultRepository).getCurrentVersionInternal"
 	k, err := r.getKey(ctx, keyID)
 	if err != nil {
@@ -509,7 +510,7 @@ func (r *VaultRepository) getCurrentVersionInternal(ctx context.Context, keyID s
 	return v, nil
 }
 
-func (r *VaultRepository) GetCurrentVersion(ctx context.Context, keyID string) (*Version, error) {
+func (r *VaultRepository) GetCurrentVersion(ctx context.Context, keyID string) (*corekey.Version, error) {
 	const op errors.Op = "key.(VaultRepository).GetCurrentVersion"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
@@ -522,7 +523,7 @@ func (r *VaultRepository) GetCurrentVersion(ctx context.Context, keyID string) (
 
 }
 
-func (r *VaultRepository) getVersionInternal(ctx context.Context, keyID string, versionNumber uint32) (*Version, error) {
+func (r *VaultRepository) getVersionInternal(ctx context.Context, keyID string, versionNumber uint32) (*corekey.Version, error) {
 	const op errors.Op = "key.(VaultRepository).getVersionInternal"
 
 	v, err := r.getKeyVersion(ctx, keyID, versionNumber)
@@ -531,12 +532,12 @@ func (r *VaultRepository) getVersionInternal(ctx context.Context, keyID string, 
 	}
 	return v, nil
 }
-func (r *VaultRepository) GetVersion(ctx context.Context, keyID string, versionNumber uint32) (*Version, error) {
+func (r *VaultRepository) GetVersion(ctx context.Context, keyID string, versionNumber uint32) (*corekey.Version, error) {
 	const op errors.Op = "key.(VaultRepository).GetVersion"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	var v *Version
+	var v *corekey.Version
 	var err error
 
 	if versionNumber == 0 {

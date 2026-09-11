@@ -18,11 +18,12 @@ import (
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
+	"github.com/agile-crypto/citius-core/crypto"
+	"github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/app/vault"
-	"github.com/agile-crypto/citius-server/internal/crypto"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
@@ -45,7 +46,7 @@ func wireWithSoftwareProvider(t *testing.T) *vault.Service {
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
-	err = template.LoadStandardCatalog(context.Background(), catalogPath(), reg)
+	err = coretemplate.LoadStandardCatalog(context.Background(), catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}

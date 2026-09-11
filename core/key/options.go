@@ -22,36 +22,28 @@ type Option func(*options)
 
 // options = how options are represented
 type options struct {
-	withLock                 *sync.RWMutex
-	withTemplateID           string
-	withState                types.KeyLifecycleState
-	withLabels               map[string]string
-	withName                 string
-	withWrappingKeyID        string
-	withPublicID             string
-	withDigestAlgorithm      string
-	withCurrentVersion       uint32
-	withInitialVersion       uint32
-	withVetForWrite          bool
-	withKeyNameToIDFunc      func(name string) (string, error)
-	withKeyNameToIDCacheSize int
-	withCacheFactoryFunc     func(size int) cache[string, string]
+	withLock            *sync.RWMutex
+	withTemplateID      string
+	withState           types.KeyLifecycleState
+	withLabels          map[string]string
+	withName            string
+	withWrappingKeyID   string
+	withPublicID        string
+	withDigestAlgorithm string
+	withCurrentVersion  uint32
+	withInitialVersion  uint32
+	withVetForWrite     bool
 }
 
 func getDefaultOptions() options {
 	return options{
-		withLock:                 &sync.RWMutex{},
-		withState:                types.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED,
-		withLabels:               nil,
-		withDigestAlgorithm:      "HMAC-SHA256",
-		withCurrentVersion:       0,
-		withVetForWrite:          true, // default: vet for write
-		withInitialVersion:       1,
-		withKeyNameToIDFunc:      nil,
-		withKeyNameToIDCacheSize: 1000,
-		withCacheFactoryFunc: func(size int) cache[string, string] {
-			return newLRUCache[string, string](size)
-		},
+		withLock:            &sync.RWMutex{},
+		withState:           types.KeyLifecycleState_KEY_LIFECYCLE_STATE_UNSPECIFIED,
+		withLabels:          nil,
+		withDigestAlgorithm: "HMAC-SHA256",
+		withCurrentVersion:  0,
+		withVetForWrite:     true, // default: vet for write
+		withInitialVersion:  1,
 	}
 }
 
@@ -120,20 +112,20 @@ func WithVetForWrite(vet bool) Option {
 	}
 }
 
-func WithKeyNameToIDFunc(f func(name string) (string, error)) Option {
-	return func(o *options) {
-		o.withKeyNameToIDFunc = f
-	}
+// VaultOptions is the subset of resolved options needed by Vault-backed
+// adapters that live outside this package (see internal/key).
+type VaultOptions struct {
+	Lock           *sync.RWMutex
+	VetForWrite    bool
+	InitialVersion uint32
 }
 
-func WithKeyNameToIDCacheSize(size int) Option {
-	return func(o *options) {
-		o.withKeyNameToIDCacheSize = size
-	}
-}
-
-func WithCacheFactoryFunc(f func(size int) cache[string, string]) Option {
-	return func(o *options) {
-		o.withCacheFactoryFunc = f
+// GetVaultOptions resolves Option values for use by out-of-package Vault adapters.
+func GetVaultOptions(opt ...Option) VaultOptions {
+	opts := getOpts(opt...)
+	return VaultOptions{
+		Lock:           opts.withLock,
+		VetForWrite:    opts.withVetForWrite,
+		InitialVersion: opts.withInitialVersion,
 	}
 }

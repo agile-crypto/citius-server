@@ -30,3 +30,15 @@ func WithLock(lock *sync.RWMutex) Option {
 		o.withLock = lock
 	}
 }
+
+// VaultOptions is the subset of resolved options needed by Vault-backed
+// adapters that live outside this package (see internal/template).
+type VaultOptions struct {
+	Lock *sync.RWMutex
+}
+
+// GetVaultOptions resolves Option values for use by out-of-package Vault adapters.
+func GetVaultOptions(opt ...Option) VaultOptions {
+	opts := getOpts(opt...)
+	return VaultOptions{Lock: opts.withLock}
+}

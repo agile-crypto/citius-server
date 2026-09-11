@@ -14,8 +14,8 @@ import (
 	"github.com/agile-crypto/ossl-go/ossl"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
+	"github.com/agile-crypto/citius-core/provider"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/provider"
 )
 
 // catalogPath returns the absolute path to standard_algorithms.json.

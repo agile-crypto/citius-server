@@ -22,12 +22,14 @@ import (
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
+	"github.com/agile-crypto/citius-core/crypto"
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/app/vault"
-	"github.com/agile-crypto/citius-server/internal/crypto"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
@@ -73,7 +75,7 @@ func wireLoopback(t *testing.T) *vault.Service {
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
-	err = template.LoadStandardCatalog(context.Background(), catalogPath(), reg)
+	err = coretemplate.LoadStandardCatalog(context.Background(), catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -99,7 +101,7 @@ func wireLoopback(t *testing.T) *vault.Service {
 	cryptoFactory := func(s storage.Storage) (service.CryptoOrchestrator, error) {
 		return buildCryptoOrchestrator(ctx, s, reg, provReg)
 	}
-	policyFactory := func(s storage.Storage) (policy.Engine, error) {
+	policyFactory := func(s storage.Storage) (corepolicy.Engine, error) {
 		return buildPolicyEngine(ctx, s)
 	}
 	instanceFactory := func(_ storage.Storage) (provider.InstanceManager, error) {
@@ -122,17 +124,17 @@ func wireLoopback(t *testing.T) *vault.Service {
 
 // seedPolicy creates a policy in the request scope that allows the given
 // templates and operations, then returns the policy name.
-func seedPolicy(t *testing.T, ctx context.Context, pol policy.Engine,
+func seedPolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine,
 	name string, templates []string, ops []core.Operation) string {
 	t.Helper()
 	keyOps := make([]string, len(ops))
 	for i, op := range ops {
 		keyOps[i] = string(op)
 	}
-	rules := &policy.Rules{
+	rules := &corepolicy.Rules{
 		Version:          "1",
 		AllowedTemplates: templates,
-		AllowedOperations: &policy.OperationRule{
+		AllowedOperations: &corepolicy.OperationRule{
 			KeyOperations: keyOps,
 		},
 	}
@@ -140,7 +142,7 @@ func seedPolicy(t *testing.T, ctx context.Context, pol policy.Engine,
 	if err != nil {
 		t.Fatalf("marshal rules: %v", err)
 	}
-	p := policy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
+	p := corepolicy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
 	if _, err := pol.CreatePolicy(ctx, p); err != nil {
 		t.Fatalf("seed policy %q: %v", name, err)
 	}
@@ -160,7 +162,7 @@ func sigScopeSpec() *core.ScopeSpecification {
 
 func buildKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
-	reg template.Registry, provReg provider.Registry,
+	reg coretemplate.Registry, provReg provider.Registry,
 ) (service.KeyOrchestrator, error) {
 	repo, err := key.NewVaultRepository(ctx, s)
 	if err != nil {
@@ -170,7 +172,7 @@ func buildKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
 	if err != nil {
 		return nil, err
 	}
@@ -179,7 +181,7 @@ func buildKeyOrchestrator(
 
 func buildCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
-	reg template.Registry, provReg provider.Registry,
+	reg coretemplate.Registry, provReg provider.Registry,
 ) (service.CryptoOrchestrator, error) {
 	repo, err := key.NewVaultRepository(ctx, s)
 	if err != nil {
@@ -189,7 +191,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
 	if err != nil {
 		return nil, err
 	}
@@ -198,12 +200,12 @@ func buildCryptoOrchestrator(
 
 func buildPolicyEngine(
 	ctx context.Context, s storage.Storage,
-) (policy.Engine, error) {
+) (corepolicy.Engine, error) {
 	policyRepo, err := policy.NewVaultRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-	return policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
+	return corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
 }
 
 // ============================================================================

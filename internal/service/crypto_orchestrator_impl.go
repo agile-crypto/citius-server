@@ -6,13 +6,13 @@ import (
 	"slices"
 
 	core "github.com/agile-crypto/citius-core"
+	"github.com/agile-crypto/citius-core/crypto"
 	"github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/provider"
+	"github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/crypto"
-	"github.com/agile-crypto/citius-server/internal/key"
-	"github.com/agile-crypto/citius-server/internal/policy"
-	"github.com/agile-crypto/citius-server/internal/provider"
-	"github.com/agile-crypto/citius-server/internal/template"
 	"google.golang.org/protobuf/proto"
 )
 

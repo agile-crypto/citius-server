@@ -8,8 +8,8 @@ import (
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
-	"github.com/agile-crypto/citius-server/internal/crypto"
-	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/citius-core/crypto"
+	"github.com/agile-crypto/citius-core/policy"
 )
 
 // digestSignPolicyName is the name of the policy that allows create_key,

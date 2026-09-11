@@ -7,8 +7,8 @@ import (
 
 	metapb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
+	provider "github.com/agile-crypto/citius-core/provider"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )

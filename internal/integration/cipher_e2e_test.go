@@ -12,7 +12,7 @@ import (
 	messages "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
-	"github.com/agile-crypto/citius-server/internal/crypto"
+	"github.com/agile-crypto/citius-core/crypto"
 )
 
 // cipherE2ETemplates lists every cipher template this test exercises through

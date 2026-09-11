@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/citius-core/provider"
 )
 
 func TestDigestLengthForHash(t *testing.T) {

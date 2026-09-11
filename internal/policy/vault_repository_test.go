@@ -4,16 +4,18 @@ import (
 	"context"
 	"testing"
 
+	corepolicy "github.com/agile-crypto/citius-core/policy"
+
 	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func newTestPolicy(name string) *policy.Policy {
-	return policy.NewPolicy("", name, nil)
+func newTestPolicy(name string) *corepolicy.Policy {
+	return corepolicy.NewPolicy("", name, nil)
 }
 
-var repoFn = func() policy.Repository {
+var repoFn = func() corepolicy.Repository {
 	storage := &logical.InmemStorage{}
 	r, err := policy.NewVaultRepository(context.Background(), storage)
 	if err != nil {

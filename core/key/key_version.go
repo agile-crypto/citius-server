@@ -18,6 +18,8 @@ type Version struct {
 	*storepb.KeyVersion
 }
 
+const versionSep string = ":"
+
 func defaultKeyVersionID(keyID string, version uint32) string {
 	return fmt.Sprintf("%s%s%d", keyID, versionSep, version)
 }

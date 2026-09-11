@@ -4,21 +4,23 @@ import (
 	"context"
 	"testing"
 
+	coreprovider "github.com/agile-crypto/citius-core/provider"
+
 	"github.com/agile-crypto/citius-core/errors"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func newTestProviderInstance(publicID, name, provType string) *provider.Instance {
-	return provider.NewInstance(&storepb.StoredProviderInstance{
+func newTestProviderInstance(publicID, name, provType string) *coreprovider.Instance {
+	return coreprovider.NewInstance(&storepb.StoredProviderInstance{
 		PublicId:     publicID,
 		Name:         name,
 		ProviderType: provType,
 	})
 }
 
-var repoFn = func() provider.InstanceRepository {
+var repoFn = func() coreprovider.InstanceRepository {
 	storage := &logical.InmemStorage{}
 	r, err := provider.NewVaultRepository(context.Background(), storage)
 	if err != nil {
