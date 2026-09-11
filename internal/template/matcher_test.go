@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/core"
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/stretchr/testify/require"
 )

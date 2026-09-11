@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/core"
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-server/internal/policy"
 )
 

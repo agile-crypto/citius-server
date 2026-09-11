@@ -13,8 +13,8 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
+	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/core"
 	keygrpc "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/service"

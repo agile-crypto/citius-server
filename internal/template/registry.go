@@ -3,7 +3,7 @@ package template
 import (
 	"context"
 
-	"github.com/agile-crypto/citius-server/internal/core"
+	core "github.com/agile-crypto/citius-core"
 )
 
 // CandidateSet specifies which template IDs are eligible for selection.

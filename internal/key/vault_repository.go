@@ -6,9 +6,9 @@ import (
 	"strings"
 	"sync"
 
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/hashicorp/vault/sdk/logical"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
+	core "github.com/agile-crypto/citius-core"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/stretchr/testify/require"
 )

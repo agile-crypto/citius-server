@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/core"
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-server/internal/crypto"
 	"github.com/agile-crypto/citius-server/internal/policy"
 )

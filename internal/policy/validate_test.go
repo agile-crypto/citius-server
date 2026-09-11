@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/hashicorp/vault/sdk/logical"
 )

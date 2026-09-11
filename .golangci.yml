@@ -29,12 +29,14 @@ linters:
         core-is-leaf:
           list-mode: strict
           files:
-            - '**/internal/core/**/*.go'
+            - '**/core/*.go'
             - '!$test'
           allow:
             - $gostd
             - github.com/agile-crypto/citius-core/errors
             - github.com/oklog/ulid/v2
+            - github.com/agile-crypto/citius-api-go/gen/go/types
+            - google.golang.org/protobuf/proto
         # errors/ is the absolute leaf — stdlib + gRPC status codes. It lives in
         # the separate citius-core module now, so `golangci-lint run ./...`
         # invoked from citius-server's root can no longer reach it — ./... does

@@ -2,7 +2,7 @@ package provider
 
 import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/core"
+	core "github.com/agile-crypto/citius-core"
 )
 
 // score computes a provider's match score against required security

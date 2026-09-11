@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // Requirements narrows a Match call to a template, optionally a specific

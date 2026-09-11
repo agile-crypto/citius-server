@@ -3,7 +3,7 @@ package policy
 import (
 	"context"
 
-	"github.com/agile-crypto/citius-server/internal/core"
+	core "github.com/agile-crypto/citius-core"
 )
 
 // Evaluator validates operations and key creation against stored policies.

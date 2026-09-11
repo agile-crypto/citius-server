@@ -1,6 +1,6 @@
 package policy
 
-import "github.com/agile-crypto/citius-server/internal/core"
+import core "github.com/agile-crypto/citius-core"
 
 // RulesEvaluator is the strategy interface for interpreting rules_json.
 // Different implementations handle different policy schemas or engines.
