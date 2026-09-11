@@ -135,8 +135,13 @@ vet: ## Run 'go vet' on all internal packages (+ citius-core)
 
 lint: lint-go lint-proto ## Run all linters (Go + proto)
 
-lint-go: ## Run golangci-lint on the whole module (gen/ excluded via .golangci.yml)
+lint-go: ## Run golangci-lint on the whole module + citius-core (gen/ excluded via .golangci.yml)
 	golangci-lint run ./...
+	# `./...` from the root never crosses into core/ (a separate module) even
+	# under go.work, so lint it as its own invocation. golangci-lint walks up
+	# parent directories for config, so this still runs against .golangci.yml
+	# at the repo root (confirmed: reports "Used config file ../.golangci.yml").
+	cd core && golangci-lint run ./...
 
 lint-proto: ## Run 'buf lint' on the proto tree
 	cd proto && buf lint
