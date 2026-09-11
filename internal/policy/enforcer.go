@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/agile-crypto/citius-server/internal/core"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // Enforcer implements policy.Engine.

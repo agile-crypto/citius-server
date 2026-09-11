@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/agile-crypto/citius-server/internal/core"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/hashicorp/vault/sdk/logical"
 )

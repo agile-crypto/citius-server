@@ -13,7 +13,7 @@ import (
 	"github.com/agile-crypto/ossl-go/ossl"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 const testOp errors.Op = "openssl.names_test"

@@ -8,7 +8,7 @@ import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/crypto"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/policy"
 )
 

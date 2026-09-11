@@ -7,7 +7,7 @@ import (
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // generateRSAKey generates an RSA key pair through libctx, returning

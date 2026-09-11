@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/agile-crypto/citius-server/internal/core"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // Requirements narrows a Match call to a template, optionally a specific

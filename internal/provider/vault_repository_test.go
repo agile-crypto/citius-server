@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/hashicorp/vault/sdk/logical"
 )

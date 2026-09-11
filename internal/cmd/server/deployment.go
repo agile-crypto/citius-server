@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	discogrpc "github.com/agile-crypto/citius-server/internal/grpc/discovery"
 	keyestgrpc "github.com/agile-crypto/citius-server/internal/grpc/keyestablishment"

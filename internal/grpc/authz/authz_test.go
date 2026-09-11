@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	citiusauth "github.com/agile-crypto/citius-server/internal/auth"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	zauth "github.com/agile-crypto/zitadel-grpc-auth"
 	"github.com/stretchr/testify/require"
 )

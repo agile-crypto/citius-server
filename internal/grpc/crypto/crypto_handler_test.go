@@ -14,7 +14,7 @@ import (
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/crypto"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/service"

@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
 
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 )
 
 // ToStatusError converts a domain error to a gRPC status error, returning nil

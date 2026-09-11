@@ -7,7 +7,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 )
 
 func TestToStatusError_Nil(t *testing.T) {

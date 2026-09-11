@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/chacha20poly1305"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // ChaCha20Poly1305TagSizeBytes is the fixed Poly1305 authentication tag

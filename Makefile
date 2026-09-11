@@ -86,8 +86,8 @@ _hooks-check:
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
-build: ## Compile all internal packages
-	go build ./internal/...
+build: ## Compile all internal packages (+ citius-core, via the go.work workspace)
+	go build ./internal/... ./core/...
 
 # ---------------------------------------------------------------------------
 # Run the gRPC server
@@ -111,13 +111,13 @@ run-dev: ## Run the gRPC server via 'go run' (no build artefact)
 # Test
 # ---------------------------------------------------------------------------
 test: ## Run all unit tests (no race detector)
-	go test ./internal/... -count=1
+	go test ./internal/... ./core/... -count=1
 
 test-race: ## Run all unit tests with the race detector
-	go test ./internal/... -race -count=1
+	go test ./internal/... ./core/... -race -count=1
 
 test-cover: ## Run tests and generate HTML coverage report
-	go test ./internal/... -coverprofile=coverage.out -count=1
+	go test ./internal/... ./core/... -coverprofile=coverage.out -count=1
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
@@ -130,8 +130,8 @@ smoke: ## Run smoke tests under test/smoke/...
 # ---------------------------------------------------------------------------
 # Static analysis
 # ---------------------------------------------------------------------------
-vet: ## Run 'go vet' on all internal packages
-	go vet ./internal/...
+vet: ## Run 'go vet' on all internal packages (+ citius-core)
+	go vet ./internal/... ./core/...
 
 lint: lint-go lint-proto ## Run all linters (Go + proto)
 

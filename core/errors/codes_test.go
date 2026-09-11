@@ -5,7 +5,7 @@ import (
 	stderrors "errors"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"google.golang.org/grpc/codes"
 )
 

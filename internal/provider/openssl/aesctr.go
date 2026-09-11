@@ -7,7 +7,7 @@ import (
 	"github.com/agile-crypto/ossl-go/ossl"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // checkAESCTRParamsValid rejects a nonce_size_bits/counter_bits split this

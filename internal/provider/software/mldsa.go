@@ -12,7 +12,7 @@ import (
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // mldsaScheme resolves the CIRCL generic sign.Scheme for a declared ML-DSA

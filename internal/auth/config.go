@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 )
 
 // Environment variable names. These are the contract surface between

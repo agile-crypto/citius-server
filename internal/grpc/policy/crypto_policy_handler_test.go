@@ -13,7 +13,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	"github.com/agile-crypto/citius-server/internal/core"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	policygrpc "github.com/agile-crypto/citius-server/internal/grpc/policy"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"google.golang.org/grpc/codes"

@@ -8,7 +8,7 @@ import (
 	"math/big"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // ecdsaSignatureEncodingLabel maps the declared SignatureFormat to the

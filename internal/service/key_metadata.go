@@ -6,7 +6,7 @@ import (
 	messages "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/core"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

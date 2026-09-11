@@ -12,7 +12,7 @@ import (
 	"context"
 
 	citiusauth "github.com/agile-crypto/citius-server/internal/auth"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/grpc/status"
 )
 

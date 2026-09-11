@@ -10,7 +10,7 @@ import (
 	"context"
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/template"
 
 	"google.golang.org/grpc"

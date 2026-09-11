@@ -8,7 +8,7 @@ import (
 
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 	"github.com/agile-crypto/citius-server/internal/core"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/hashicorp/vault/sdk/logical"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"

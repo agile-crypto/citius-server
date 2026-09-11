@@ -6,7 +6,7 @@ import (
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	"github.com/agile-crypto/citius-server/internal/crypto"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	"github.com/agile-crypto/citius-server/internal/service"
 )

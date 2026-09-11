@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/template"
 )

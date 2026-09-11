@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/agile-crypto/citius-server/internal/cmd/server"
-	engerr "github.com/agile-crypto/citius-server/internal/errors"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/service"

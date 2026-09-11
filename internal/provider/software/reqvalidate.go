@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	protovalidate "buf.build/go/protovalidate"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 	"google.golang.org/protobuf/proto"
 )
 

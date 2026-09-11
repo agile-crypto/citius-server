@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/agile-crypto/citius-server/internal/crypto"
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // ============================================================================

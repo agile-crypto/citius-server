@@ -6,7 +6,7 @@ import (
 
 	"github.com/agile-crypto/ossl-go/ossl"
 
-	"github.com/agile-crypto/citius-server/internal/errors"
+	"github.com/agile-crypto/citius-core/errors"
 )
 
 // chaCha20Poly1305TagSizeBytes is the fixed Poly1305 authentication tag
