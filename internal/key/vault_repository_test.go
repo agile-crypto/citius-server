@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // helper: create a valid Key domain object.

@@ -5,8 +5,8 @@ import (
 
 	"github.com/hashicorp/vault/sdk/logical"
 
-	"github.com/agile-crypto/citius-server/internal/core"
 	engerr "github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
 	cryptohandler "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	keymgmthandler "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	policyhandler "github.com/agile-crypto/citius-server/internal/grpc/policy"

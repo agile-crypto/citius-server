@@ -11,8 +11,8 @@ package authz
 import (
 	"context"
 
-	citiusauth "github.com/agile-crypto/citius-server/internal/auth"
 	engerr "github.com/agile-crypto/citius-core/errors"
+	citiusauth "github.com/agile-crypto/citius-server/internal/auth"
 	"github.com/agile-crypto/citius-server/internal/grpc/status"
 )
 

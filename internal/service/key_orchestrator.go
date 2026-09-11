@@ -4,8 +4,8 @@ import (
 	"context"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // KeyOrchestrator orchestrates key lifecycle workflows.

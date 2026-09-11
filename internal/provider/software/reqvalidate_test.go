@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-core/errors"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
 

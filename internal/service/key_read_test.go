@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/stretchr/testify/require"
 )
 

@@ -6,8 +6,8 @@ import (
 
 	"github.com/agile-crypto/ossl-go/ossl"
 
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-core/errors"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 )
 
 // parsePrivateKey parses privDER as an asymmetric private key of the given

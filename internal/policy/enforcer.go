@@ -3,8 +3,8 @@ package policy
 import (
 	"context"
 
-	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-server/internal/core"
 )
 
 // Enforcer implements policy.Engine.

@@ -10,8 +10,8 @@ import (
 	"github.com/agile-crypto/ossl-go/ossl"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-core/errors"
+	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )

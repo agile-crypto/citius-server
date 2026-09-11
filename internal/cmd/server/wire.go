@@ -11,8 +11,8 @@ import (
 	"context"
 	"log"
 
-	"github.com/agile-crypto/citius-server/internal/app"
 	engerr "github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/grpc/authz"
 	"github.com/agile-crypto/citius-server/internal/key"
 	"github.com/agile-crypto/citius-server/internal/policy"
