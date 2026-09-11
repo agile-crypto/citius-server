@@ -3,7 +3,7 @@ package key
 import (
 	"sync"
 
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 )
 
 // getOpts - iterate the inbound Options and return a struct

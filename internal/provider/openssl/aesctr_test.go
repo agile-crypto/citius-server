@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	metapb "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	metapb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/errors"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"

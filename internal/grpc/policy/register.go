@@ -18,7 +18,7 @@ package policygrpc
 import (
 	"context"
 
-	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	"github.com/agile-crypto/citius-server/internal/policy"

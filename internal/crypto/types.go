@@ -1,8 +1,8 @@
 package crypto
 
 import (
-	messages "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	messages "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 )
 
 // SignatureScopeFields groups the scope_params for signature operations.

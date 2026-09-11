@@ -153,7 +153,11 @@ fmt: ## Format Go source (gofmt + goimports)
 # Proto code generation
 # ---------------------------------------------------------------------------
 proto: ## Generate Go code from proto definitions (buf generate)
-	cd proto && buf generate
+	# --path server: only proto/server/** generates Go here. proto/api/** stays
+	# in the build for import resolution (proto/server/** imports api/types/*),
+	# but its Go is no longer generated locally -- code for it comes from the
+	# github.com/agile-crypto/citius-api-go dependency instead.
+	cd proto && buf generate --path server
 	@echo "Proto generation complete"
 
 # ---------------------------------------------------------------------------

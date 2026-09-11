@@ -19,6 +19,7 @@ const (
 	MethodImportKey            = methodPrefix + "KeyManagementService/ImportKey"
 	MethodRotateKey            = methodPrefix + "KeyManagementService/RotateKey"
 	MethodTransformKey         = methodPrefix + "KeyManagementService/TransformKey"
+	MethodUpdateKeyState       = methodPrefix + "KeyManagementService/UpdateKeyState"
 	MethodMigrateKey           = methodPrefix + "KeyManagementService/MigrateKey"
 	MethodUpdateKeyPolicy      = methodPrefix + "KeyManagementService/UpdateKeyPolicy"
 	MethodReadKey              = methodPrefix + "KeyManagementService/ReadKey"
@@ -98,6 +99,13 @@ const (
 	MethodDigestFinal  = methodPrefix + "StreamingCryptoService/DigestFinal"
 	MethodDigestKey    = methodPrefix + "StreamingCryptoService/DigestKey"
 
+	MethodGenerateMACInit   = methodPrefix + "StreamingCryptoService/GenerateMACInit"
+	MethodGenerateMACUpdate = methodPrefix + "StreamingCryptoService/GenerateMACUpdate"
+	MethodGenerateMACFinal  = methodPrefix + "StreamingCryptoService/GenerateMACFinal"
+	MethodVerifyMACInit     = methodPrefix + "StreamingCryptoService/VerifyMACInit"
+	MethodVerifyMACUpdate   = methodPrefix + "StreamingCryptoService/VerifyMACUpdate"
+	MethodVerifyMACFinal    = methodPrefix + "StreamingCryptoService/VerifyMACFinal"
+
 	MethodXofInit             = methodPrefix + "StreamingCryptoService/XofInit"
 	MethodXofUpdate           = methodPrefix + "StreamingCryptoService/XofUpdate"
 	MethodXofFinal            = methodPrefix + "StreamingCryptoService/XofFinal"
@@ -105,6 +113,8 @@ const (
 	MethodDecryptDigestUpdate = methodPrefix + "StreamingCryptoService/DecryptDigestUpdate"
 	MethodSignEncryptUpdate   = methodPrefix + "StreamingCryptoService/SignEncryptUpdate"
 	MethodDecryptVerifyUpdate = methodPrefix + "StreamingCryptoService/DecryptVerifyUpdate"
+
+	MethodCancelOperation = methodPrefix + "StreamingCryptoService/CancelOperation"
 )
 
 // KeyEstablishmentService

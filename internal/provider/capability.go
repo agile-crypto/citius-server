@@ -3,7 +3,7 @@ package provider
 import (
 	"sort"
 
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 )
 
 // Capability names one of the optional interfaces a Backend may implement

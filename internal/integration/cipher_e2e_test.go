@@ -9,8 +9,8 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	"google.golang.org/protobuf/proto"
 
-	messages "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	messages "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/crypto"
 )

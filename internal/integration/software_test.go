@@ -16,7 +16,7 @@ import (
 
 	"github.com/hashicorp/vault/sdk/logical"
 
-	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/app/vault"
 	"github.com/agile-crypto/citius-server/internal/core"

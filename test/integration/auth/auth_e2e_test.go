@@ -34,9 +34,9 @@ import (
 	"testing"
 	"time"
 
-	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
-	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
+	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"

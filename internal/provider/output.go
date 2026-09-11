@@ -1,7 +1,7 @@
 package provider
 
 import (
-	metapb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	metapb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 )
 
 // NoOutput builds a ProviderOutput with the no_output arm set and the given

@@ -5,7 +5,7 @@ import (
 	"context"
 	"testing"
 
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
 	"github.com/agile-crypto/citius-server/internal/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"

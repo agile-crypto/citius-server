@@ -3,7 +3,7 @@ package auth_test
 import (
 	"testing"
 
-	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	"github.com/agile-crypto/citius-server/internal/auth"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"

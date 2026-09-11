@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )

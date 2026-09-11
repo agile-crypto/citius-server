@@ -1,6 +1,6 @@
 package core
 
-import types "github.com/agile-crypto/citius-server/gen/go/api/types"
+import types "github.com/agile-crypto/citius-api-go/gen/go/types"
 
 // Scope is the SDK-level type for the operational variant of a cryptographic primitive.
 // Each constant identifies a distinct caller interface: the set of parameters the caller

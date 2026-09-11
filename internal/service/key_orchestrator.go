@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 
-	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	"github.com/agile-crypto/citius-server/internal/core"
 	"github.com/agile-crypto/citius-server/internal/errors"
 )

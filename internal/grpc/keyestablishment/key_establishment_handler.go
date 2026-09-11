@@ -3,8 +3,8 @@ package keyestgrpc
 import (
 	"context"
 
-	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	"github.com/agile-crypto/citius-server/internal/service"
 )
 

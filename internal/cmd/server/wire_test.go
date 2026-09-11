@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"testing"
 
-	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/cmd/server"
 )
 

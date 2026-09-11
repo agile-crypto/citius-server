@@ -11,7 +11,7 @@ import (
 
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
 
-	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	"github.com/agile-crypto/citius-server/internal/core"
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
 	policygrpc "github.com/agile-crypto/citius-server/internal/grpc/policy"

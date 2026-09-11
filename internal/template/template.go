@@ -1,7 +1,7 @@
 package template
 
 import (
-	api "github.com/agile-crypto/citius-server/gen/go/api/types"
+	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"google.golang.org/protobuf/proto"
 )
 

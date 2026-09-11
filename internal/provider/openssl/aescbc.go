@@ -7,7 +7,7 @@ import (
 
 	"github.com/agile-crypto/ossl-go/ossl"
 
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/errors"
 )
 

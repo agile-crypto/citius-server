@@ -1,7 +1,7 @@
 package provider
 
 import (
-	types "github.com/agile-crypto/citius-server/gen/go/api/types"
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 )
 
 // DigestLengthForHash returns the fixed output length in bytes for h, and

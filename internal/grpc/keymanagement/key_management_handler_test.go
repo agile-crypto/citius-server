@@ -11,8 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	messagespb "github.com/agile-crypto/citius-server/gen/go/api/messages"
-	typespb "github.com/agile-crypto/citius-server/gen/go/api/types"
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/internal/core"
 	engerr "github.com/agile-crypto/citius-server/internal/errors"
 	keygrpc "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"

@@ -80,6 +80,7 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodImportKey:            keysCreate,
 		MethodRotateKey:            keysRotate,
 		MethodTransformKey:         keysRotate,
+		MethodUpdateKeyState:       keysRotate, // stub: no handler yet (UnimplementedServer); revisit permission once implemented.
 		MethodMigrateKey:           keysRotate,
 		MethodUpdateKeyPolicy:      keysUpdatePolicy,
 		MethodReadKey:              keysRead,
@@ -160,6 +161,14 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodSeedRandom:          cryptoMisc,
 		MethodGenerateMAC:         cryptoMisc,
 		MethodVerifyMAC:           cryptoMisc,
+		// Stubs: no handler yet (UnimplementedServer); revisit permission once implemented.
+		MethodGenerateMACInit:   cryptoMisc,
+		MethodGenerateMACUpdate: cryptoMisc,
+		MethodGenerateMACFinal:  cryptoMisc,
+		MethodVerifyMACInit:     cryptoMisc,
+		MethodVerifyMACUpdate:   cryptoMisc,
+		MethodVerifyMACFinal:    cryptoMisc,
+		MethodCancelOperation:   cryptoMisc,
 
 		// KeyEstablishmentService — wrap / unwrap / derive etc.
 		MethodWrapKey:        cryptoMisc,

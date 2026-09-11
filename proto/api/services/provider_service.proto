@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-server/gen/go/api/services;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;api";
 
 import "google/api/annotations.proto";
 import "api/types/providers.proto";

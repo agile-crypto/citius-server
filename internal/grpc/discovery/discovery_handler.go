@@ -3,7 +3,7 @@ package discogrpc
 import (
 	"context"
 
-	servicespb "github.com/agile-crypto/citius-server/gen/go/api/services"
+	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	"github.com/agile-crypto/citius-server/internal/template"
 )
 
