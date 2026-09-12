@@ -1,9 +1,11 @@
-package service
+package service_test
 
 import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -61,7 +63,7 @@ var (
 // setupWithCapturingSigner mirrors setupCryptoOrchestratorFull but registers
 // a capturingSigner instead of a plain software.Provider, so the test can
 // inspect the provider-level requests the orchestrator builds.
-func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator, *capturingSigner) {
+func setupWithCapturingSigner(t *testing.T) (service.CryptoOrchestrator, service.KeyOrchestrator, *capturingSigner) {
 	t.Helper()
 	ctx := context.Background()
 	storage := &logical.InmemStorage{}
@@ -116,13 +118,13 @@ func setupWithCapturingSigner(t *testing.T) (CryptoOrchestrator, KeyOrchestrator
 		t.Fatalf("seed policy: %v", err)
 	}
 
-	keyOrch, err := NewKeyOrchestrator(repo, reg, provReg, pol)
+	keyOrch, err := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 	if err != nil {
-		t.Fatalf("NewKeyOrchestrator: %v", err)
+		t.Fatalf("service.NewKeyOrchestrator: %v", err)
 	}
-	ops, err := NewCryptoOrchestrator(repo, pol, provReg, reg)
+	ops, err := service.NewCryptoOrchestrator(repo, pol, provReg, reg)
 	if err != nil {
-		t.Fatalf("NewCryptoOrchestrator: %v", err)
+		t.Fatalf("service.NewCryptoOrchestrator: %v", err)
 	}
 
 	if _, err = keyOrch.CreateKey(ctx, core.KeyCreationSpec{

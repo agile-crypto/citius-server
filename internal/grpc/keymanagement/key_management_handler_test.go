@@ -16,8 +16,8 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/service"
 	keygrpc "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
-	"github.com/agile-crypto/citius-server/internal/service"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

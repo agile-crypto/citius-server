@@ -7,8 +7,8 @@ import (
 
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
+	"github.com/agile-crypto/citius-core/service"
 	"github.com/agile-crypto/citius-core/template"
-	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
 )
 

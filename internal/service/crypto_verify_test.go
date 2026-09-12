@@ -1,9 +1,11 @@
-package service
+package service_test
 
 import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -41,10 +43,10 @@ func seedVerifyPolicy(t *testing.T, ctx context.Context, pol policy.Engine) {
 	}
 }
 
-// setupCryptoWithKeyForVerify creates a wired CryptoOrchestrator, seeds a
+// setupCryptoWithKeyForVerify creates a wired service.CryptoOrchestrator, seeds a
 // policy that allows create_key + sign + verify for ml-dsa-65, creates a key,
-// and returns the CryptoOrchestrator and the key's public ID.
-func setupCryptoWithKeyForVerify(t *testing.T) (CryptoOrchestrator, string) {
+// and returns the service.CryptoOrchestrator and the key's public ID.
+func setupCryptoWithKeyForVerify(t *testing.T) (service.CryptoOrchestrator, string) {
 	t.Helper()
 	ctx := context.Background()
 	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)

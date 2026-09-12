@@ -1,10 +1,12 @@
-package service
+package service_test
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -42,15 +44,15 @@ func seedDigestSignPolicy(t *testing.T, ctx context.Context, pol policy.Engine) 
 	}
 }
 
-// setupDigestSignWithKey creates a wired CryptoOrchestrator, seeds a policy
+// setupDigestSignWithKey creates a wired service.CryptoOrchestrator, seeds a policy
 // that allows create_key + digest_sign + digest_verify for
-// ecdsa-p256-sha256-der, creates a key, and returns the CryptoOrchestrator
+// ecdsa-p256-sha256-der, creates a key, and returns the service.CryptoOrchestrator
 // and the key's name.
 //
 // ECDSA is used (not ML-DSA) because the software provider's SignDigest is
 // currently hard-coded to ECDSA-P256 only — the AlgorithmDetails-based
 // dispatch is a later change.
-func setupDigestSignWithKey(t *testing.T) (CryptoOrchestrator, string) {
+func setupDigestSignWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
 	t.Helper()
 	ctx := context.Background()
 	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)

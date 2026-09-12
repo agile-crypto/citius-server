@@ -6,6 +6,7 @@ import (
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
+	"github.com/agile-crypto/citius-core/service"
 	"github.com/agile-crypto/citius-core/template"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	discogrpc "github.com/agile-crypto/citius-server/internal/grpc/discovery"
@@ -15,7 +16,6 @@ import (
 	providergrpc "github.com/agile-crypto/citius-server/internal/grpc/provider"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	streamgrpc "github.com/agile-crypto/citius-server/internal/grpc/streaming"
-	"github.com/agile-crypto/citius-server/internal/service"
 
 	"google.golang.org/grpc"
 )

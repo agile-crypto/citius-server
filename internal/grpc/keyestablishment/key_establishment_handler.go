@@ -5,7 +5,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
-	"github.com/agile-crypto/citius-server/internal/service"
+	"github.com/agile-crypto/citius-core/service"
 )
 
 // KeyEstablishmentHandler serves services.KeyEstablishmentService — wrapping,

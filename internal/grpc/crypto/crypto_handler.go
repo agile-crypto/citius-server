@@ -7,8 +7,8 @@ import (
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	"github.com/agile-crypto/citius-core/crypto"
 	engerr "github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-core/service"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
-	"github.com/agile-crypto/citius-server/internal/service"
 )
 
 // CryptoHandler serves services.CryptoService — the one-shot data-plane RPCs

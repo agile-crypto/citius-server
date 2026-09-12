@@ -7,8 +7,8 @@ import (
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
+	"github.com/agile-crypto/citius-core/service"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
-	"github.com/agile-crypto/citius-server/internal/service"
 )
 
 // KeyManagementHandler serves services.KeyManagementService — the key lifecycle.

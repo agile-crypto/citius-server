@@ -1,9 +1,11 @@
-package service
+package service_test
 
 import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -151,7 +153,7 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)
 
-	orch, _ := NewKeyOrchestrator(repo, reg, provReg, pol)
+	orch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 
 	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:               "no-provider",
@@ -220,7 +222,7 @@ func TestCreateKey_withoutScope_returnsError(t *testing.T) {
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)
 
-	orch, _ := NewKeyOrchestrator(repo, reg, provReg, pol)
+	orch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 
 	_, err := orch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:       "no-provider",

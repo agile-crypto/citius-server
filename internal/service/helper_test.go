@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	core "github.com/agile-crypto/citius-core"
 	corekey "github.com/agile-crypto/citius-core/key"
@@ -67,7 +69,7 @@ func catalogPath() string {
 	return filepath.Join(filepath.Dir(currentFile), "..", "..", "proto", "standard_algorithms.json")
 }
 
-// setupOrchestratorFull creates a fully wired KeyOrchestrator backed by
+// setupOrchestratorFull creates a fully wired service.KeyOrchestrator backed by
 // in-memory storage, the software provider, and the standard algorithm catalog.
 // It returns the orchestrator, the underlying key.Repository (for lifecycle
 // mutation in tests), and the policy.Engine (for seeding custom policies).
@@ -78,7 +80,7 @@ func catalogPath() string {
 //
 // A permissive policy (testPolicyName) is pre-seeded that allows ml-dsa-65 and
 // the create_key operation.
-func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, corekey.Repository, coreprovider.Registry, corepolicy.Engine, coretemplate.Registry) {
+func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repository, coreprovider.Registry, corepolicy.Engine, coretemplate.Registry) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -119,9 +121,9 @@ func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, corekey.Repository, c
 
 	seedPermissivePolicy(t, ctx, pol)
 
-	orch, err := NewKeyOrchestrator(repo, reg, provReg, pol)
+	orch, err := service.NewKeyOrchestrator(repo, reg, provReg, pol)
 	if err != nil {
-		t.Fatalf("NewKeyOrchestrator: %v", err)
+		t.Fatalf("service.NewKeyOrchestrator: %v", err)
 	}
 	return orch, repo, provReg, pol, reg
 }
@@ -129,7 +131,7 @@ func setupOrchestratorFull(t *testing.T) (KeyOrchestrator, corekey.Repository, c
 // setupOrchestratorWithPolicy is a convenience wrapper that returns the
 // orchestrator and policy engine (without the repo). Use setupOrchestratorFull
 // when you also need the underlying key.Repository for lifecycle mutation.
-func setupOrchestratorWithPolicy(t *testing.T) (KeyOrchestrator, corepolicy.Engine) {
+func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, corepolicy.Engine) {
 	t.Helper()
 	orch, _, _, pol, _ := setupOrchestratorFull(t)
 	return orch, pol
@@ -137,7 +139,7 @@ func setupOrchestratorWithPolicy(t *testing.T) (KeyOrchestrator, corepolicy.Engi
 
 // setupOrchestrator is a convenience wrapper that returns only the orchestrator.
 // Use setupOrchestratorWithPolicy when you need to seed additional policies.
-func setupOrchestrator(t *testing.T) KeyOrchestrator {
+func setupOrchestrator(t *testing.T) service.KeyOrchestrator {
 	t.Helper()
 	orch, _ := setupOrchestratorWithPolicy(t)
 	return orch

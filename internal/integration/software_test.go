@@ -21,11 +21,11 @@ import (
 	"github.com/agile-crypto/citius-core/crypto"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
+	"github.com/agile-crypto/citius-core/service"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/app/vault"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
 	"github.com/agile-crypto/vault-storage/template"
 )

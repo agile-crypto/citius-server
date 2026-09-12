@@ -1,4 +1,4 @@
-package service
+package service_test
 
 import (
 	"context"
@@ -94,12 +94,12 @@ func TestGenerateRandom_notImplemented(t *testing.T) {
 // ============================================================================
 
 func TestCryptoOrchestrator_interfaceComplete(t *testing.T) {
-	// Compile-time check: if this file compiles, cryptoOrchestrator satisfies CryptoOrchestrator.
+	// Compile-time check: if this file compiles, cryptoOrchestrator satisfies service.CryptoOrchestrator.
 	// The real assertion is in service/crypto_orchestrator_impl.go:
-	//   var _ CryptoOrchestrator = (*cryptoOrchestrator)(nil)
+	//   var _ service.CryptoOrchestrator = (*cryptoOrchestrator)(nil)
 	// From service_test, we verify via the constructor return type.
 	ops := setupCryptoOrchestrator(t)
 	if ops == nil {
-		t.Fatal("expected non-nil CryptoOrchestrator from constructor")
+		t.Fatal("expected non-nil service.CryptoOrchestrator from constructor")
 	}
 }

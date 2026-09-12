@@ -1,10 +1,12 @@
-package service
+package service_test
 
 import (
 	"context"
 	"fmt"
 	"math/rand"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -22,7 +24,7 @@ import (
 )
 
 // ============================================================================
-// NewKeyOrchestrator Constructor Tests
+// service.NewKeyOrchestrator Constructor Tests
 // ============================================================================
 
 // allDeps creates a full set of valid dependencies for the constructor.
@@ -53,18 +55,18 @@ func allDeps(t *testing.T) (corekey.Repository, coretemplate.Registry, provider.
 
 func TestNewKeyOrchestrator_allDependencies_succeeds(t *testing.T) {
 	repo, reg, prov, pol := allDeps(t)
-	orch, err := NewKeyOrchestrator(repo, reg, prov, pol)
+	orch, err := service.NewKeyOrchestrator(repo, reg, prov, pol)
 	if err != nil {
-		t.Fatalf("NewKeyOrchestrator: %v", err)
+		t.Fatalf("service.NewKeyOrchestrator: %v", err)
 	}
 	if orch == nil {
-		t.Fatal("NewKeyOrchestrator returned nil")
+		t.Fatal("service.NewKeyOrchestrator returned nil")
 	}
 }
 
 func TestNewKeyOrchestrator_nilRepository_returnsError(t *testing.T) {
 	_, reg, prov, pol := allDeps(t)
-	_, err := NewKeyOrchestrator(nil, reg, prov, pol)
+	_, err := service.NewKeyOrchestrator(nil, reg, prov, pol)
 	if err == nil {
 		t.Fatal("expected error for nil repository")
 	}
@@ -72,7 +74,7 @@ func TestNewKeyOrchestrator_nilRepository_returnsError(t *testing.T) {
 
 func TestNewKeyOrchestrator_nilTemplateRegistry_returnsError(t *testing.T) {
 	repo, _, prov, pol := allDeps(t)
-	_, err := NewKeyOrchestrator(repo, nil, prov, pol)
+	_, err := service.NewKeyOrchestrator(repo, nil, prov, pol)
 	if err == nil {
 		t.Fatal("expected error for nil template registry")
 	}
@@ -80,7 +82,7 @@ func TestNewKeyOrchestrator_nilTemplateRegistry_returnsError(t *testing.T) {
 
 func TestNewKeyOrchestrator_nilProviderRegistry_returnsError(t *testing.T) {
 	repo, reg, _, pol := allDeps(t)
-	_, err := NewKeyOrchestrator(repo, reg, nil, pol)
+	_, err := service.NewKeyOrchestrator(repo, reg, nil, pol)
 	if err == nil {
 		t.Fatal("expected error for nil provider registry")
 	}
@@ -88,7 +90,7 @@ func TestNewKeyOrchestrator_nilProviderRegistry_returnsError(t *testing.T) {
 
 func TestNewKeyOrchestrator_nilPolicyEngine_returnsError(t *testing.T) {
 	repo, reg, prov, _ := allDeps(t)
-	_, err := NewKeyOrchestrator(repo, reg, prov, nil)
+	_, err := service.NewKeyOrchestrator(repo, reg, prov, nil)
 	if err == nil {
 		t.Fatal("expected error for nil policy engine")
 	}
@@ -96,10 +98,10 @@ func TestNewKeyOrchestrator_nilPolicyEngine_returnsError(t *testing.T) {
 
 func TestNewKeyOrchestrator_returnsInterface(t *testing.T) {
 	repo, reg, prov, pol := allDeps(t)
-	var orch KeyOrchestrator
-	orch, err := NewKeyOrchestrator(repo, reg, prov, pol)
+	var orch service.KeyOrchestrator
+	orch, err := service.NewKeyOrchestrator(repo, reg, prov, pol)
 	if err != nil {
-		t.Fatalf("NewKeyOrchestrator: %v", err)
+		t.Fatalf("service.NewKeyOrchestrator: %v", err)
 	}
 	_ = orch // confirms the return type satisfies the interface
 }
@@ -110,21 +112,21 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 		initialScopeSpec *core.ScopeSpecification
 		wantErr          bool
 		errCode          errors.Code
-		transformSpec    TransformKeySpec
+		transformSpec    service.TransformKeySpec
 		policyRules      *corepolicy.Rules
 	}{
 		{
 			name:    "missing key name",
 			wantErr: true,
 			errCode: errors.CodeInvalidArgument,
-			transformSpec: TransformKeySpec{
+			transformSpec: service.TransformKeySpec{
 				TemplateID: "ml-dsa-65",
 			},
 		},
 		{
 			name:    "key name only",
 			wantErr: false,
-			transformSpec: TransformKeySpec{
+			transformSpec: service.TransformKeySpec{
 				KeyName: "test-key-1",
 			},
 		},
@@ -132,7 +134,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 		// 	name:             "with unchanged scope specification",
 		// 	initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
 		// 	wantErr:          false,
-		// 	transformSpec: TransformKeySpec{
+		// 	transformSpec: service.TransformKeySpec{
 		// 		KeyName:            "test-key-2",
 		// 		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
 		// 	},
@@ -142,7 +144,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
 			wantErr:          true,
 			errCode:          errors.CodeNotImplemented,
-			transformSpec: TransformKeySpec{
+			transformSpec: service.TransformKeySpec{
 				KeyName:            "test-key-2",
 				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
 			},
@@ -150,7 +152,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 		{
 			name:    "with template ID",
 			wantErr: false,
-			transformSpec: TransformKeySpec{
+			transformSpec: service.TransformKeySpec{
 				KeyName:    "test-key-3",
 				TemplateID: "ml-dsa-65",
 			},
@@ -159,7 +161,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			name:    "with retain bytes",
 			wantErr: true,
 			errCode: errors.CodeNotImplemented,
-			transformSpec: TransformKeySpec{
+			transformSpec: service.TransformKeySpec{
 				KeyName:     "test-key-4",
 				RetainBytes: true,
 			},
@@ -168,7 +170,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			name:    "failed when template ID is not allowed by policy",
 			wantErr: true,
 			errCode: errors.CodePolicyViolation,
-			transformSpec: TransformKeySpec{
+			transformSpec: service.TransformKeySpec{
 				KeyName:    "test-key-5",
 				TemplateID: "ml-dsa-65", // not allowed by policy
 			},
@@ -233,7 +235,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 	}
 }
 
-func assertMatchTransformSpec(t *testing.T, expectedSpec TransformKeySpec, v *corekey.Version, k *corekey.Key, oldVersion *corekey.Version) {
+func assertMatchTransformSpec(t *testing.T, expectedSpec service.TransformKeySpec, v *corekey.Version, k *corekey.Key, oldVersion *corekey.Version) {
 	if expectedSpec.TemplateID != "" {
 		require.Equal(t, expectedSpec.TemplateID, v.TemplateId)
 	}
@@ -247,7 +249,7 @@ func assertMatchTransformSpec(t *testing.T, expectedSpec TransformKeySpec, v *co
 		require.Equal(t, oldVersion.KeyMaterial, v.KeyMaterial)
 	}
 }
-func assertVersionConsistent(t *testing.T, expectedVersion uint32, k *corekey.Key, v *corekey.Version, md *KeyMetadata) {
+func assertVersionConsistent(t *testing.T, expectedVersion uint32, k *corekey.Key, v *corekey.Version, md *service.KeyMetadata) {
 	require.Equal(t, expectedVersion, k.CurrentVersion)
 	require.Equal(t, expectedVersion, md.Version)
 	require.Equal(t, expectedVersion, v.Version)
@@ -286,7 +288,7 @@ func TestKeyOrchestrator_TransformKey_SuccessiveTransforms(t *testing.T) {
 			k0, _ := setupFirstKeyVersion(t, ctx, keyName, keyID, providers, templates, keys, policyName, initTemplateID, initVersion, scopeSpecWithScope(t, core.ScopeSignatureStandard))
 			for i := range tt.rounds {
 				// transform the key
-				metadata, err := orch.TransformKey(ctx, TransformKeySpec{
+				metadata, err := orch.TransformKey(ctx, service.TransformKeySpec{
 					KeyName: keyName,
 				})
 				require.NoError(t, err)
@@ -322,7 +324,7 @@ func seedPolicy(t *testing.T, ctx context.Context, engine corepolicy.Engine, nam
 		_ = seedScopePolicy(t, ctx, engine, name, defaultRules)
 	}
 }
-func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadata *KeyMetadata, k *corekey.Key, v *corekey.Version) {
+func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadata *service.KeyMetadata, k *corekey.Key, v *corekey.Version) {
 	specBytes, err := metadata.ScopeSpec.Serialize(ctx)
 	require.NoError(t, err)
 	require.Equal(t, k.ScopeSpecification, specBytes)

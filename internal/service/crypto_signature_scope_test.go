@@ -1,9 +1,11 @@
-package service
+package service_test
 
 import (
 	"context"
 	"encoding/json"
 	"testing"
+
+	"github.com/agile-crypto/citius-core/service"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -12,7 +14,7 @@ import (
 	"github.com/agile-crypto/citius-core/policy"
 )
 
-// setupCryptoWithScopedKey creates a wired CryptoOrchestrator holding one
+// setupCryptoWithScopedKey creates a wired service.CryptoOrchestrator holding one
 // ml-dsa-65 key bound to the given scope.
 //
 // ml-dsa-65 is the right template for this: its catalog entry declares both a
@@ -20,7 +22,7 @@ import (
 // the same template can back a key under either scope, and the key's own
 // ScopeSpecification — fixed here at creation — is what pins down which
 // contract that key actually offers its callers.
-func setupCryptoWithScopedKey(t *testing.T, scope core.Scope) (CryptoOrchestrator, string) {
+func setupCryptoWithScopedKey(t *testing.T, scope core.Scope) (service.CryptoOrchestrator, string) {
 	t.Helper()
 	ctx := context.Background()
 	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
