@@ -9,7 +9,7 @@ import (
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/template"
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/app"
 	internaltemplate "github.com/agile-crypto/vault-storage/template"
 )

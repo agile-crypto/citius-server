@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/cloudflare/circl/sign/mldsa/mldsa65"
 )

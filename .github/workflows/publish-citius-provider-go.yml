@@ -1,0 +1,125 @@
+name: Publish citius-provider-go
+
+# Generates Go code from proto/server/provider/** and opens a PR against the
+# separate github.com/agile-crypto/citius-provider-go repo with the result.
+# That repo's only content is generated code (gen/go/**) plus a go.mod naming
+# it as a module -- no hand-written logic. citius-server stays the source of
+# truth for the .proto files (provider proto is still actively developed
+# alongside the server's own provider-related gRPC handlers); this is the one
+# place they get compiled to Go for external consumption. A human reviews and
+# merges the PR -- this workflow never pushes to citius-provider-go's main
+# branch directly.
+#
+# Scoped tag prefix (provider-v*, not v*) so this doesn't fire on citius-server's
+# own unrelated release tags.
+on:
+  push:
+    tags: ["provider-v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Generate and validate only; skip opening a PR against citius-provider-go"
+        type: boolean
+        default: true
+
+jobs:
+  publish:
+    name: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout citius-server
+        uses: actions/checkout@v6
+        with:
+          path: citius-server
+
+      - name: Setup buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: buf lint
+        working-directory: citius-server/proto
+        run: buf lint --path server/provider
+
+      - name: buf generate
+        working-directory: citius-server/proto
+        run: buf generate --path server/provider
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+
+      - name: Assemble citius-provider-go module tree (dry run only)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run == true }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/citius-provider-go-dryrun/gen
+          cp -r citius-server/gen/go/server/provider /tmp/citius-provider-go-dryrun/gen/provider
+          cat > /tmp/citius-provider-go-dryrun/go.mod <<'EOF'
+          module github.com/agile-crypto/citius-provider-go
+
+          go 1.26
+          EOF
+          cd /tmp/citius-provider-go-dryrun
+          go mod tidy
+          go build ./...
+          echo "Dry run OK: generated tree assembled and builds at /tmp/citius-provider-go-dryrun (nothing pushed)."
+          find . -name "*.go" | sort
+
+      - name: Checkout citius-provider-go
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        uses: actions/checkout@v6
+        with:
+          repository: agile-crypto/citius-provider-go
+          token: ${{ secrets.CITIUS_PROVIDER_GO_DEPLOY_TOKEN }}
+          path: citius-provider-go
+
+      - name: Assemble citius-provider-go module tree
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        run: |
+          set -euo pipefail
+          rm -rf citius-provider-go/gen
+          mkdir -p citius-provider-go/gen
+          cp -r citius-server/gen/go/server/provider citius-provider-go/gen/provider
+          cat > citius-provider-go/go.mod <<'EOF'
+          module github.com/agile-crypto/citius-provider-go
+
+          go 1.26
+          EOF
+
+      - name: go mod tidy and build
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        working-directory: citius-provider-go
+        run: |
+          go mod tidy
+          go build ./...
+
+      - name: Open PR against citius-provider-go
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
+        working-directory: citius-provider-go
+        env:
+          GH_TOKEN: ${{ secrets.CITIUS_PROVIDER_GO_DEPLOY_TOKEN }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          BRANCH="generated/${SOURCE_REF}"
+          git config user.name "citius-provider-go-bot"
+          git config user.email "actions@github.com"
+          git checkout -b "$BRANCH"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No generated-code changes for ${SOURCE_REF}; nothing to open a PR for."
+            exit 0
+          fi
+          git commit -m "Regenerate from agile-crypto/citius-server@${SOURCE_SHA} (${SOURCE_REF})"
+          git push origin "$BRANCH" --force
+          gh pr create \
+            --repo agile-crypto/citius-provider-go \
+            --base main \
+            --head "$BRANCH" \
+            --title "Regenerate from agile-crypto/citius-server ${SOURCE_REF}" \
+            --body "Generated from agile-crypto/citius-server@${SOURCE_SHA}, tag ${SOURCE_REF}. Review the diff, then merge and tag ${SOURCE_REF#provider-} on citius-provider-go." \
+            || echo "PR for ${BRANCH} may already exist; updated the branch above."

@@ -7,7 +7,7 @@ import (
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/errors"
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 )
 
 // generateECDSAKey generates an ECDSA key pair for curve through libctx,

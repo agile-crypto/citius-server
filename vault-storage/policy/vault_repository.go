@@ -7,7 +7,7 @@ import (
 	corepolicy "github.com/agile-crypto/citius-core/policy"
 
 	"github.com/agile-crypto/citius-core/errors"
-	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	storepb "github.com/agile-crypto/citius-core/store"
 	"github.com/hashicorp/vault/sdk/logical"
 	"google.golang.org/protobuf/proto"
 )

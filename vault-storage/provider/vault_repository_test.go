@@ -7,7 +7,7 @@ import (
 	coreprovider "github.com/agile-crypto/citius-core/provider"
 
 	"github.com/agile-crypto/citius-core/errors"
-	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	storepb "github.com/agile-crypto/citius-core/store"
 	"github.com/agile-crypto/vault-storage/provider"
 	"github.com/hashicorp/vault/sdk/logical"
 )

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/agile-crypto/citius-core/errors"
-	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
+	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 )
 

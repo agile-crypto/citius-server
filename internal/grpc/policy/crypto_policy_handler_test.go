@@ -9,7 +9,7 @@ import (
 	"context"
 	"testing"
 
-	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	storepb "github.com/agile-crypto/citius-core/store"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	core "github.com/agile-crypto/citius-core"

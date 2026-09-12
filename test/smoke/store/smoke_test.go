@@ -9,7 +9,7 @@ import (
 
 	protovalidate "buf.build/go/protovalidate"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
-	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
+	storepb "github.com/agile-crypto/citius-core/store"
 	"google.golang.org/protobuf/proto"
 )
 
