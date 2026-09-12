@@ -27,7 +27,7 @@ import (
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/agile-crypto/citius-server/internal/service"
 	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/agile-crypto/vault-storage/template"
 )
 
 // ============================================================================

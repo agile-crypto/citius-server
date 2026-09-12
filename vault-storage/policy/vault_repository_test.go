@@ -7,7 +7,7 @@ import (
 	corepolicy "github.com/agile-crypto/citius-core/policy"
 
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-server/internal/policy"
+	"github.com/agile-crypto/vault-storage/policy"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 

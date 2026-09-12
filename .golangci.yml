@@ -53,11 +53,11 @@ linters:
             - google.golang.org/grpc/codes
         # ── Sibling bounded-context isolation ─────────────────────
         # Each domain package lists the sibling core packages it must NOT
-        # import. These pin core/<domain> (moved there in item 4.4), not
-        # internal/<domain> — the internal/ counterparts are now thin Vault
-        # adapters that can't meaningfully violate bounded-context isolation,
-        # and core/ has no module dependency on citius-server's internal/
-        # service/app/storage layers at all, so those denies are dropped as
+        # import. These pin core/<domain> (the port, moved there in item 4.4),
+        # not the Vault adapters (vault_repository.go/vault_registry.go, moved
+        # to the separate vault-storage module in 4.5) — core/ has no module
+        # dependency on citius-server's internal/ service/app/storage layers,
+        # or on vault-storage, at all, so denies for those are dropped as
         # structurally unreachable rather than kept as dead rules.
         policy-no-siblings:
           list-mode: lax

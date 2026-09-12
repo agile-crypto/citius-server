@@ -8,7 +8,7 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
 	coretemplate "github.com/agile-crypto/citius-core/template"
-	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/agile-crypto/vault-storage/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 

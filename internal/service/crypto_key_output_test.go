@@ -12,10 +12,10 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-server/gen/go/server/provider"
-	"github.com/agile-crypto/citius-server/internal/key"
-	"github.com/agile-crypto/citius-server/internal/policy"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/template"
+	"github.com/agile-crypto/vault-storage/key"
+	"github.com/agile-crypto/vault-storage/policy"
+	"github.com/agile-crypto/vault-storage/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 

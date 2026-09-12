@@ -8,7 +8,7 @@ import (
 
 	"github.com/agile-crypto/citius-core/errors"
 	storepb "github.com/agile-crypto/citius-server/gen/go/server/store"
-	"github.com/agile-crypto/citius-server/internal/provider"
+	"github.com/agile-crypto/vault-storage/provider"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
