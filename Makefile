@@ -86,8 +86,8 @@ _hooks-check:
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
-build: ## Compile all internal packages (+ citius-core, vault-storage, via the go.work workspace)
-	go build ./internal/... ./core/... ./vault-storage/...
+build: ## Compile all internal packages (+ vault-storage, via the go.work workspace)
+	go build ./internal/... ./vault-storage/...
 
 # ---------------------------------------------------------------------------
 # Run the gRPC server
@@ -111,13 +111,13 @@ run-dev: ## Run the gRPC server via 'go run' (no build artefact)
 # Test
 # ---------------------------------------------------------------------------
 test: ## Run all unit tests (no race detector)
-	go test ./internal/... ./core/... ./vault-storage/... -count=1
+	go test ./internal/... ./vault-storage/... -count=1
 
 test-race: ## Run all unit tests with the race detector
-	go test ./internal/... ./core/... ./vault-storage/... -race -count=1
+	go test ./internal/... ./vault-storage/... -race -count=1
 
 test-cover: ## Run tests and generate HTML coverage report
-	go test ./internal/... ./core/... ./vault-storage/... -coverprofile=coverage.out -count=1
+	go test ./internal/... ./vault-storage/... -coverprofile=coverage.out -count=1
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
@@ -130,19 +130,19 @@ smoke: ## Run smoke tests under test/smoke/...
 # ---------------------------------------------------------------------------
 # Static analysis
 # ---------------------------------------------------------------------------
-vet: ## Run 'go vet' on all internal packages (+ citius-core, vault-storage)
-	go vet ./internal/... ./core/... ./vault-storage/...
+vet: ## Run 'go vet' on all internal packages (+ vault-storage)
+	go vet ./internal/... ./vault-storage/...
 
 lint: lint-go lint-proto ## Run all linters (Go + proto)
 
-lint-go: ## Run golangci-lint on the whole module + citius-core + vault-storage (gen/ excluded via .golangci.yml)
+lint-go: ## Run golangci-lint on the whole module + vault-storage (gen/ excluded via .golangci.yml)
 	golangci-lint run ./...
-	# `./...` from the root never crosses into core/ or vault-storage/ (separate
-	# modules) even under go.work, so lint them as their own invocations.
-	# golangci-lint walks up parent directories for config, so both still run
-	# against .golangci.yml at the repo root (confirmed: reports "Used config
-	# file ../.golangci.yml").
-	cd core && golangci-lint run ./...
+	# `./...` from the root never crosses into vault-storage/ (a separate module)
+	# even under go.work, so lint it as its own invocation. golangci-lint walks
+	# up parent directories for config, so it still runs against .golangci.yml
+	# at the repo root (confirmed: reports "Used config file ../.golangci.yml").
+	# citius-core is no longer part of this repo (published externally,
+	# §7) -- linting it is that repo's own responsibility now.
 	cd vault-storage && golangci-lint run ./...
 
 lint-proto: ## Run 'buf lint' on the proto tree
