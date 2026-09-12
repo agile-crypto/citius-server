@@ -2,7 +2,6 @@ package key
 
 import (
 	"context"
-	"fmt"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
@@ -16,12 +15,6 @@ import (
 // external callers access material only through KeyOrchestrator.GetKeyWithMaterial.
 type Version struct {
 	*storepb.KeyVersion
-}
-
-const versionSep string = ":"
-
-func defaultKeyVersionID(keyID string, version uint32) string {
-	return fmt.Sprintf("%s%s%d", keyID, versionSep, version)
 }
 
 // NewVersion creates a new [Version] with the given parameters.
