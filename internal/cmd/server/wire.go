@@ -62,6 +62,11 @@ type Config struct {
 // authorization should use AllowAllKeyNames() / AllowAllPolicyNames() instead.
 //
 // A change to SQL or remote storage would be a change to the wiring here, not to the gRPC handlers or the domain services.
+//
+// TODO(embed): embed.Core (citius-server/embed) calls this with no way to
+// override the InmemStorage below, so every embedded Core is ephemeral --
+// state is lost when the embedding process exits. Acceptable for now; needs
+// a real option once an embedding application wants persistence.
 func WireFactorySet(ctx context.Context, cfg Config) (FactorySet, error) {
 	const op engerr.Op = "server.WireFactorySet"
 	store := &logical.InmemStorage{}
