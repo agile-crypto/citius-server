@@ -9,7 +9,6 @@ import (
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-server/embed"
-	server "github.com/agile-crypto/citius-server/internal/cmd/server"
 )
 
 // catalogPath returns the absolute path to standard_algorithms.json.
@@ -27,8 +26,8 @@ func TestNew_CreateKey_Sign_Verify(t *testing.T) {
 	ctx := context.Background()
 
 	core, err := embed.New(ctx, embed.Config{
-		Config: server.Config{CatalogPath: catalogPath()},
-		Services: server.Services{
+		CatalogPath: catalogPath(),
+		Services: embed.Services{
 			KeyManagement: true,
 			Crypto:        true,
 			CryptoPolicy:  true,
@@ -111,8 +110,8 @@ func TestNew_CreateKey_Sign_Verify(t *testing.T) {
 func TestNew_UnselectedServiceIsNil(t *testing.T) {
 	ctx := context.Background()
 	core, err := embed.New(ctx, embed.Config{
-		Config:   server.Config{CatalogPath: catalogPath()},
-		Services: server.Services{KeyManagement: true},
+		CatalogPath: catalogPath(),
+		Services:    embed.Services{KeyManagement: true},
 	})
 	if err != nil {
 		t.Fatalf("embed.New: %v", err)

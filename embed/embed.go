@@ -2,11 +2,11 @@
 // use by an embedding Go program — most notably go-sdk's embedded submodule.
 //
 // Unlike internal/cmd/server, this package is not internal/: it is the
-// stable, public boundary a caller outside this module builds against. It
-// deliberately exposes handlers typed as citius-api-go's generated server
-// interfaces, not citius-server's internal concrete handler types, so a
-// caller depends only on the proto-derived shape, never on how a handler is
-// constructed or wired internally.
+// stable, public boundary a caller outside this module builds against. Every
+// exported type here is either a plain value type owned by this package or a
+// citius-api-go-generated proto/service type — never a type named in
+// internal/cmd/server — so a caller never needs to (and, being outside this
+// module, cannot) name an internal/ type to use this package.
 //
 // There is no gRPC transport involved here: Core's accessors return the
 // handler values directly, for a caller to invoke as plain Go method calls.
@@ -23,8 +23,29 @@ import (
 // plus the same wiring knobs internal/cmd/server.Config exposes (catalog
 // path, FIPS config).
 type Config struct {
-	server.Config
-	Services server.Services
+	// CatalogPath is the path to the proto-JSON standard_algorithms.json
+	// file. When empty, no catalog is loaded (useful for testing).
+	CatalogPath string
+
+	// FIPSConfigPath is an OpenSSL config activating the fips provider; see
+	// internal/cmd/server.Config's doc comment for the exact shape
+	// required. When empty, no FIPS provider instance is registered.
+	FIPSConfigPath string
+
+	// Services selects which handlers New builds.
+	Services Services
+}
+
+// Services selects which per-service handlers Core exposes. The zero value
+// selects none.
+type Services struct {
+	KeyManagement    bool
+	Crypto           bool
+	CryptoPolicy     bool
+	Discovery        bool
+	Provider         bool
+	KeyEstablishment bool
+	Streaming        bool
 }
 
 // Core holds the handlers built for an embedded deployment. A nil accessor
@@ -37,11 +58,22 @@ type Core struct {
 // produces, with handlers constructed directly (server.BuildHandlers)
 // rather than registered onto a grpc.ServiceRegistrar.
 func New(ctx context.Context, cfg Config) (*Core, error) {
-	factorySet, err := server.WireFactorySet(ctx, cfg.Config)
+	factorySet, err := server.WireFactorySet(ctx, server.Config{
+		CatalogPath:    cfg.CatalogPath,
+		FIPSConfigPath: cfg.FIPSConfigPath,
+	})
 	if err != nil {
 		return nil, err
 	}
-	handlers, err := server.BuildHandlers(ctx, cfg.Services, factorySet)
+	handlers, err := server.BuildHandlers(ctx, server.Services{
+		KeyManagement:    cfg.Services.KeyManagement,
+		Crypto:           cfg.Services.Crypto,
+		CryptoPolicy:     cfg.Services.CryptoPolicy,
+		Discovery:        cfg.Services.Discovery,
+		Provider:         cfg.Services.Provider,
+		KeyEstablishment: cfg.Services.KeyEstablishment,
+		Streaming:        cfg.Services.Streaming,
+	}, factorySet)
 	if err != nil {
 		return nil, err
 	}
