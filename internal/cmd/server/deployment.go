@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
@@ -179,69 +180,122 @@ func (s Services) anyEnabled() bool {
 		s.Provider || s.KeyEstablishment || s.Streaming
 }
 
-// RegisterAll registers exactly the services selected in s, building each
-// handler from the factories it needs — one call per service package.
+// Handlers is the full-server bundle of constructed per-service handlers,
+// returned by BuildHandlers. A nil field means that service was not selected
+// in the Services passed to BuildHandlers.
 //
-// It calls Validate first, so a misconfigured deployment fails here rather than
-// on its first RPC. ctx is used only to build errors during construction; it is
-// not retained by any handler.
+// Each field is typed as the stable, citius-api-go-generated server
+// interface for that service, not the concrete handler struct — so a
+// consumer (e.g. the embed package) depends only on the proto-derived
+// boundary, not on citius-server's internal handler construction details.
+type Handlers struct {
+	KeyManagement    servicespb.KeyManagementServiceServer
+	Crypto           servicespb.CryptoServiceServer
+	CryptoPolicy     servicespb.CryptoPolicyServiceServer
+	Discovery        servicespb.AlgorithmDiscoveryServiceServer
+	Provider         servicespb.ProviderServiceServer
+	KeyEstablishment servicespb.KeyEstablishmentServiceServer
+	Streaming        servicespb.StreamingCryptoServiceServer
+}
+
+// BuildHandlers constructs exactly the per-service handlers selected in s,
+// building each from the factories it needs — one call per service package.
+// It calls Validate first, so a misconfigured deployment fails here rather
+// than on first use. ctx is used only to build errors during construction;
+// it is not retained by any handler.
+//
+// This is the shared construction logic behind both RegisterAll (gRPC
+// transport) and the embed package (in-process, direct-call transport) —
+// the two differ only in what they do with the resulting handlers.
 //
 // Exhaustive iteration yields a high cognitive and cyclomatic complexity score, so this function is exempted from that linter check.
 //
 //nolint:gocognit,cyclop
-func RegisterAll(ctx context.Context, reg grpc.ServiceRegistrar, s Services, f FactorySet) error {
+func BuildHandlers(ctx context.Context, s Services, f FactorySet) (*Handlers, error) {
 	if err := s.Validate(f); err != nil {
-		return engerr.Wrap(ctx, registerOp, err)
+		return nil, engerr.Wrap(ctx, registerOp, err)
 	}
 
+	var handlers Handlers
 	if s.KeyManagement {
 		h, err := keygrpc.New(ctx, f.Keys, f.AuthorizeKey, f.AuthorizePolicy)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		keygrpc.Register(reg, h)
+		handlers.KeyManagement = h
 	}
 	if s.Crypto {
 		h, err := cryptogrpc.New(ctx, f.Crypto, f.AuthorizeKey)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		cryptogrpc.Register(reg, h)
+		handlers.Crypto = h
 	}
 	if s.CryptoPolicy {
 		h, err := policygrpc.New(ctx, f.Policy, f.AuthorizePolicy)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		policygrpc.Register(reg, h)
+		handlers.CryptoPolicy = h
 	}
 	if s.Discovery {
 		h, err := discogrpc.New(ctx, f.Templates)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		discogrpc.Register(reg, h)
+		handlers.Discovery = h
 	}
 	if s.Provider {
 		h, err := providergrpc.New(ctx, f.Catalog, f.Instances)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		providergrpc.Register(reg, h)
+		handlers.Provider = h
 	}
 	if s.KeyEstablishment {
 		h, err := keyestgrpc.New(ctx, f.Crypto, f.Keys)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		keyestgrpc.Register(reg, h)
+		handlers.KeyEstablishment = h
 	}
 	if s.Streaming {
 		h, err := streamgrpc.New(ctx, f.Crypto)
 		if err != nil {
-			return engerr.Wrap(ctx, registerOp, err)
+			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
-		streamgrpc.Register(reg, h)
+		handlers.Streaming = h
+	}
+	return &handlers, nil
+}
+
+// RegisterAll registers exactly the services selected in s onto reg, building
+// each handler via BuildHandlers.
+func RegisterAll(ctx context.Context, reg grpc.ServiceRegistrar, s Services, f FactorySet) error {
+	handlers, err := BuildHandlers(ctx, s, f)
+	if err != nil {
+		return err
+	}
+	if handlers.KeyManagement != nil {
+		servicespb.RegisterKeyManagementServiceServer(reg, handlers.KeyManagement)
+	}
+	if handlers.Crypto != nil {
+		servicespb.RegisterCryptoServiceServer(reg, handlers.Crypto)
+	}
+	if handlers.CryptoPolicy != nil {
+		servicespb.RegisterCryptoPolicyServiceServer(reg, handlers.CryptoPolicy)
+	}
+	if handlers.Discovery != nil {
+		servicespb.RegisterAlgorithmDiscoveryServiceServer(reg, handlers.Discovery)
+	}
+	if handlers.Provider != nil {
+		servicespb.RegisterProviderServiceServer(reg, handlers.Provider)
+	}
+	if handlers.KeyEstablishment != nil {
+		servicespb.RegisterKeyEstablishmentServiceServer(reg, handlers.KeyEstablishment)
+	}
+	if handlers.Streaming != nil {
+		servicespb.RegisterStreamingCryptoServiceServer(reg, handlers.Streaming)
 	}
 	return nil
 }
