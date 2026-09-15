@@ -48,8 +48,8 @@ func TestLoadACLRetainsLegacyMachineUserBehavior(t *testing.T) {
 	if acl.WebApplication != nil {
 		t.Fatal("legacy ACL unexpectedly contains a Web application")
 	}
-	if _, err := acl.usersForMachineProvisioning(); err != nil {
-		t.Fatalf("legacy ACL should remain provisionable: %v", err)
+	if web := acl.webApplicationInput(); web != nil {
+		t.Fatalf("legacy ACL unexpectedly produced Web application input: %#v", web)
 	}
 }
 
@@ -262,13 +262,21 @@ func TestLoadACLAllowsDevelopmentHTTPOnlyOnLoopback(t *testing.T) {
 	}
 }
 
-func TestHumanConfigurationIsNotSilentlyMachineProvisioned(t *testing.T) {
+func TestHumanConfigurationConvertsToAdminInputs(t *testing.T) {
 	acl, err := loadACLText(t, validHumanACL)
 	if err != nil {
 		t.Fatalf("load ACL: %v", err)
 	}
-	if _, err := acl.usersForMachineProvisioning(); err == nil {
-		t.Fatal("human configuration was accepted by the machine provisioner")
+	web := acl.webApplicationInput()
+	if web == nil || web.Name != "citius-ui" || len(web.RedirectURIs) != 1 {
+		t.Fatalf("unexpected Web application input: %#v", web)
+	}
+	human := acl.HumanUsers[0].onboardInput("initial-secret")
+	if human.Username != "alice" || human.InitialPassword != "initial-secret" {
+		t.Fatalf("unexpected human onboard input: %#v", human)
+	}
+	if !human.EmailVerified || human.PasswordChangeRequired {
+		t.Fatalf("unexpected human flags: %#v", human)
 	}
 }
 

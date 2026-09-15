@@ -174,15 +174,21 @@ func appendACLUser(
 	return nil
 }
 
-func (a *parsedACL) usersForMachineProvisioning() ([]admin.OnboardInput, error) {
-	if len(a.HumanUsers) != 0 || a.WebApplication != nil {
-		return nil, fmt.Errorf("ACL contains human login configuration; this command only provisions machine users")
-	}
-	return a.MachineUsers, nil
-}
-
 func (a *parsedACL) userCount() int {
 	return len(a.MachineUsers) + len(a.HumanUsers)
+}
+
+func (a *parsedACL) webApplicationInput() *admin.WebApplicationInput {
+	if a.WebApplication == nil {
+		return nil
+	}
+	return &admin.WebApplicationInput{
+		Name:                   a.WebApplication.Name,
+		RedirectURIs:           append([]string(nil), a.WebApplication.RedirectURIs...),
+		PostLogoutRedirectURIs: append([]string(nil), a.WebApplication.PostLogoutRedirectURIs...),
+		EnableRefreshTokens:    a.WebApplication.EnableRefreshTokens,
+		DevMode:                a.WebApplication.DevMode,
+	}
 }
 
 func validateMachineUser(u aclUser) error {
@@ -269,6 +275,28 @@ func humanACLInput(u aclUser, permissions []string) aclHumanUser {
 		Permissions:            permissions,
 		KeyAccess:              keyAccess(u.KeyAccess),
 		PolicyAccess:           policyAccess(u.PolicyAccess),
+	}
+}
+
+func (u aclHumanUser) onboardInput(initialPassword string) admin.HumanOnboardInput {
+	return admin.HumanOnboardInput{
+		Username:               u.Username,
+		DisplayName:            u.DisplayName,
+		GivenName:              u.GivenName,
+		FamilyName:             u.FamilyName,
+		Email:                  u.Email,
+		EmailVerified:          u.EmailVerified,
+		InitialPassword:        initialPassword,
+		PasswordChangeRequired: u.PasswordChangeRequired,
+		Permissions:            append([]string(nil), u.Permissions...),
+		KeyAccess: admin.KeyAccess{
+			AllowedKeyPatterns: append([]string(nil), u.KeyAccess.AllowedKeyPatterns...),
+			DenyKeyPatterns:    append([]string(nil), u.KeyAccess.DenyKeyPatterns...),
+		},
+		PolicyAccess: admin.PolicyAccess{
+			AllowedPolicyPatterns: append([]string(nil), u.PolicyAccess.AllowedPolicyPatterns...),
+			DenyPolicyPatterns:    append([]string(nil), u.PolicyAccess.DenyPolicyPatterns...),
+		},
 	}
 }
 

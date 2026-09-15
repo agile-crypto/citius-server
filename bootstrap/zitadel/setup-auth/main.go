@@ -12,9 +12,9 @@
 //	    citius-zitadel.env.
 //
 //	setup-auth users    -acl PATH [-dry-run]
-//	   Onboard users only, reusing the project_id from existing
-//	   ../generated-config.json. Use this for incremental ACL edits
-//	   when the project + catalog are already provisioned.
+//	   Reconcile the optional Web application and onboard users, reusing
+//	   the project_id from existing ../generated-config.json. Use this for
+//	   incremental ACL edits when the project + catalog already exist.
 //
 // Required environment for `apply` and `users`:
 //
@@ -22,6 +22,7 @@
 //	ZITADEL_DOMAIN          - default citius-auth.localhost
 //	ZITADEL_PORT            - default 443
 //	ZITADEL_INSECURE        - "true" to disable TLS (local-only)
+//	<password_env>          - each human user's initial password variable
 //
 // The CLI is a separate Go module (see go.mod) so bootstrap-only deps
 // (yaml, the Zitadel admin SDK) don't pollute the main citius-server build.
@@ -101,13 +102,14 @@ Usage:
 Commands:
   validate   Parse and validate an ACL file. No network calls.
   apply      Bootstrap project + RPC catalog, then onboard users from ACL.
-  users      Onboard users from ACL against an already-bootstrapped project.
+  users      Reconcile the Web app and users against an existing project.
 
 Environment (apply, users):
   ZITADEL_ADMIN_PAT  required - PAT with org/project owner scope
   ZITADEL_DOMAIN     default citius-auth.localhost
   ZITADEL_PORT       default 443
   ZITADEL_INSECURE   "true" to disable TLS (local-only)
+  <password_env>     each human user's initial password variable
 
 Default ACL path: %s
 `, defaultACL)
@@ -161,11 +163,6 @@ func runApply(args []string) int {
 		log.Printf("apply: %v", err)
 		return 1
 	}
-	users, err := acl.usersForMachineProvisioning()
-	if err != nil {
-		log.Printf("apply: %v", err)
-		return 1
-	}
 
 	pat := mustEnv("ZITADEL_ADMIN_PAT")
 	domain := envOr("ZITADEL_DOMAIN", "citius-auth.localhost")
@@ -185,8 +182,9 @@ func runApply(args []string) int {
 	defer func() { _ = bs.Close() }()
 
 	if *dryRun {
-		log.Printf("dry-run: would bootstrap project %q with %d operations and onboard %d user(s)",
-			projectName, len(citiusOperations()), len(users))
+		log.Printf("dry-run: would bootstrap project %q with %d operations, reconcile_web=%t, and onboard %d machine plus %d human user(s)",
+			projectName, len(citiusOperations()), acl.WebApplication != nil,
+			len(acl.MachineUsers), len(acl.HumanUsers))
 		return 0
 	}
 
@@ -201,16 +199,19 @@ func runApply(args []string) int {
 	}
 	log.Printf("project provisioned: id=%s api_app_client_id=%s", res.ProjectID, res.APIApp.ClientID)
 
-	onboarded, rc := onboardAll(ctx, domain, port, insecure, pat, res.ProjectID, users)
-	if rc != 0 {
-		return rc
+	identities, err := reconcileIdentities(ctx, domain, port, insecure, pat, res.ProjectID, acl)
+	if err != nil {
+		log.Printf("reconcile identities: %v", err)
+		return 1
 	}
 
 	out := generatedConfig{
-		ProjectID: res.ProjectID,
-		ActionID:  res.ActionID,
-		APIApp:    res.APIApp,
-		Users:     onboarded,
+		ProjectID:      res.ProjectID,
+		ActionID:       res.ActionID,
+		APIApp:         res.APIApp,
+		WebApplication: identities.WebApplication,
+		Users:          identities.MachineUsers,
+		HumanUsers:     identities.HumanUsers,
 	}
 	if err := writeGeneratedConfig(out); err != nil {
 		log.Printf("write %s: %v", generatedConfigPath, err)
@@ -238,11 +239,6 @@ func runUsers(args []string) int {
 		log.Printf("users: %v", err)
 		return 1
 	}
-	users, err := acl.usersForMachineProvisioning()
-	if err != nil {
-		log.Printf("users: %v", err)
-		return 1
-	}
 
 	existing, err := readGeneratedConfig()
 	if err != nil {
@@ -259,13 +255,15 @@ func runUsers(args []string) int {
 	defer cancel()
 
 	if *dryRun {
-		log.Printf("dry-run: would onboard %d user(s) into project %s", len(users), existing.ProjectID)
+		log.Printf("dry-run: would reconcile_web=%t and onboard %d machine plus %d human user(s) into project %s",
+			acl.WebApplication != nil, len(acl.MachineUsers), len(acl.HumanUsers), existing.ProjectID)
 		return 0
 	}
 
-	onboarded, rc := onboardAll(ctx, domain, port, insecure, pat, existing.ProjectID, users)
-	if rc != 0 {
-		return rc
+	identities, err := reconcileIdentities(ctx, domain, port, insecure, pat, existing.ProjectID, acl)
+	if err != nil {
+		log.Printf("reconcile identities: %v", err)
+		return 1
 	}
 
 	// Merge over any users that disappeared from the ACL but stay in the
@@ -274,8 +272,17 @@ func runUsers(args []string) int {
 	if existing.Users == nil {
 		existing.Users = map[string]admin.OnboardResult{}
 	}
-	for k, v := range onboarded {
+	for k, v := range identities.MachineUsers {
 		existing.Users[k] = v
+	}
+	if existing.HumanUsers == nil {
+		existing.HumanUsers = map[string]admin.HumanOnboardResult{}
+	}
+	for k, v := range identities.HumanUsers {
+		existing.HumanUsers[k] = v
+	}
+	if identities.WebApplication != nil {
+		existing.WebApplication = identities.WebApplication
 	}
 	if err := writeGeneratedConfig(*existing); err != nil {
 		log.Printf("write %s: %v", generatedConfigPath, err)
@@ -289,47 +296,96 @@ func runUsers(args []string) int {
 // shared
 // ---------------------------------------------------------------------------
 
-// onboardAll opens an org-scoped admin client (ProjectID set) and runs
-// Onboard for each user. On the first failure it logs and returns a
-// non-zero rc; the partial result is discarded by the caller because a
-// half-provisioned ACL is worse than none.
-func onboardAll(
+type identityAdmin interface {
+	EnsureWebApplication(context.Context, admin.WebApplicationInput) (*admin.WebApplicationResult, error)
+	Onboard(context.Context, admin.OnboardInput) (*admin.OnboardResult, error)
+	OnboardHuman(context.Context, admin.HumanOnboardInput) (*admin.HumanOnboardResult, error)
+}
+
+type identityResults struct {
+	WebApplication *admin.WebApplicationResult
+	MachineUsers   map[string]admin.OnboardResult
+	HumanUsers     map[string]admin.HumanOnboardResult
+}
+
+func reconcileIdentities(
 	ctx context.Context,
 	domain, port string,
 	insecure bool,
 	pat, projectID string,
-	users []admin.OnboardInput,
-) (map[string]admin.OnboardResult, int) {
-	on, err := admin.NewClient(ctx, admin.Config{
+	acl *parsedACL,
+) (*identityResults, error) {
+	client, err := admin.NewClient(ctx, admin.Config{
 		Domain: domain, Port: port, Insecure: insecure, PAT: pat,
 		Namespace: claimNamespace, ProjectID: projectID,
 	})
 	if err != nil {
-		log.Printf("admin.NewClient (onboard): %v", err)
-		return nil, 1
+		return nil, fmt.Errorf("admin.NewClient: %w", err)
 	}
-	defer func() { _ = on.Close() }()
+	defer func() { _ = client.Close() }()
+	return reconcileIdentityResources(ctx, client, acl)
+}
 
-	out := make(map[string]admin.OnboardResult, len(users))
-	for _, spec := range users {
-		u, err := on.Onboard(ctx, spec)
+func reconcileIdentityResources(ctx context.Context, client identityAdmin, acl *parsedACL) (*identityResults, error) {
+	humanInputs, err := resolveHumanInputs(acl.HumanUsers)
+	if err != nil {
+		return nil, err
+	}
+	out := &identityResults{
+		MachineUsers: make(map[string]admin.OnboardResult, len(acl.MachineUsers)),
+		HumanUsers:   make(map[string]admin.HumanOnboardResult, len(acl.HumanUsers)),
+	}
+	if web := acl.webApplicationInput(); web != nil {
+		result, err := client.EnsureWebApplication(ctx, *web)
 		if err != nil {
-			log.Printf("onboard %s: %v", spec.Username, err)
-			return nil, 1
+			return nil, fmt.Errorf("ensure Web application %q: %w", web.Name, err)
+		}
+		log.Printf("reconciled Web application: %s (client_id=%s created=%t updated=%t)",
+			web.Name, result.ClientID, result.Created, result.Updated)
+		out.WebApplication = result
+	}
+
+	for _, spec := range acl.MachineUsers {
+		u, err := client.Onboard(ctx, spec)
+		if err != nil {
+			return nil, fmt.Errorf("onboard machine user %q: %w", spec.Username, err)
 		}
 		log.Printf("onboarded service user: %s (client_id=%s)", spec.Username, u.ClientID)
-		out[spec.Username] = *u
+		out.MachineUsers[spec.Username] = *u
 	}
-	return out, 0
+
+	for _, spec := range humanInputs {
+		u, err := client.OnboardHuman(ctx, spec)
+		if err != nil {
+			return nil, fmt.Errorf("onboard human user %q: %w", spec.Username, err)
+		}
+		log.Printf("onboarded human user: %s (login_name=%s created=%t)", spec.Username, u.LoginName, u.Created)
+		out.HumanUsers[spec.Username] = *u
+	}
+	return out, nil
+}
+
+func resolveHumanInputs(specs []aclHumanUser) ([]admin.HumanOnboardInput, error) {
+	out := make([]admin.HumanOnboardInput, 0, len(specs))
+	for _, spec := range specs {
+		password := os.Getenv(spec.PasswordEnv)
+		if password == "" {
+			return nil, fmt.Errorf("required password env var %s for human user %q is empty", spec.PasswordEnv, spec.Username)
+		}
+		out = append(out, spec.onboardInput(password))
+	}
+	return out, nil
 }
 
 // generatedConfig is the on-disk shape of generated-config.json.
 // bootstrap.sh slices this file into citius-zitadel.env.
 type generatedConfig struct {
-	ProjectID string                         `json:"project_id"`
-	ActionID  string                         `json:"action_id"`
-	APIApp    admin.AppCredentials           `json:"api_app"`
-	Users     map[string]admin.OnboardResult `json:"users"`
+	ProjectID      string                              `json:"project_id"`
+	ActionID       string                              `json:"action_id"`
+	APIApp         admin.AppCredentials                `json:"api_app"`
+	WebApplication *admin.WebApplicationResult         `json:"web_application,omitempty"`
+	Users          map[string]admin.OnboardResult      `json:"users"`
+	HumanUsers     map[string]admin.HumanOnboardResult `json:"human_users,omitempty"`
 }
 
 func writeGeneratedConfig(c generatedConfig) error {
