@@ -191,6 +191,22 @@ func (a *parsedACL) webApplicationInput() *admin.WebApplicationInput {
 	}
 }
 
+func (a *parsedACL) humanAuthConfigurationInput() (admin.HumanAuthConfigurationInput, error) {
+	web := a.webApplicationInput()
+	if web == nil {
+		return admin.HumanAuthConfigurationInput{}, fmt.Errorf("ACL does not declare a web_application")
+	}
+	humans := make([]admin.HumanConfiguration, 0, len(a.HumanUsers))
+	for _, human := range a.HumanUsers {
+		humans = append(humans, human.configuration())
+	}
+	return admin.HumanAuthConfigurationInput{
+		ClaimNamespace: claimNamespace,
+		Humans:         humans,
+		WebApplication: *web,
+	}, nil
+}
+
 func validateMachineUser(u aclUser) error {
 	if u.GivenName != "" || u.FamilyName != "" || u.Email != "" || u.EmailVerified != nil ||
 		u.PasswordEnv != "" || u.PasswordChangeRequired != nil {
@@ -287,6 +303,27 @@ func (u aclHumanUser) onboardInput(initialPassword string) admin.HumanOnboardInp
 		Email:                  u.Email,
 		EmailVerified:          u.EmailVerified,
 		InitialPassword:        initialPassword,
+		PasswordChangeRequired: u.PasswordChangeRequired,
+		Permissions:            append([]string(nil), u.Permissions...),
+		KeyAccess: admin.KeyAccess{
+			AllowedKeyPatterns: append([]string(nil), u.KeyAccess.AllowedKeyPatterns...),
+			DenyKeyPatterns:    append([]string(nil), u.KeyAccess.DenyKeyPatterns...),
+		},
+		PolicyAccess: admin.PolicyAccess{
+			AllowedPolicyPatterns: append([]string(nil), u.PolicyAccess.AllowedPolicyPatterns...),
+			DenyPolicyPatterns:    append([]string(nil), u.PolicyAccess.DenyPolicyPatterns...),
+		},
+	}
+}
+
+func (u aclHumanUser) configuration() admin.HumanConfiguration {
+	return admin.HumanConfiguration{
+		Username:               u.Username,
+		DisplayName:            u.DisplayName,
+		GivenName:              u.GivenName,
+		FamilyName:             u.FamilyName,
+		Email:                  u.Email,
+		EmailVerified:          u.EmailVerified,
 		PasswordChangeRequired: u.PasswordChangeRequired,
 		Permissions:            append([]string(nil), u.Permissions...),
 		KeyAccess: admin.KeyAccess{

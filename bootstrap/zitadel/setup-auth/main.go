@@ -1,4 +1,4 @@
-// Package main is the Citius bootstrap CLI for Zitadel. It owns three
+// Package main is the Citius bootstrap CLI for Zitadel. It owns four
 // commands:
 //
 //	setup-auth validate -acl PATH
@@ -7,22 +7,27 @@
 //
 //	setup-auth apply    -acl PATH [-dry-run]
 //	    Bootstrap the citius-api project and per-RPC permission catalog
-//	    (idempotent), then onboard every user in the ACL. Writes the same
-//	    ../generated-config.json that bootstrap.sh slices into
-//	    citius-zitadel.env.
+//	    (idempotent), then onboard every user in the ACL. Writes the secret
+//	    ../generated-config.json used by bootstrap.sh and, when a Web app is
+//	    declared, the non-secret ../citius-ui-auth.json.
 //
 //	setup-auth users    -acl PATH [-dry-run]
 //	   Reconcile the optional Web application and onboard users, reusing
 //	   the project_id from existing ../generated-config.json. Use this for
 //	   incremental ACL edits when the project + catalog already exist.
 //
-// Required environment for `apply` and `users`:
+//	setup-auth verify   -acl PATH
+//	   Compare the declared human-login configuration with Zitadel using
+//	   read-only APIs and report any drift.
+//
+// Required environment for `apply`, `users`, and `verify`:
 //
 //	ZITADEL_ADMIN_PAT       - PAT with org-owner / project-owner scope
 //	ZITADEL_DOMAIN          - default citius-auth.localhost
 //	ZITADEL_PORT            - default 443
 //	ZITADEL_INSECURE        - "true" to disable TLS (local-only)
 //	<password_env>          - each human user's initial password variable
+//	                          (`apply` and `users` only)
 //
 // The CLI is a separate Go module (see go.mod) so bootstrap-only deps
 // (yaml, the Zitadel admin SDK) don't pollute the main citius-server build.
@@ -34,8 +39,11 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/agile-crypto/zitadel-grpc-auth/admin"
@@ -62,6 +70,10 @@ const (
 
 	// generatedConfigPath is the contract with bootstrap.sh.
 	generatedConfigPath = "../generated-config.json"
+
+	// uiAuthConfigPath is safe to provide to the UI process. It contains
+	// public OIDC coordinates and identity labels, never credentials.
+	uiAuthConfigPath = "../citius-ui-auth.json"
 )
 
 func main() {
@@ -81,6 +93,8 @@ func main() {
 		os.Exit(runApply(args))
 	case "users":
 		os.Exit(runUsers(args))
+	case "verify":
+		os.Exit(runVerify(args))
 	case "-h", "--help", "help":
 		usage()
 		os.Exit(0)
@@ -98,17 +112,21 @@ Usage:
   setup-auth validate -acl PATH
   setup-auth apply    -acl PATH [-dry-run]
   setup-auth users    -acl PATH [-dry-run]
+  setup-auth verify   -acl PATH
 
 Commands:
   validate   Parse and validate an ACL file. No network calls.
   apply      Bootstrap project + RPC catalog, then onboard users from ACL.
   users      Reconcile the Web app and users against an existing project.
+  verify     Read Zitadel configuration and report human-login drift.
 
-Environment (apply, users):
+Environment (apply, users, verify):
   ZITADEL_ADMIN_PAT  required - PAT with org/project owner scope
   ZITADEL_DOMAIN     default citius-auth.localhost
   ZITADEL_PORT       default 443
   ZITADEL_INSECURE   "true" to disable TLS (local-only)
+
+Additional environment (apply, users):
   <password_env>     each human user's initial password variable
 
 Default ACL path: %s
@@ -213,11 +231,12 @@ func runApply(args []string) int {
 		Users:          identities.MachineUsers,
 		HumanUsers:     identities.HumanUsers,
 	}
-	if err := writeGeneratedConfig(out); err != nil {
-		log.Printf("write %s: %v", generatedConfigPath, err)
+	wroteUI, err := writeBootstrapConfigs(out, acl, issuerFromEnvironment(domain, port, insecure))
+	if err != nil {
+		log.Printf("write bootstrap configuration: %v", err)
 		return 1
 	}
-	log.Printf("wrote %s", generatedConfigPath)
+	logWrittenConfigs(wroteUI)
 	return 0
 }
 
@@ -284,11 +303,68 @@ func runUsers(args []string) int {
 	if identities.WebApplication != nil {
 		existing.WebApplication = identities.WebApplication
 	}
-	if err := writeGeneratedConfig(*existing); err != nil {
-		log.Printf("write %s: %v", generatedConfigPath, err)
+	wroteUI, err := writeBootstrapConfigs(*existing, acl, issuerFromEnvironment(domain, port, insecure))
+	if err != nil {
+		log.Printf("write bootstrap configuration: %v", err)
 		return 1
 	}
-	log.Printf("wrote %s", generatedConfigPath)
+	logWrittenConfigs(wroteUI)
+	return 0
+}
+
+// ---------------------------------------------------------------------------
+// verify
+// ---------------------------------------------------------------------------
+
+func runVerify(args []string) int {
+	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
+	aclPath := fs.String("acl", defaultACL, "path to ACL file")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	loadEnv()
+	acl, err := loadACL(*aclPath)
+	if err != nil {
+		log.Printf("verify: %v", err)
+		return 1
+	}
+	existing, err := readGeneratedConfig()
+	if err != nil {
+		log.Printf("verify: %v (run `apply` first to bootstrap the project)", err)
+		return 1
+	}
+
+	pat := mustEnv("ZITADEL_ADMIN_PAT")
+	domain := envOr("ZITADEL_DOMAIN", "citius-auth.localhost")
+	port := envOr("ZITADEL_PORT", "443")
+	insecure := os.Getenv("ZITADEL_INSECURE") == "true"
+	ctx, cancel := context.WithTimeout(context.Background(), bootstrapTimeout)
+	defer cancel()
+
+	client, err := admin.NewClient(ctx, admin.Config{
+		Domain: domain, Port: port, Insecure: insecure, PAT: pat,
+		Namespace: claimNamespace, ProjectID: existing.ProjectID,
+	})
+	if err != nil {
+		log.Printf("verify: admin.NewClient: %v", err)
+		return 1
+	}
+	defer func() { _ = client.Close() }()
+
+	result, err := verifyIdentityResources(ctx, client, acl)
+	if err != nil {
+		log.Printf("verify: %v", err)
+		return 1
+	}
+	if !result.Current {
+		log.Printf("human authentication configuration has %d drift item(s)", len(result.Drift))
+		for _, drift := range result.Drift {
+			log.Printf("  %s.%s: expected=%s actual=%s", drift.Resource, drift.Field, drift.Expected, drift.Actual)
+		}
+		return 1
+	}
+	log.Printf("human authentication configuration is current for project %s", result.ProjectID)
 	return 0
 }
 
@@ -300,6 +376,10 @@ type identityAdmin interface {
 	EnsureWebApplication(context.Context, admin.WebApplicationInput) (*admin.WebApplicationResult, error)
 	Onboard(context.Context, admin.OnboardInput) (*admin.OnboardResult, error)
 	OnboardHuman(context.Context, admin.HumanOnboardInput) (*admin.HumanOnboardResult, error)
+}
+
+type identityVerifier interface {
+	VerifyHumanAuthConfiguration(context.Context, admin.HumanAuthConfigurationInput) (*admin.HumanAuthConfigurationResult, error)
 }
 
 type identityResults struct {
@@ -377,6 +457,18 @@ func resolveHumanInputs(specs []aclHumanUser) ([]admin.HumanOnboardInput, error)
 	return out, nil
 }
 
+func verifyIdentityResources(ctx context.Context, client identityVerifier, acl *parsedACL) (*admin.HumanAuthConfigurationResult, error) {
+	input, err := acl.humanAuthConfigurationInput()
+	if err != nil {
+		return nil, err
+	}
+	result, err := client.VerifyHumanAuthConfiguration(ctx, input)
+	if err != nil {
+		return nil, fmt.Errorf("verify human authentication configuration: %w", err)
+	}
+	return result, nil
+}
+
 // generatedConfig is the on-disk shape of generated-config.json.
 // bootstrap.sh slices this file into citius-zitadel.env.
 type generatedConfig struct {
@@ -386,6 +478,116 @@ type generatedConfig struct {
 	WebApplication *admin.WebApplicationResult         `json:"web_application,omitempty"`
 	Users          map[string]admin.OnboardResult      `json:"users"`
 	HumanUsers     map[string]admin.HumanOnboardResult `json:"human_users,omitempty"`
+}
+
+type uiAuthConfig struct {
+	ProjectID string                      `json:"project_id"`
+	Issuer    string                      `json:"issuer"`
+	Audience  string                      `json:"audience"`
+	WebApp    uiWebApplicationConfig      `json:"web_app"`
+	DemoUsers map[string]uiDemoUserConfig `json:"demo_users"`
+}
+
+type uiWebApplicationConfig struct {
+	ClientID               string   `json:"client_id"`
+	RedirectURIs           []string `json:"redirect_uris"`
+	PostLogoutRedirectURIs []string `json:"post_logout_redirect_uris"`
+	EnableRefreshTokens    bool     `json:"enable_refresh_tokens"`
+}
+
+type uiDemoUserConfig struct {
+	UserID      string `json:"user_id"`
+	LoginName   string `json:"login_name"`
+	DisplayName string `json:"display_name"`
+}
+
+func writeBootstrapConfigs(generated generatedConfig, acl *parsedACL, issuer string) (bool, error) {
+	ui, err := buildUIAuthConfig(generated, acl, issuer)
+	if err != nil {
+		return false, err
+	}
+	if err := writeGeneratedConfig(generated); err != nil {
+		return false, fmt.Errorf("write %s: %w", generatedConfigPath, err)
+	}
+	if ui == nil {
+		if err := os.Remove(uiAuthConfigPath); err != nil && !os.IsNotExist(err) {
+			return false, fmt.Errorf("remove stale %s: %w", uiAuthConfigPath, err)
+		}
+		return false, nil
+	}
+	data, err := json.MarshalIndent(ui, "", "  ")
+	if err != nil {
+		return false, fmt.Errorf("marshal UI auth configuration: %w", err)
+	}
+	if err := os.WriteFile(uiAuthConfigPath, data, 0o644); err != nil {
+		return false, fmt.Errorf("write %s: %w", uiAuthConfigPath, err)
+	}
+	return true, nil
+}
+
+func logWrittenConfigs(wroteUI bool) {
+	if wroteUI {
+		log.Printf("wrote %s and %s", generatedConfigPath, uiAuthConfigPath)
+		return
+	}
+	log.Printf("wrote %s", generatedConfigPath)
+}
+
+func buildUIAuthConfig(generated generatedConfig, acl *parsedACL, issuer string) (*uiAuthConfig, error) {
+	web := acl.webApplicationInput()
+	if web == nil {
+		return nil, nil
+	}
+	if generated.ProjectID == "" {
+		return nil, fmt.Errorf("cannot generate UI auth configuration: project_id is empty")
+	}
+	if generated.WebApplication == nil || generated.WebApplication.ClientID == "" {
+		return nil, fmt.Errorf("cannot generate UI auth configuration: Web application client_id is empty")
+	}
+	parsedIssuer, err := url.Parse(issuer)
+	if err != nil || parsedIssuer.Host == "" || parsedIssuer.User != nil || parsedIssuer.RawQuery != "" ||
+		parsedIssuer.Fragment != "" || (parsedIssuer.Scheme != "https" && parsedIssuer.Scheme != "http") {
+		return nil, fmt.Errorf("cannot generate UI auth configuration: invalid issuer %q", issuer)
+	}
+
+	demoUsers := make(map[string]uiDemoUserConfig, len(acl.HumanUsers))
+	for _, human := range acl.HumanUsers {
+		result, ok := generated.HumanUsers[human.Username]
+		if !ok || result.UserID == "" {
+			return nil, fmt.Errorf("cannot generate UI auth configuration: human user %q has no generated user_id", human.Username)
+		}
+		demoUsers[human.Username] = uiDemoUserConfig{
+			UserID: result.UserID, LoginName: result.LoginName, DisplayName: human.DisplayName,
+		}
+	}
+
+	return &uiAuthConfig{
+		ProjectID: generated.ProjectID,
+		Issuer:    strings.TrimRight(issuer, "/"),
+		Audience:  "urn:zitadel:iam:org:project:id:" + generated.ProjectID + ":aud",
+		WebApp: uiWebApplicationConfig{
+			ClientID:               generated.WebApplication.ClientID,
+			RedirectURIs:           append([]string(nil), web.RedirectURIs...),
+			PostLogoutRedirectURIs: append([]string(nil), web.PostLogoutRedirectURIs...),
+			EnableRefreshTokens:    web.EnableRefreshTokens,
+		},
+		DemoUsers: demoUsers,
+	}, nil
+}
+
+func issuerFromEnvironment(domain, port string, insecure bool) string {
+	if configured := strings.TrimSpace(os.Getenv("ZITADEL_ISSUER")); configured != "" {
+		return configured
+	}
+	scheme := "https"
+	if insecure {
+		scheme = "http"
+	}
+	host := domain
+	if port != "" && port != "443" && !(scheme == "http" && port == "80") {
+		host = net.JoinHostPort(domain, port)
+	}
+	return (&url.URL{Scheme: scheme, Host: host}).String()
 }
 
 func writeGeneratedConfig(c generatedConfig) error {

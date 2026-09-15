@@ -4,6 +4,7 @@ pat/
 certs/
 tokens/
 generated-config.json
+citius-ui-auth.json
 citius-zitadel.env
 
 # The root .gitignore globs `.env.*`; re-include the committed template.

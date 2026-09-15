@@ -5,14 +5,16 @@
 # Subcommands:
 #   up      Bring the stack up (default). Idempotent.
 #   down    Stop containers but preserve data volumes, .env, certs, PAT,
-#           generated-config.json and citius-zitadel.env. Safe to follow
-#           with `up` for a fast restart against the same instance.
-#   reset   Stop containers AND wipe data volumes, PAT, generated config,
-#           citius-zitadel.env. Then `up`. Issues a fresh masterkey only
-#           if .env is recreated by the operator.
+#           generated-config.json, citius-ui-auth.json and
+#           citius-zitadel.env. Safe to follow with `up` for a fast
+#           restart against the same instance.
+#   reset   Stop containers AND wipe data volumes, PAT and generated output.
+#           Then `up`. Issues a fresh masterkey only if .env is recreated
+#           by the operator.
 #   nuke    `reset` plus delete .env. The next `up` regenerates every
 #           secret. Operator must be sure.
 #   certs   (Re)issue mkcert certificate for ${ZITADEL_DOMAIN}.
+#   verify  Compare the declared human-login configuration with Zitadel.
 #   env     Print path to citius-zitadel.env.
 #   help    Show this message.
 #
@@ -27,6 +29,7 @@ readonly ENV_EXAMPLE="${SCRIPT_DIR}/.env.example"
 readonly PAT_DIR="${SCRIPT_DIR}/pat"
 readonly CERTS_DIR="${SCRIPT_DIR}/certs"
 readonly GENERATED_CONFIG="${SCRIPT_DIR}/generated-config.json"
+readonly UI_AUTH_CONFIG="${SCRIPT_DIR}/citius-ui-auth.json"
 readonly OUT_ENV="${SCRIPT_DIR}/citius-zitadel.env"
 readonly TOKENS_DIR="${SCRIPT_DIR}/tokens"
 readonly COMPOSE_PROJECT="citius-zitadel"
@@ -230,6 +233,21 @@ run_setup_sdk() {
   [[ -f "$GENERATED_CONFIG" ]] || die "setup-auth did not produce ${GENERATED_CONFIG}"
 }
 
+run_verify_sdk() {
+  load_env
+  need_cmd go
+  [[ -s "${PAT_DIR}/admin.pat" ]] || die "${PAT_DIR}/admin.pat is missing or empty"
+  log "verifying Zitadel human-login configuration"
+  (
+    cd "${SCRIPT_DIR}/setup-auth"
+    ZITADEL_ADMIN_PAT="$(<"${PAT_DIR}/admin.pat")" \
+    ZITADEL_DOMAIN="${ZITADEL_DOMAIN}" \
+    ZITADEL_PORT="${ZITADEL_HTTPS_PORT:-${ZITADEL_EXTERNALPORT:-443}}" \
+    ZITADEL_INSECURE="${ZITADEL_INSECURE:-false}" \
+      go run . verify -acl "${ACL_FILE:-../acl.yaml}"
+  )
+}
+
 # ---------------------------------------------------------------------------
 # Service-user token minting (OAuth2 client_credentials)
 # ---------------------------------------------------------------------------
@@ -417,6 +435,7 @@ cmd_up() {
     log "stack ready: https://${ZITADEL_DOMAIN}:${_https_port}"
   fi
   log "env file:    ${OUT_ENV}"
+  [[ -f "$UI_AUTH_CONFIG" ]] && log "UI auth:     ${UI_AUTH_CONFIG}"
 }
 
 cmd_down() {
@@ -438,7 +457,7 @@ cmd_reset() {
     log "docker compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
-  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$OUT_ENV"
+  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV"
   cmd_up
 }
 
@@ -448,7 +467,7 @@ cmd_nuke() {
     log "docker compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
-  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$OUT_ENV"
+  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV"
   rm -f "$ENV_FILE"
   log "wiped .env, data volumes and runtime artefacts"
 }
@@ -457,15 +476,19 @@ cmd_env() {
   printf '%s\n' "$OUT_ENV"
 }
 
+cmd_verify() {
+  run_verify_sdk
+}
+
 cmd_help() {
   sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
 
 main() {
-  # `help` and `env` are read-only; do not bootstrap .env from .env.example
-  # for them or we leak operator state on every `--help` invocation.
+  # Read-only commands must not bootstrap .env from .env.example or mutate
+  # operator state merely by being invoked.
   case "${1:-up}" in
-    help|-h|--help|env) ;;
+    help|-h|--help|env|verify) ;;
     *)
       if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
         warn ".env not found; copying from .env.example"
@@ -481,6 +504,7 @@ main() {
     reset) cmd_reset ;;
     nuke)  cmd_nuke ;;
     certs) do_certs ;;
+    verify) cmd_verify ;;
     env)   cmd_env ;;
     help|-h|--help) cmd_help ;;
     *)     die "unknown subcommand: $1 (try: help)" ;;

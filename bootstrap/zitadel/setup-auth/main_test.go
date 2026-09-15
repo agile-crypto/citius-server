@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -96,10 +97,147 @@ func TestReconcileIdentityResourcesStopsOnFailure(t *testing.T) {
 	}
 }
 
+func TestVerifyIdentityResourcesUsesNonSecretACLConfiguration(t *testing.T) {
+	acl, err := loadACLText(t, validHumanACL)
+	if err != nil {
+		t.Fatalf("load ACL: %v", err)
+	}
+	client := &fakeIdentityVerifier{
+		result: &admin.HumanAuthConfigurationResult{ProjectID: "project-1", Current: true},
+	}
+
+	got, err := verifyIdentityResources(context.Background(), client, acl)
+	if err != nil {
+		t.Fatalf("verify identities: %v", err)
+	}
+	if !got.Current || got.ProjectID != "project-1" {
+		t.Fatalf("verification result = %#v", got)
+	}
+	if client.input.ClaimNamespace != claimNamespace || client.input.WebApplication.Name != "citius-ui" {
+		t.Fatalf("verification input = %#v", client.input)
+	}
+	if len(client.input.Humans) != 1 || client.input.Humans[0].Username != "alice" {
+		t.Fatalf("verification humans = %#v", client.input.Humans)
+	}
+}
+
+func TestBuildUIAuthConfigExcludesBootstrapSecrets(t *testing.T) {
+	acl, err := loadACLText(t, validHumanACL)
+	if err != nil {
+		t.Fatalf("load ACL: %v", err)
+	}
+	generated := generatedConfig{
+		ProjectID: "project-1",
+		APIApp: admin.AppCredentials{
+			ClientID: "introspection-client", ClientSecret: "introspection-secret",
+		},
+		WebApplication: &admin.WebApplicationResult{ApplicationID: "web-app", ClientID: "public-client"},
+		Users: map[string]admin.OnboardResult{
+			"service": {ClientID: "machine-client", ClientSecret: "machine-secret"},
+		},
+		HumanUsers: map[string]admin.HumanOnboardResult{
+			"alice": {UserID: "human-1", LoginName: "alice@example.test"},
+		},
+	}
+
+	got, err := buildUIAuthConfig(generated, acl, "https://issuer.example.test/")
+	if err != nil {
+		t.Fatalf("build UI auth configuration: %v", err)
+	}
+	if got.Issuer != "https://issuer.example.test" || got.WebApp.ClientID != "public-client" {
+		t.Fatalf("UI auth configuration = %#v", got)
+	}
+	if got.Audience != "urn:zitadel:iam:org:project:id:project-1:aud" {
+		t.Fatalf("audience = %q", got.Audience)
+	}
+	if got.DemoUsers["alice"].UserID != "human-1" || got.DemoUsers["alice"].DisplayName != "Alice Producer" {
+		t.Fatalf("demo users = %#v", got.DemoUsers)
+	}
+
+	raw, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal UI auth configuration: %v", err)
+	}
+	for _, forbidden := range []string{
+		"introspection-secret", "machine-secret", `"password":`,
+		`"access_token":`, `"refresh_token":`, `"id_token":`,
+	} {
+		if strings.Contains(strings.ToLower(string(raw)), forbidden) {
+			t.Fatalf("UI auth configuration contains forbidden value %q: %s", forbidden, raw)
+		}
+	}
+}
+
+func TestBuildUIAuthConfigRejectsIncompleteGeneratedState(t *testing.T) {
+	acl, err := loadACLText(t, validHumanACL)
+	if err != nil {
+		t.Fatalf("load ACL: %v", err)
+	}
+	valid := generatedConfig{
+		ProjectID:      "project-1",
+		WebApplication: &admin.WebApplicationResult{ClientID: "public-client"},
+		HumanUsers: map[string]admin.HumanOnboardResult{
+			"alice": {UserID: "human-1"},
+		},
+	}
+	missingProject := valid
+	missingProject.ProjectID = ""
+	missingWebClient := valid
+	missingWebClient.WebApplication = nil
+	missingHuman := valid
+	missingHuman.HumanUsers = nil
+	tests := []struct {
+		name      string
+		generated generatedConfig
+		issuer    string
+		wantErr   string
+	}{
+		{name: "missing project", generated: missingProject, issuer: "https://issuer.example.test", wantErr: "project_id"},
+		{name: "missing Web client", generated: missingWebClient, issuer: "https://issuer.example.test", wantErr: "client_id"},
+		{name: "missing human", generated: missingHuman, issuer: "https://issuer.example.test", wantErr: "user_id"},
+		{name: "issuer without scheme", generated: valid, issuer: "issuer.example.test", wantErr: "invalid issuer"},
+		{name: "issuer with credentials", generated: valid, issuer: "https://user:secret@issuer.example.test", wantErr: "invalid issuer"},
+		{name: "issuer with query", generated: valid, issuer: "https://issuer.example.test?token=secret", wantErr: "invalid issuer"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := buildUIAuthConfig(tt.generated, acl, tt.issuer)
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("buildUIAuthConfig() error = %v, want substring %q", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestIssuerFromEnvironment(t *testing.T) {
+	t.Setenv("ZITADEL_ISSUER", "")
+	if got := issuerFromEnvironment("citius-auth.localhost", "443", false); got != "https://citius-auth.localhost" {
+		t.Fatalf("default TLS issuer = %q", got)
+	}
+	if got := issuerFromEnvironment("citius-auth.localhost", "8080", true); got != "http://citius-auth.localhost:8080" {
+		t.Fatalf("insecure issuer = %q", got)
+	}
+	t.Setenv("ZITADEL_ISSUER", " https://identity.example.test/ ")
+	if got := issuerFromEnvironment("ignored", "443", false); got != "https://identity.example.test/" {
+		t.Fatalf("configured issuer = %q", got)
+	}
+}
+
 type fakeIdentityAdmin struct {
 	calls         []string
 	humanPassword string
 	machineErr    error
+}
+
+type fakeIdentityVerifier struct {
+	input  admin.HumanAuthConfigurationInput
+	result *admin.HumanAuthConfigurationResult
+	err    error
+}
+
+func (f *fakeIdentityVerifier) VerifyHumanAuthConfiguration(_ context.Context, input admin.HumanAuthConfigurationInput) (*admin.HumanAuthConfigurationResult, error) {
+	f.input = input
+	return f.result, f.err
 }
 
 func (f *fakeIdentityAdmin) EnsureWebApplication(_ context.Context, in admin.WebApplicationInput) (*admin.WebApplicationResult, error) {

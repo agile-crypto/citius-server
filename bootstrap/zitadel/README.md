@@ -58,13 +58,24 @@ cp bootstrap/zitadel/.env.example bootstrap/zitadel/.env
 make zitadel-up         # alias for: cd bootstrap/zitadel && ./bootstrap.sh up
 ```
 
-On success, `bootstrap/zitadel/citius-zitadel.env` is emitted. Source it
-and the Citius server will run with `AUTH_ENABLED=true`:
+On success, `bootstrap/zitadel/citius-zitadel.env` and the non-secret
+`bootstrap/zitadel/citius-ui-auth.json` are emitted. Source the environment
+file and the Citius server will run with `AUTH_ENABLED=true`:
 
 ```bash
 set -a && source bootstrap/zitadel/citius-zitadel.env && set +a
 make run
 ```
+
+Verify the human users, exact grants and resource metadata, claim action, and
+Web/PKCE application using read-only Zitadel APIs:
+
+```bash
+bootstrap/zitadel/bootstrap.sh verify
+```
+
+The command exits non-zero and prints each field that differs from
+`bootstrap/zitadel/acl.yaml`.
 
 ---
 
@@ -78,11 +89,12 @@ make run
 | `docker-compose.mode-letsencrypt.yml` | Prod overlay — ACME via Let's Encrypt. |
 | `.env.example` | Template; copy to `.env`. |
 | `.env` | **gitignored** — runtime config + generated secrets. |
-| `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `env`). |
-| `setup-auth/` | Go program that calls the Zitadel admin SDK to provision the `citius-api` project, the per-RPC permission catalog, and the seed service users. |
+| `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `verify` / `env`). |
+| `setup-auth/` | Go program that provisions and verifies the `citius-api` project, permission catalog, Web application, and machine/human users. |
 | `pat/` | **gitignored** — bootstrap PAT mount target. |
 | `certs/` | **gitignored** — mkcert output. |
 | `generated-config.json` | **gitignored** — written by `setup-auth`. |
+| `citius-ui-auth.json` | **gitignored** — non-secret issuer, PKCE client, audience, and demo-user configuration for the UI. |
 | `citius-zitadel.env` | **gitignored** — sourceable env file consumed by the server and the integration test suite. |
 
 ---
@@ -117,4 +129,3 @@ Then:
 > Note: the upstream filename is `docker-compose.prodlike.yml` (a dot
 > before `prodlike`, not a hyphen). Earlier revisions of this README had
 > the wrong path; the curl above is correct.
-
