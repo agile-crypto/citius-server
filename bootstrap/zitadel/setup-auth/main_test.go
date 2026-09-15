@@ -40,9 +40,9 @@ func TestReconcileIdentityResources(t *testing.T) {
 }
 
 func TestReconcileIdentityResourcesRetainsMachineOnlyFlow(t *testing.T) {
-	acl, err := loadACL("../acl.yaml")
+	acl, err := loadACLText(t, validMachineACL)
 	if err != nil {
-		t.Fatalf("load repository ACL: %v", err)
+		t.Fatalf("load legacy ACL: %v", err)
 	}
 
 	client := &fakeIdentityAdmin{}

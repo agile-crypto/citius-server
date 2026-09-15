@@ -1,8 +1,8 @@
 # Citius access-control list, applied by bootstrap/zitadel/setup-auth.
 #
-# This file is the source of truth for which Zitadel service users exist,
-# what gRPC permissions they hold, and which key/policy name patterns they
-# may touch. Apply with:
+# This file is the source of truth for which Zitadel machine and human users
+# exist, what gRPC permissions they hold, and which key/policy name patterns
+# they may touch. Apply with:
 #
 #   cd bootstrap/zitadel/setup-auth
 #   go run . apply -acl ../acl.yaml
@@ -39,9 +39,19 @@
 
 version: 1
 
+web_application:
+  name: citius-ui
+  redirect_uris:
+    - http://127.0.0.1:7861/auth/callback
+  post_logout_redirect_uris:
+    - http://127.0.0.1:7861/
+  enable_refresh_tokens: true
+  dev_mode: true
+
 users:
   # Catch-all admin: full grant + access to every key and policy.
   - username: svc-admin
+    user_type: machine
     display_name: "Citius admin (full grant)"
     permissions: ["*"]
     key_access:
@@ -51,6 +61,7 @@ users:
 
   # Integration-test rig: scoped to itest-* keys and policies.
   - username: svc-tester
+    user_type: machine
     display_name: "Citius integration tester"
     permissions:
       - citius:keys:create
@@ -69,6 +80,7 @@ users:
 
   # Observers: read-only across every read permission.
   - username: svc-readonly
+    user_type: machine
     display_name: "Citius read-only consumer"
     permissions:
       - citius:keys:read
@@ -80,4 +92,77 @@ users:
   # Integration suite asserts requests from this user are rejected with
   # PermissionDenied (not Unauthenticated).
   - username: svc-noperm
+    user_type: machine
     display_name: "Citius negative-path user (no permissions)"
+
+  # Interactive policy and key-lifecycle administrator for the UI demo.
+  - username: citius-ciso
+    user_type: human
+    display_name: "Citius CISO"
+    given_name: Citius
+    family_name: CISO
+    email: citius-ciso@citius.local
+    email_verified: true
+    password_env: CITIUS_DEMO_CISO_PASSWORD
+    password_change_required: false
+    permissions:
+      - citius:policy:read
+      - citius:policy:write
+      - citius:keys:create
+      - citius:keys:read
+      - citius:keys:rotate
+      - citius:keys:update-policy
+      - citius:discovery:read
+      - citius:provider:read
+    key_access:
+      allow: ["demo-*"]
+    policy_access:
+      allow: ["demo-*"]
+
+  # Creates demo keys and produces ciphertexts and signatures.
+  - username: citius-producer
+    user_type: human
+    display_name: "Citius Producer"
+    given_name: Citius
+    family_name: Producer
+    email: citius-producer@citius.local
+    email_verified: true
+    password_env: CITIUS_DEMO_PRODUCER_PASSWORD
+    password_change_required: false
+    permissions:
+      - citius:policy:read
+      - citius:keys:create
+      - citius:keys:read
+      - citius:discovery:read
+      - citius:provider:read
+      - citius:crypto:sign
+      - citius:crypto:encrypt
+    key_access:
+      allow: ["demo-*"]
+      deny: ["demo-restricted-*"]
+    policy_access:
+      allow: ["demo-*"]
+      deny: ["demo-restricted-*"]
+
+  # Consumes historical ciphertexts and signatures after key evolution.
+  - username: citius-consumer
+    user_type: human
+    display_name: "Citius Consumer"
+    given_name: Citius
+    family_name: Consumer
+    email: citius-consumer@citius.local
+    email_verified: true
+    password_env: CITIUS_DEMO_CONSUMER_PASSWORD
+    password_change_required: false
+    permissions:
+      - citius:policy:read
+      - citius:keys:read
+      - citius:discovery:read
+      - citius:crypto:verify
+      - citius:crypto:decrypt
+    key_access:
+      allow: ["demo-*"]
+      deny: ["demo-restricted-*"]
+    policy_access:
+      allow: ["demo-*"]
+      deny: ["demo-restricted-*"]

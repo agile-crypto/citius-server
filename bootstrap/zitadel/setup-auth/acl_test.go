@@ -34,13 +34,21 @@ users:
       deny: ["demo-restricted-*"]
 `
 
+const validMachineACL = `version: 1
+users:
+  - username: service
+    display_name: Legacy Service
+    permissions:
+      - citius:discovery:read
+`
+
 func TestLoadACLRetainsLegacyMachineUserBehavior(t *testing.T) {
-	acl, err := loadACL("../acl.yaml")
+	acl, err := loadACLText(t, validMachineACL)
 	if err != nil {
-		t.Fatalf("load repository ACL: %v", err)
+		t.Fatalf("load legacy ACL: %v", err)
 	}
-	if got := len(acl.MachineUsers); got != 4 {
-		t.Fatalf("machine users = %d, want 4", got)
+	if got := len(acl.MachineUsers); got != 1 {
+		t.Fatalf("machine users = %d, want 1", got)
 	}
 	if got := len(acl.HumanUsers); got != 0 {
 		t.Fatalf("human users = %d, want 0", got)
@@ -50,6 +58,77 @@ func TestLoadACLRetainsLegacyMachineUserBehavior(t *testing.T) {
 	}
 	if web := acl.webApplicationInput(); web != nil {
 		t.Fatalf("legacy ACL unexpectedly produced Web application input: %#v", web)
+	}
+}
+
+func TestRepositoryACLDeclaresWebApplicationAndDemoPersonas(t *testing.T) {
+	acl, err := loadACL("../acl.yaml")
+	if err != nil {
+		t.Fatalf("load repository ACL: %v", err)
+	}
+	if len(acl.MachineUsers) != 4 {
+		t.Fatalf("machine users = %d, want 4", len(acl.MachineUsers))
+	}
+	if len(acl.HumanUsers) != 3 {
+		t.Fatalf("human users = %d, want 3", len(acl.HumanUsers))
+	}
+	web := acl.webApplicationInput()
+	if web == nil || web.Name != "citius-ui" || !web.DevMode || !web.EnableRefreshTokens {
+		t.Fatalf("unexpected Web application: %#v", web)
+	}
+	if len(web.RedirectURIs) != 1 || web.RedirectURIs[0] != "http://127.0.0.1:7861/auth/callback" {
+		t.Fatalf("redirect URIs = %v", web.RedirectURIs)
+	}
+	if len(web.PostLogoutRedirectURIs) != 1 || web.PostLogoutRedirectURIs[0] != "http://127.0.0.1:7861/" {
+		t.Fatalf("post-logout redirect URIs = %v", web.PostLogoutRedirectURIs)
+	}
+
+	expected := map[string]struct {
+		passwordEnv string
+		email       string
+		permissions []string
+		deny        []string
+	}{
+		"citius-ciso": {
+			passwordEnv: "CITIUS_DEMO_CISO_PASSWORD",
+			email:       "citius-ciso@citius.local",
+			permissions: []string{
+				permPolicyRead, permPolicyWrite, permKeysCreate, permKeysRead,
+				permKeysRotate, permKeysUpdatePolicy, permDiscoveryRead, permProviderRead,
+			},
+		},
+		"citius-producer": {
+			passwordEnv: "CITIUS_DEMO_PRODUCER_PASSWORD",
+			email:       "citius-producer@citius.local",
+			permissions: []string{
+				permPolicyRead, permKeysCreate, permKeysRead, permDiscoveryRead,
+				permProviderRead, permCryptoSign, permCryptoEncrypt,
+			},
+			deny: []string{"demo-restricted-*"},
+		},
+		"citius-consumer": {
+			passwordEnv: "CITIUS_DEMO_CONSUMER_PASSWORD",
+			email:       "citius-consumer@citius.local",
+			permissions: []string{
+				permPolicyRead, permKeysRead, permDiscoveryRead, permCryptoVerify, permCryptoDecrypt,
+			},
+			deny: []string{"demo-restricted-*"},
+		},
+	}
+	for _, human := range acl.HumanUsers {
+		want, ok := expected[human.Username]
+		if !ok {
+			t.Fatalf("unexpected human user %q", human.Username)
+		}
+		if human.PasswordEnv != want.passwordEnv || human.Email != want.email ||
+			!human.EmailVerified || human.PasswordChangeRequired {
+			t.Fatalf("unexpected identity configuration for %s: %#v", human.Username, human)
+		}
+		assertStringSet(t, human.Username+" permissions", human.Permissions, want.permissions)
+		assertStringSet(t, human.Username+" key allow", human.KeyAccess.AllowedKeyPatterns, []string{"demo-*"})
+		assertStringSet(t, human.Username+" policy allow", human.PolicyAccess.AllowedPolicyPatterns, []string{"demo-*"})
+		assertStringSet(t, human.Username+" key deny", human.KeyAccess.DenyKeyPatterns, want.deny)
+		assertStringSet(t, human.Username+" policy deny", human.PolicyAccess.DenyPolicyPatterns, want.deny)
 	}
 }
 
@@ -287,4 +366,23 @@ func loadACLText(t *testing.T, contents string) (*parsedACL, error) {
 		t.Fatalf("write ACL fixture: %v", err)
 	}
 	return loadACL(path)
+}
+
+func assertStringSet(t *testing.T, name string, got, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("%s = %v, want %v", name, got, want)
+	}
+	remaining := make(map[string]int, len(want))
+	for _, value := range want {
+		remaining[value]++
+	}
+	for _, value := range got {
+		remaining[value]--
+	}
+	for value, count := range remaining {
+		if count != 0 {
+			t.Fatalf("%s = %v, want %v (difference at %q)", name, got, want, value)
+		}
+	}
 }
