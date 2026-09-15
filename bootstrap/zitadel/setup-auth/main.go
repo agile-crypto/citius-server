@@ -124,14 +124,19 @@ func runValidate(args []string) int {
 		return 2
 	}
 
-	users, err := loadACL(*aclPath)
+	acl, err := loadACL(*aclPath)
 	if err != nil {
 		log.Printf("validate: %v", err)
 		return 1
 	}
-	log.Printf("ACL OK: %d user(s) in %s", len(users), *aclPath)
-	for _, u := range users {
+	log.Printf("ACL OK: %d user(s) in %s", acl.userCount(), *aclPath)
+	for _, u := range acl.MachineUsers {
 		log.Printf("  %s: %d permission(s), key_allow=%v, policy_allow=%v",
+			u.Username, len(u.Permissions),
+			u.KeyAccess.AllowedKeyPatterns, u.PolicyAccess.AllowedPolicyPatterns)
+	}
+	for _, u := range acl.HumanUsers {
+		log.Printf("  %s (human): %d permission(s), key_allow=%v, policy_allow=%v",
 			u.Username, len(u.Permissions),
 			u.KeyAccess.AllowedKeyPatterns, u.PolicyAccess.AllowedPolicyPatterns)
 	}
@@ -151,7 +156,12 @@ func runApply(args []string) int {
 	}
 
 	loadEnv()
-	users, err := loadACL(*aclPath)
+	acl, err := loadACL(*aclPath)
+	if err != nil {
+		log.Printf("apply: %v", err)
+		return 1
+	}
+	users, err := acl.usersForMachineProvisioning()
 	if err != nil {
 		log.Printf("apply: %v", err)
 		return 1
@@ -223,7 +233,12 @@ func runUsers(args []string) int {
 	}
 
 	loadEnv()
-	users, err := loadACL(*aclPath)
+	acl, err := loadACL(*aclPath)
+	if err != nil {
+		log.Printf("users: %v", err)
+		return 1
+	}
+	users, err := acl.usersForMachineProvisioning()
 	if err != nil {
 		log.Printf("users: %v", err)
 		return 1
