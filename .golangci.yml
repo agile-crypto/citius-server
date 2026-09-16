@@ -83,6 +83,9 @@ linters:
           - forbidigo
         path: 'internal/cmd/server/main/'
       - linters:
+          - forbidigo
+        path: 'bootstrap/zitadel/interactive-login/'
+      - linters:
           - cyclop
           - errcheck
           - forbidigo

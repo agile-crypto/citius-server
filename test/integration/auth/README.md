@@ -18,7 +18,21 @@ Plain `go test ./...` will never compile or run these files.
    `bootstrap/zitadel/citius-zitadel.env` and `bootstrap/zitadel/tokens/*`)
 2. `source bootstrap/zitadel/citius-zitadel.env`
 3. `caas-server` running with `AUTH_ENABLED=true` and the issued TLS cert
-4. `make test-integration-auth`
+4. `make test-integration-auth-e2e`
+
+For the human-persona acceptance matrix, obtain tokens through Zitadel's hosted
+login and then run the dedicated target:
+
+```bash
+make zitadel-login-all
+make test-integration-auth-human-e2e
+```
+
+The login helper prints a URL for each selected persona and waits on the exact
+registered loopback callback. It never receives a password in the terminal and
+never prints the resulting access token. `prompt=login` asks Zitadel to
+reauthenticate each persona instead of silently reusing a previous browser
+session.
 
 ## Required environment
 
@@ -33,6 +47,9 @@ Plain `go test ./...` will never compile or run these files.
 | `SVC_TESTER_TOKEN_FILE`     | path to file containing access token  |
 | `SVC_READONLY_TOKEN_FILE`   | path to file containing access token  |
 | `SVC_NOPERM_TOKEN_FILE`     | path to file containing access token  |
+| `CITIUS_CISO_TOKEN_FILE`    | hosted-login token for Citius CISO    |
+| `CITIUS_PRODUCER_TOKEN_FILE` | hosted-login token for producer      |
+| `CITIUS_CONSUMER_TOKEN_FILE` | hosted-login token for consumer      |
 
 ## Coverage
 
@@ -43,3 +60,4 @@ Plain `go test ./...` will never compile or run these files.
 | `TestReadOnlyCannotCreate`        | per-method permission registry     |
 | `TestTesterCannotEscapeNamespace` | per-resource glob scoping          |
 | `TestAdminCanCreateAndRead`       | happy path — both layers succeed   |
+| `TestHumanPersonaAuthorizationMatrix` | hosted human identity, method grants, and resource deny precedence |

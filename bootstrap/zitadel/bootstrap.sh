@@ -15,6 +15,8 @@
 #           secret. Operator must be sure.
 #   certs   (Re)issue mkcert certificate for ${ZITADEL_DOMAIN}.
 #   verify  Compare the declared human-login configuration with Zitadel.
+#   login USER  Complete hosted PKCE login for a declared demo user and write
+#               a short-lived token under tokens/.
 #   env     Print path to citius-zitadel.env.
 #   help    Show this message.
 #
@@ -245,6 +247,32 @@ run_verify_sdk() {
     ZITADEL_PORT="${ZITADEL_HTTPS_PORT:-${ZITADEL_EXTERNALPORT:-443}}" \
     ZITADEL_INSECURE="${ZITADEL_INSECURE:-false}" \
       go run . verify -acl "${ACL_FILE:-../acl.yaml}"
+  )
+}
+
+run_interactive_login() {
+  local persona="$1"
+  [[ -n "$persona" ]] || die "usage: $0 login <demo-username>"
+  [[ -s "$UI_AUTH_CONFIG" ]] || die "${UI_AUTH_CONFIG} is missing or empty; run 'up' first"
+  load_env
+  need_cmd go
+
+  local ca_args=()
+  if [[ "${TLS_MODE:-local-tls}" == "local-tls" ]] && command -v mkcert >/dev/null 2>&1; then
+    local ca_root
+    ca_root="$(mkcert -CAROOT 2>/dev/null || true)"
+    [[ -n "$ca_root" && -s "${ca_root}/rootCA.pem" ]] && ca_args=(-ca-file "${ca_root}/rootCA.pem")
+  fi
+
+  mkdir -p "$TOKENS_DIR"
+  chmod 700 "$TOKENS_DIR"
+  (
+    cd "$SCRIPT_DIR"
+    go run ./interactive-login \
+      -config "$UI_AUTH_CONFIG" \
+      -persona "$persona" \
+      -output "${TOKENS_DIR}/${persona}.token" \
+      "${ca_args[@]}"
   )
 }
 
@@ -480,6 +508,10 @@ cmd_verify() {
   run_verify_sdk
 }
 
+cmd_login() {
+  run_interactive_login "$1"
+}
+
 cmd_help() {
   sed -n '2,/^$/p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'
 }
@@ -488,7 +520,7 @@ main() {
   # Read-only commands must not bootstrap .env from .env.example or mutate
   # operator state merely by being invoked.
   case "${1:-up}" in
-    help|-h|--help|env|verify) ;;
+    help|-h|--help|env|verify|login) ;;
     *)
       if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
         warn ".env not found; copying from .env.example"
@@ -505,6 +537,7 @@ main() {
     nuke)  cmd_nuke ;;
     certs) do_certs ;;
     verify) cmd_verify ;;
+    login) cmd_login "${2:-}" ;;
     env)   cmd_env ;;
     help|-h|--help) cmd_help ;;
     *)     die "unknown subcommand: $1 (try: help)" ;;

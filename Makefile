@@ -22,7 +22,7 @@
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env test-integration-auth-e2e
+.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all test-integration-auth-e2e test-integration-auth-human-e2e
 .PHONY: proto-update-api
 
 # Default goal: print help when `make` is run with no arguments.
@@ -35,7 +35,7 @@ help: ## Show this help (list all available targets)
 	@printf "\n\033[1mUsage:\033[0m make <target> [VAR=value ...]\n\n"
 	@printf "\033[1mTargets:\033[0m\n"
 	@awk 'BEGIN {FS = ":.*##"} \
-	     /^[a-zA-Z_-]+:.*##/ { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' \
+	     /^[a-zA-Z0-9_-]+:.*##/ { printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2 }' \
 	     $(MAKEFILE_LIST)
 	@printf "\n\033[1mTunable variables (override on the command line):\033[0m\n"
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "ADDR"     "gRPC listen address"   "$(ADDR)"
@@ -111,10 +111,10 @@ run-dev: ## Run the gRPC server via 'go run' (no build artefact)
 # Test
 # ---------------------------------------------------------------------------
 test: ## Run all unit tests (no race detector)
-	go test ./internal/... ./vault-storage/... -count=1
+	go test ./internal/... ./vault-storage/... ./bootstrap/zitadel/interactive-login -count=1
 
 test-race: ## Run all unit tests with the race detector
-	go test ./internal/... ./vault-storage/... -race -count=1
+	go test ./internal/... ./vault-storage/... ./bootstrap/zitadel/interactive-login -race -count=1
 
 test-cover: ## Run tests and generate HTML coverage report
 	go test ./internal/... ./vault-storage/... -coverprofile=coverage.out -count=1
@@ -131,7 +131,7 @@ smoke: ## Run smoke tests under test/smoke/...
 # Static analysis
 # ---------------------------------------------------------------------------
 vet: ## Run 'go vet' on all internal packages (+ vault-storage)
-	go vet ./internal/... ./vault-storage/...
+	go vet ./internal/... ./vault-storage/... ./bootstrap/zitadel/interactive-login
 
 lint: lint-go lint-proto ## Run all linters (Go + proto)
 
@@ -225,6 +225,15 @@ zitadel-nuke: ## Wipe everything including .env (next up regenerates all secrets
 zitadel-env: ## Print sourced env entries written by bootstrap.sh
 	$(ZITADEL_DIR)/bootstrap.sh env
 
+zitadel-login: ## Complete hosted PKCE login for PERSONA=<demo username>
+	@test -n "$(PERSONA)" || (echo "ERROR: set PERSONA=citius-ciso, citius-producer, or citius-consumer" && exit 1)
+	$(ZITADEL_DIR)/bootstrap.sh login "$(PERSONA)"
+
+zitadel-login-all: ## Complete hosted PKCE login for all three demo personas
+	@for persona in citius-ciso citius-producer citius-consumer; do \
+	  $(ZITADEL_DIR)/bootstrap.sh login "$$persona" || exit; \
+	done
+
 ZITADEL_ENV_FILE := $(ZITADEL_DIR)/citius-zitadel.env
 ZITADEL_TLS_CERT := $(ZITADEL_DIR)/certs/local.crt
 ZITADEL_TLS_KEY  := $(ZITADEL_DIR)/certs/local.key
@@ -251,9 +260,15 @@ test-integration-auth-e2e: ## One-shot: build, start caas-server, run auth integ
 	  if ! (exec 3<>/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then echo "caas-server never listened; log:"; cat "$$log"; exit 1; fi; \
 	  exec 3<&-; exec 3>&-; \
 	  echo "caas-server up; running tests"; \
-	  env $$(grep -v "^#" $(ZITADEL_ENV_FILE) | sed "s/^export //") \
+	  env $$(grep -v "^#" $(ZITADEL_ENV_FILE) | sed "s/^export //") $(HUMAN_AUTH_ENV) \
 	    go test -tags "integration zitadel" -count=1 ./test/integration/auth/...; \
 	  rc=$$?; \
 	  echo "tests exited rc=$$rc; shutting caas-server down"; \
 	  exit $$rc \
 	'
+
+test-integration-auth-human-e2e: ## Run auth E2E with hosted-login tokens for all demo personas
+	@test -s $(ZITADEL_DIR)/tokens/citius-ciso.token || (echo "ERROR: missing CISO token; run make zitadel-login-all" && exit 1)
+	@test -s $(ZITADEL_DIR)/tokens/citius-producer.token || (echo "ERROR: missing producer token; run make zitadel-login-all" && exit 1)
+	@test -s $(ZITADEL_DIR)/tokens/citius-consumer.token || (echo "ERROR: missing consumer token; run make zitadel-login-all" && exit 1)
+	@$(MAKE) test-integration-auth-e2e HUMAN_AUTH_ENV='CITIUS_CISO_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-ciso.token) CITIUS_PRODUCER_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-producer.token) CITIUS_CONSUMER_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-consumer.token)'

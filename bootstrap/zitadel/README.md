@@ -77,6 +77,32 @@ bootstrap/zitadel/bootstrap.sh verify
 The command exits non-zero and prints each field that differs from
 `bootstrap/zitadel/acl.yaml`.
 
+Exercise the real hosted username/password screen and Authorization Code +
+PKCE flow for all three demo personas:
+
+```bash
+make zitadel-login-all
+```
+
+The command prints one authorization URL at a time. Open it in a browser and
+sign in as the named user using the password from `.env`. The callback helper
+validates OAuth state, exchanges the code with the PKCE verifier, calls
+UserInfo to bind the token to the selected provisioned user ID, and writes the
+short-lived token to the gitignored `tokens/` directory without printing it.
+Use `make zitadel-login PERSONA=citius-producer` to refresh one token.
+
+With all three tokens present, run the Citius method- and resource-authorization
+acceptance matrix:
+
+```bash
+make test-integration-auth-human-e2e
+```
+
+This starts an authenticated Citius server, confirms each persona's allowed and
+denied API categories, and verifies deny precedence for
+`demo-restricted-*`. The helper deliberately does not implement a UI session,
+refresh, or logout; those remain responsibilities of `citius-ui`.
+
 ---
 
 ## Layout
@@ -89,8 +115,9 @@ The command exits non-zero and prints each field that differs from
 | `docker-compose.mode-letsencrypt.yml` | Prod overlay — ACME via Let's Encrypt. |
 | `.env.example` | Template; copy to `.env`. |
 | `.env` | **gitignored** — runtime config + generated secrets. |
-| `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `verify` / `env`). |
+| `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `verify` / `login` / `env`). |
 | `setup-auth/` | Go program that provisions and verifies the `citius-api` project, permission catalog, Web application, and machine/human users. |
+| `interactive-login/` | Operator-run hosted-login/PKCE acceptance helper; tokens are identity-checked and written only to `tokens/`. |
 | `pat/` | **gitignored** — bootstrap PAT mount target. |
 | `certs/` | **gitignored** — mkcert output. |
 | `generated-config.json` | **gitignored** — written by `setup-auth`. |
