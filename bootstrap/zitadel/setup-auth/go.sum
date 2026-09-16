@@ -1,5 +1,5 @@
-github.com/agile-crypto/zitadel-grpc-auth v0.2.0 h1:7xgJvgPWMsWa1AmCyKs4iricETVzUTEFIr9F2axhYyE=
-github.com/agile-crypto/zitadel-grpc-auth v0.2.0/go.mod h1:APcuKmEB/FCfIRrIEKgRtcnf0OU0NWbotpyIDsMySgo=
+github.com/agile-crypto/zitadel-grpc-auth v0.2.1 h1:j0Jz/2ihp5euBHDts2hXwqI7VtpYKmYAqfVmea/Dx3I=
+github.com/agile-crypto/zitadel-grpc-auth v0.2.1/go.mod h1:APcuKmEB/FCfIRrIEKgRtcnf0OU0NWbotpyIDsMySgo=
 github.com/bmatcuk/doublestar/v4 v4.10.0 h1:zU9WiOla1YA122oLM6i4EXvGW62DvKZVxIe6TYWexEs=
 github.com/bmatcuk/doublestar/v4 v4.10.0/go.mod h1:xBQ8jztBU6kakFMg+8WGxn0c6z1fTSPVIjEY1Wr7jzc=
 github.com/cespare/xxhash/v2 v2.3.0 h1:UL815xU9SqsFlibzuggzjXhog7bL6oX9BbNZnL2UFvs=

@@ -7,7 +7,7 @@ module github.com/agile-crypto/citius-server/bootstrap/zitadel/setup-auth
 go 1.25.0
 
 require (
-	github.com/agile-crypto/zitadel-grpc-auth v0.2.0
+	github.com/agile-crypto/zitadel-grpc-auth v0.2.1
 	github.com/joho/godotenv v1.5.1
 	gopkg.in/yaml.v3 v3.0.1
 )

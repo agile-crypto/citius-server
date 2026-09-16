@@ -230,6 +230,7 @@ run_setup_sdk() {
     ZITADEL_DOMAIN="${ZITADEL_DOMAIN}" \
     ZITADEL_PORT="${ZITADEL_HTTPS_PORT:-${ZITADEL_EXTERNALPORT:-443}}" \
     ZITADEL_INSECURE="${ZITADEL_INSECURE:-false}" \
+    GOWORK=off \
       go run . apply -acl "${ACL_FILE:-../acl.yaml}"
   )
   [[ -f "$GENERATED_CONFIG" ]] || die "setup-auth did not produce ${GENERATED_CONFIG}"
@@ -246,6 +247,7 @@ run_verify_sdk() {
     ZITADEL_DOMAIN="${ZITADEL_DOMAIN}" \
     ZITADEL_PORT="${ZITADEL_HTTPS_PORT:-${ZITADEL_EXTERNALPORT:-443}}" \
     ZITADEL_INSECURE="${ZITADEL_INSECURE:-false}" \
+    GOWORK=off \
       go run . verify -acl "${ACL_FILE:-../acl.yaml}"
   )
 }
