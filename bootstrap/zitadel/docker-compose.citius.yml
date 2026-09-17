@@ -1,0 +1,60 @@
+# docker-compose.citius.yml — optional overlay that runs the Citius (caas)
+# gRPC server inside the same stack as Zitadel.
+#
+# Applied by bootstrap.sh when CITIUS_SERVER=1 so the demo stack brings up
+# Zitadel AND citius-server together. The server:
+#   - joins the shared network so it can reach the Zitadel issuer through the
+#     Traefik proxy for token introspection;
+#   - trusts the local mkcert CA (mounted read-only) for that HTTPS call;
+#   - terminates its own gRPC TLS with the same local certificate;
+#   - reads its Zitadel introspection configuration from citius-zitadel.env,
+#     which bootstrap.sh generates after setup-auth completes.
+#
+# The container is (re)built from the repository Dockerfile. It depends on
+# Zitadel being healthy but is provisioned independently, so setup-auth still
+# runs against Zitadel before the env file the server consumes is emitted.
+
+services:
+  # Alias the Zitadel public domain to the Traefik proxy inside the network so
+  # the issuer URL used by the browser also resolves from the server container.
+  proxy:
+    networks:
+      zitadel:
+        aliases:
+          - ${ZITADEL_DOMAIN}
+
+  citius-server:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: citius-server:local
+    restart: unless-stopped
+    command:
+      - -addr
+      - ":50051"
+      - -catalog
+      - /app/proto/standard_algorithms.json
+      - -tls-cert
+      - /certs/local.crt
+      - -tls-key
+      - /certs/local.key
+    environment:
+      AUTH_ENABLED: "true"
+      ZITADEL_ISSUER: ${CITIUS_SERVER_ISSUER}
+      ZITADEL_INSECURE: "false"
+      INTROSPECT_ID: ${CITIUS_SERVER_INTROSPECT_ID}
+      INTROSPECT_SECRET: ${CITIUS_SERVER_INTROSPECT_SECRET}
+      PROJECT_ID: ${CITIUS_SERVER_PROJECT_ID}
+      EXPECTED_AUDIENCE: ${CITIUS_SERVER_EXPECTED_AUDIENCE}
+      GRPC_REFLECTION: ${CITIUS_SERVER_REFLECTION:-false}
+      # Trust the local mkcert CA for the outbound introspection HTTPS call.
+      SSL_CERT_FILE: /certs/rootCA.pem
+    ports:
+      - ${CITIUS_SERVER_PUBLISHED_PORT:-50051}:50051
+    volumes:
+      - ./certs:/certs:ro
+    networks:
+      - zitadel
+    depends_on:
+      zitadel-api:
+        condition: service_healthy

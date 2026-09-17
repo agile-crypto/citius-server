@@ -20,6 +20,12 @@
 #   env     Print path to citius-zitadel.env.
 #   help    Show this message.
 #
+# Environment toggles:
+#   CITIUS_SERVER=1       Also build and run the containerized citius-server
+#                         (docker-compose.citius.yml) as part of `up`, and emit
+#                         citius-stack.json for the UI and Go SDK to consume.
+#   CITIUS_DEV_CONSOLE=1  Provision a dev admin console account.
+#
 # Exit codes: 0 ok, non-zero on failure. Every error is printed to stderr.
 
 set -euo pipefail
@@ -33,10 +39,12 @@ readonly CERTS_DIR="${SCRIPT_DIR}/certs"
 readonly GENERATED_CONFIG="${SCRIPT_DIR}/generated-config.json"
 readonly UI_AUTH_CONFIG="${SCRIPT_DIR}/citius-ui-auth.json"
 readonly OUT_ENV="${SCRIPT_DIR}/citius-zitadel.env"
+readonly STACK_CONFIG="${SCRIPT_DIR}/citius-stack.json"
 readonly TOKENS_DIR="${SCRIPT_DIR}/tokens"
 readonly COMPOSE_PROJECT="citius-zitadel"
 readonly BASE_COMPOSE="${SCRIPT_DIR}/docker-compose.yml"
 readonly PRODLIKE_COMPOSE="${SCRIPT_DIR}/docker-compose.prodlike.yml"
+readonly CITIUS_COMPOSE="${SCRIPT_DIR}/docker-compose.citius.yml"
 
 readonly READINESS_TIMEOUT=120  # seconds
 
@@ -119,6 +127,9 @@ compose() {
   if [[ "${CITIUS_DEV_CONSOLE:-0}" == "1" ]]; then
     extra_overlays=(-f "${SCRIPT_DIR}/docker-compose.dev-console.yml")
   fi
+  if [[ "${CITIUS_SERVER:-0}" == "1" ]]; then
+    extra_overlays+=(-f "$CITIUS_COMPOSE")
+  fi
   docker compose \
     --env-file "$ENV_FILE" \
     --project-name "$COMPOSE_PROJECT" \
@@ -183,6 +194,16 @@ do_certs() {
   # Also include 'localhost' as a SAN so curl/clients can reach the
   # stack via either citius-auth.localhost or plain localhost.
   ( cd "$CERTS_DIR" && mkcert -cert-file "local.crt" -key-file "local.key" "${ZITADEL_DOMAIN}" "localhost" "127.0.0.1" "::1" )
+
+  # Copy the mkcert root CA into certs/ so the containerized citius-server can
+  # trust it (SSL_CERT_FILE=/certs/rootCA.pem) for the outbound introspection
+  # call. Harmless when the server runs on the host instead.
+  local caroot
+  caroot="$(mkcert -CAROOT 2>/dev/null || true)"
+  if [[ -n "$caroot" && -s "${caroot}/rootCA.pem" ]]; then
+    cp "${caroot}/rootCA.pem" "${CERTS_DIR}/rootCA.pem"
+    chmod 644 "${CERTS_DIR}/rootCA.pem"
+  fi
 
   log "certs written to ${CERTS_DIR}"
 }
@@ -421,6 +442,96 @@ emit_env() {
   chmod 600 "$OUT_ENV"
 }
 
+# emit_stack_config writes citius-stack.json: one consolidated, NON-SECRET
+# descriptor of everything a client (the UI or the Go SDK) needs to connect to
+# the local stack. Secrets (introspection client secret, PATs, masterkey,
+# passwords) are deliberately excluded; they live only in citius-zitadel.env
+# and generated-config.json, which stay mode 0600 and gitignored.
+emit_stack_config() {
+  [[ -f "$GENERATED_CONFIG" ]] || die "${GENERATED_CONFIG} not found"
+  log "emitting ${STACK_CONFIG}"
+
+  local project_id issuer_url citius_addr tls_ca tls_server_name
+  project_id="$(jq -r '.project_id' "$GENERATED_CONFIG")"
+
+  local https_port="${ZITADEL_HTTPS_PORT:-443}"
+  if [[ "$https_port" == "443" ]]; then
+    issuer_url="https://${ZITADEL_DOMAIN}"
+  else
+    issuer_url="https://${ZITADEL_DOMAIN}:${https_port}"
+  fi
+
+  citius_addr="${CITIUS_ADDR:-127.0.0.1:${CITIUS_SERVER_PUBLISHED_PORT:-50051}}"
+  tls_server_name="${CITIUS_TLS_SERVER_NAME:-${ZITADEL_DOMAIN}}"
+  tls_ca="${CITIUS_TLS_CA:-}"
+  if [[ -z "$tls_ca" && "${TLS_MODE:-local-tls}" == "local-tls" ]] && command -v mkcert >/dev/null 2>&1; then
+    local caroot
+    caroot="$(mkcert -CAROOT 2>/dev/null || true)"
+    [[ -n "$caroot" ]] && tls_ca="${caroot}/rootCA.pem"
+  fi
+
+  # Web-app (OIDC) client id and audience come from citius-ui-auth.json when
+  # setup-auth produced it; otherwise leave them null.
+  local oidc_client_id="null" audience="null"
+  if [[ -f "$UI_AUTH_CONFIG" ]]; then
+    oidc_client_id="$(jq -r '.web_app.client_id // empty' "$UI_AUTH_CONFIG")"
+    audience="$(jq -r '.audience // empty' "$UI_AUTH_CONFIG")"
+    [[ -n "$oidc_client_id" ]] && oidc_client_id="\"${oidc_client_id}\"" || oidc_client_id="null"
+    [[ -n "$audience" ]] && audience="\"${audience}\"" || audience="null"
+  fi
+
+  jq -n \
+    --arg endpoint "$citius_addr" \
+    --arg tls_ca "$tls_ca" \
+    --arg tls_server_name "$tls_server_name" \
+    --arg issuer "$issuer_url" \
+    --arg project_id "$project_id" \
+    --argjson oidc_client_id "$oidc_client_id" \
+    --argjson audience "$audience" \
+    '{
+      generated_by: "bootstrap/zitadel/bootstrap.sh",
+      citius_server: {
+        endpoint: $endpoint,
+        tls_enabled: true,
+        tls_ca: $tls_ca,
+        tls_server_name: $tls_server_name
+      },
+      zitadel: {
+        issuer: $issuer,
+        project_id: $project_id,
+        oidc_web_app_client_id: $oidc_client_id,
+        audience: $audience
+      }
+    }' > "$STACK_CONFIG"
+  chmod 644 "$STACK_CONFIG"
+}
+
+# start_citius_server brings up the containerized server AFTER Zitadel is
+# provisioned, exporting the introspection configuration derived from
+# generated-config.json so the compose overlay can consume it.
+start_citius_server() {
+  [[ "${CITIUS_SERVER:-0}" == "1" ]] || return 0
+  [[ -f "$GENERATED_CONFIG" ]] || die "${GENERATED_CONFIG} not found"
+  log "starting containerized citius-server"
+
+  local https_port="${ZITADEL_HTTPS_PORT:-443}" issuer_url project_id
+  project_id="$(jq -r '.project_id' "$GENERATED_CONFIG")"
+  if [[ "$https_port" == "443" ]]; then
+    issuer_url="https://${ZITADEL_DOMAIN}"
+  else
+    issuer_url="https://${ZITADEL_DOMAIN}:${https_port}"
+  fi
+
+  export CITIUS_SERVER_ISSUER="$issuer_url"
+  export CITIUS_SERVER_INTROSPECT_ID="$(jq -r '.api_app.ClientID' "$GENERATED_CONFIG")"
+  export CITIUS_SERVER_INTROSPECT_SECRET="$(jq -r '.api_app.ClientSecret' "$GENERATED_CONFIG")"
+  export CITIUS_SERVER_PROJECT_ID="$project_id"
+  export CITIUS_SERVER_EXPECTED_AUDIENCE="$project_id"
+  export CITIUS_SERVER_REFLECTION="${CITIUS_SERVER_REFLECTION:-false}"
+
+  compose up -d --build --wait citius-server
+}
+
 # ---------------------------------------------------------------------------
 # Subcommands
 # ---------------------------------------------------------------------------
@@ -457,6 +568,8 @@ cmd_up() {
   run_setup_sdk
   mint_tokens
   emit_env
+  start_citius_server
+  emit_stack_config
 
   local _https_port="${ZITADEL_HTTPS_PORT:-443}"
   if [[ "$_https_port" == "443" ]]; then
@@ -466,6 +579,10 @@ cmd_up() {
   fi
   log "env file:    ${OUT_ENV}"
   [[ -f "$UI_AUTH_CONFIG" ]] && log "UI auth:     ${UI_AUTH_CONFIG}"
+  [[ -f "$STACK_CONFIG" ]] && log "stack config:${STACK_CONFIG}"
+  if [[ "${CITIUS_SERVER:-0}" == "1" ]]; then
+    log "citius-server: ${CITIUS_ADDR:-127.0.0.1:${CITIUS_SERVER_PUBLISHED_PORT:-50051}}"
+  fi
 }
 
 cmd_down() {
@@ -487,7 +604,7 @@ cmd_reset() {
     log "docker compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
-  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV"
+  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV" "$STACK_CONFIG"
   cmd_up
 }
 
@@ -497,7 +614,7 @@ cmd_nuke() {
     log "docker compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
-  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV"
+  rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV" "$STACK_CONFIG"
   rm -f "$ENV_FILE"
   log "wiped .env, data volumes and runtime artefacts"
 }

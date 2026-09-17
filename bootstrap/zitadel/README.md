@@ -105,6 +105,96 @@ refresh, or logout; those remain responsibilities of `citius-ui`.
 
 ---
 
+## Unified stack: Zitadel + citius-server in one command
+
+By default `bootstrap.sh up` brings up **only** Zitadel; the Citius server is
+then run separately on the host (`make run` after sourcing
+`citius-zitadel.env`). Set `CITIUS_SERVER=1` to also build and run the Citius
+server **as a container in the same stack**, so one command provisions
+everything the UI and the Go/Python SDKs need to run against a real server:
+
+```bash
+# Bring up Zitadel AND a containerized citius-server, provision demo users,
+# and emit the consolidated non-secret config.
+CITIUS_SERVER=1 make zitadel-up
+# equivalently: CITIUS_SERVER=1 bootstrap/zitadel/bootstrap.sh up
+```
+
+What happens, in order:
+
+1. Zitadel (Traefik + Postgres + API + Login UI) comes up and is provisioned by
+   the **existing** `setup-auth` program (OIDC Web app, the CISO/producer/consumer
+   demo human users, their permissions, and the `demo-*` resource ACLs). This
+   step is unchanged.
+2. `citius-zitadel.env` is emitted with the introspection configuration.
+3. The **containerized** `citius-server` is built from the repo `Dockerfile` and
+   started via `docker-compose.citius.yml`. It joins the stack network, trusts
+   the local mkcert CA for token introspection, terminates gRPC TLS with the
+   same local certificate, and reads its Zitadel configuration from the
+   generated introspection values.
+4. `citius-stack.json` is emitted — a single **non-secret** descriptor for
+   clients.
+
+### The consolidated config: `citius-stack.json`
+
+Non-secret only. Secrets (introspection client secret, PATs, masterkey, demo
+passwords) stay in `citius-zitadel.env`/`generated-config.json`, which remain
+mode `0600` and gitignored.
+
+```json
+{
+  "generated_by": "bootstrap/zitadel/bootstrap.sh",
+  "citius_server": {
+    "endpoint": "127.0.0.1:50051",
+    "tls_enabled": true,
+    "tls_ca": "/home/you/.local/share/mkcert/rootCA.pem",
+    "tls_server_name": "citius-auth.localhost"
+  },
+  "zitadel": {
+    "issuer": "https://citius-auth.localhost:8443",
+    "project_id": "…",
+    "oidc_web_app_client_id": "…",
+    "audience": "…"
+  }
+}
+```
+
+- The **UI** reads the issuer, OIDC web-app client id, and audience for hosted
+  Authorization Code + PKCE login (this is the same data as `citius-ui-auth.json`).
+- The **Go SDK** and **Python SDK** read `citius_server.endpoint`, `tls_ca`, and
+  `tls_server_name` to make an authenticated RPC over TLS.
+
+### Start and tear-down
+
+| Command | Effect |
+|---|---|
+| `CITIUS_SERVER=1 bootstrap.sh up` | Idempotent. Brings up Zitadel + citius-server, provisions users, emits config. |
+| `CITIUS_SERVER=1 bootstrap.sh down` | Stops containers, **preserves** data volumes and generated config. Fast restart with `up`. |
+| `CITIUS_SERVER=1 bootstrap.sh reset` | Stops, **wipes** data volumes and generated artefacts (including `citius-stack.json`), then `up`. |
+| `CITIUS_SERVER=1 bootstrap.sh nuke` | `reset` plus deletes `.env` so every secret is regenerated on the next `up`. |
+
+Additional toggles: `CITIUS_SERVER_PUBLISHED_PORT` (host port for gRPC, default
+`50051`) and `CITIUS_SERVER_REFLECTION=true` (enable gRPC reflection for
+`grpcurl`).
+
+### Using the stack from clients
+
+- **Go SDK by itself:** source `citius-zitadel.env`, mint or reuse a service-user
+  token (`tokens/<user>.token`), and dial `CITIUS_ADDR` with `CITIUS_TLS_CA`.
+- **Python SDK / UI:** point `CITIUS_OIDC_CONFIG_PATH` at `citius-ui-auth.json`
+  and `CITIUS_TLS_CA` at the CA from `citius-stack.json`; the UI forwards a
+  hosted-login token to the server per RPC.
+
+> Note on networking: the Zitadel issuer URL (e.g.
+> `https://citius-auth.localhost:8443`) is used by both the browser and the
+> in-network server. The overlay aliases the domain to the Traefik proxy inside
+> the stack network. The exact issuer host/port equivalence between host and
+> container is the part most likely to need adjustment on a given machine;
+> verify token introspection succeeds after the first `up` and adjust
+> `ZITADEL_HTTPS_PORT`/host aliases if the server logs introspection failures.
+
+---
+
 ## Layout
 
 | Path | Purpose |
@@ -113,6 +203,7 @@ refresh, or logout; those remain responsibilities of `citius-ui`.
 | `docker-compose.prodlike.yml` | Vendored upstream init/setup/start split. |
 | `docker-compose.mode-local-tls.yml` | Dev overlay — mkcert cert mounted into Traefik. |
 | `docker-compose.mode-letsencrypt.yml` | Prod overlay — ACME via Let's Encrypt. |
+| `docker-compose.citius.yml` | Optional overlay — runs the containerized `citius-server` in the same stack (`CITIUS_SERVER=1`). |
 | `.env.example` | Template; copy to `.env`. |
 | `.env` | **gitignored** — runtime config + generated secrets. |
 | `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `verify` / `login` / `env`). |
@@ -123,6 +214,7 @@ refresh, or logout; those remain responsibilities of `citius-ui`.
 | `generated-config.json` | **gitignored** — written by `setup-auth`. |
 | `citius-ui-auth.json` | **gitignored** — non-secret issuer, PKCE client, audience, and demo-user configuration for the UI. |
 | `citius-zitadel.env` | **gitignored** — sourceable env file consumed by the server and the integration test suite. |
+| `citius-stack.json` | **gitignored** — consolidated non-secret descriptor (endpoint, TLS CA, issuer, OIDC client, audience) for the UI and SDKs. |
 
 ---
 
