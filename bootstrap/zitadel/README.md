@@ -195,6 +195,72 @@ Additional toggles: `CITIUS_SERVER_PUBLISHED_PORT` (host port for gRPC, default
 
 ---
 
+## Configuration files, explained
+
+Several env/JSON files live in this directory and the overlap is easy to
+misread. They fall into three groups: **inputs you edit**, **secret runtime
+state** (generated, gitignored), and **non-secret outputs consumed by clients**.
+
+### Inputs — you author these
+
+| File | What it is | Secret? |
+|---|---|---|
+| `.env.example` | Committed **template** of non-secret defaults and documented knobs (Zitadel version, domain, ports, TLS mode). Copy it to `.env`. | No (committed) |
+| `.env` | Your **live config**, copied from `.env.example`. Holds operator settings **and** secrets that `bootstrap.sh` auto-fills on first `up` (`ZITADEL_MASTERKEY`, Postgres passwords). | **Yes** (gitignored, `0600`) |
+| `acl.yaml` | The **declarative access model**: project, permission catalog, the OIDC web app, and the demo users (CISO/producer/consumer) with their permissions and `demo-*` resource patterns. Consumed by `setup-auth`. | No (committed) |
+
+### Secret runtime state — generated, never committed
+
+| File / dir | Written by | What it is |
+|---|---|---|
+| `generated-config.json` | `setup-auth` | Source of truth for what was provisioned: project id, the **API app client id + secret** (server introspection creds), and machine service-user client ids/secrets. |
+| `citius-zitadel.env` | `bootstrap.sh` | Sourceable env for **the server and Go integration tests**: `AUTH_ENABLED`, `ZITADEL_ISSUER`, `INTROSPECT_ID/SECRET`, `PROJECT_ID`, `EXPECTED_AUDIENCE`, plus `CITIUS_ADDR`/`CITIUS_TLS_CA` and service-user creds. `0600`. |
+| `tokens/` | `bootstrap.sh` / `interactive-login/` | Short-lived **access tokens** (service-user and hosted-login). `0700`. |
+| `pat/` | Zitadel init | The bootstrap **admin Personal Access Token**. |
+| `certs/` | `bootstrap.sh certs` (mkcert) | Local TLS `local.crt`/`local.key` and the copied `rootCA.pem`. |
+
+### Non-secret outputs — meant to be consumed by clients
+
+| File | Written by | Consumer | What it is |
+|---|---|---|---|
+| `citius-ui-auth.json` | `setup-auth` | **UI** (`CITIUS_OIDC_CONFIG_PATH`) | OIDC config for hosted login: issuer, project id, audience, the **web-app client id** + redirect/logout URIs, and demo-user display names/ids. No secrets. |
+| `citius-stack.json` | `bootstrap.sh` | **UI + Go/Python SDKs** | Consolidated descriptor: `citius_server` (endpoint, TLS CA path, server name) **and** `zitadel` (issuer, project id, OIDC client id, audience). The single "hand this to a client" file. No secrets. |
+
+Why two non-secret files? `citius-ui-auth.json` is the OIDC detail written by the
+provisioner; `citius-stack.json` is a superset that also carries the server
+connection (endpoint + TLS) so a client needs only one file.
+
+### Data flow
+
+```text
+.env.example ──cp──▶ .env ──────────────┐
+                                         │
+acl.yaml ───────────────────────────────┤
+                                         ▼
+                                   bootstrap.sh up
+                                         │
+                          ┌──────────────┴───────────────┐
+                          ▼                              ▼
+                     setup-auth                    docker compose
+                          │                        (Zitadel [+ citius-server])
+          ┌───────────────┴───────────────┐
+          ▼                               ▼
+generated-config.json (secret)     citius-ui-auth.json (non-secret ─▶ UI)
+          │
+          ▼
+    bootstrap.sh emits:
+     ├─ citius-zitadel.env (secret ─▶ server + Go integration tests)
+     ├─ citius-stack.json  (non-secret ─▶ UI + Go/Python SDKs)
+     └─ tokens/            (secret ─▶ service-user / hosted-login tokens)
+```
+
+Rule of thumb: **secrets** (masterkey, PATs, client secrets, passwords, tokens)
+live only in `.env`, `generated-config.json`, `citius-zitadel.env`, `pat/`, and
+`tokens/` — all gitignored. Anything a browser or SDK config needs is in the two
+non-secret JSON outputs.
+
+---
+
 ## Layout
 
 | Path | Purpose |
