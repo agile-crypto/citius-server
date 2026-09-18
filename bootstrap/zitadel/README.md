@@ -53,8 +53,7 @@ Firefox/Chrome. Browsers opened *after* this step will accept the certs
 # 1. one-time: install mkcert and trust its local CA (see Prerequisites above)
 mkcert -install
 
-# 2. copy the env template, then bring the stack up
-cp bootstrap/zitadel/.env.example bootstrap/zitadel/.env
+# 2. bring the stack up (.env is seeded from .env.example if absent)
 make zitadel-up         # alias for: cd bootstrap/zitadel && ./bootstrap.sh up
 ```
 

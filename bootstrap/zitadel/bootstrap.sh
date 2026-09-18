@@ -88,17 +88,18 @@ gen_secret() {
   { LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom || true; } | head -c 32
 }
 
-# If a variable is empty in .env, generate a value and persist it.
-# Usage: ensure_env_secret VAR_NAME
-ensure_env_secret() {
-  local var="$1"
-  local current="${!var:-}"
-  if [[ -n "$current" ]]; then
-    return 0
-  fi
-  local value
-  value="$(gen_secret)"
-  log "generating ${var} (32 chars)"
+# Generate a random password satisfying Zitadel's default complexity policy:
+# at least one lower, upper, digit and symbol, and >= 8 characters. Built as a
+# fixed prefix (one of each class) plus 20 random alnum characters.
+gen_password() {
+  local rest
+  rest="$({ LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom || true; } | head -c 20)"
+  printf 'Aa1!%s' "$rest"
+}
+
+# Persist VAR=value into .env (creating or replacing the line) and export it.
+persist_env() {
+  local var="$1" value="$2"
   if grep -q "^${var}=" "$ENV_FILE"; then
     # macOS/Linux portable in-place edit.
     sed -i.bak -E "s|^${var}=.*$|${var}=${value}|" "$ENV_FILE"
@@ -108,6 +109,30 @@ ensure_env_secret() {
   fi
   chmod 600 "$ENV_FILE"
   export "${var}=${value}"
+}
+
+# If a variable is empty in .env, generate a value and persist it.
+# Usage: ensure_env_secret VAR_NAME
+ensure_env_secret() {
+  local var="$1"
+  local current="${!var:-}"
+  if [[ -n "$current" ]]; then
+    return 0
+  fi
+  log "generating ${var} (32 chars)"
+  persist_env "$var" "$(gen_secret)"
+}
+
+# If a password variable is empty in .env, generate a complexity-compliant
+# value and persist it. Usage: ensure_env_password VAR_NAME
+ensure_env_password() {
+  local var="$1"
+  local current="${!var:-}"
+  if [[ -n "$current" ]]; then
+    return 0
+  fi
+  log "generating ${var} (demo login password)"
+  persist_env "$var" "$(gen_password)"
 }
 
 # Resolve the active TLS overlay path based on TLS_MODE.
@@ -548,11 +573,27 @@ which reaches the published port directly."
 # Subcommands
 # ---------------------------------------------------------------------------
 cmd_up() {
+  # Seed .env from the example on a clean checkout (e.g. after `nuke`) so a
+  # full `up` runs unattended. All secrets left blank in the example are
+  # generated below; the example's demo passwords are public dev defaults.
+  if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
+    log "seeding .env from .env.example"
+    cp "$ENV_EXAMPLE" "$ENV_FILE"
+    chmod 600 "$ENV_FILE"
+  fi
+
   preflight
 
   ensure_env_secret ZITADEL_MASTERKEY
   ensure_env_secret POSTGRES_ADMIN_PASSWORD
   ensure_env_secret POSTGRES_ZITADEL_PASSWORD
+
+  # setup-auth requires each demo human user's initial password. Generate
+  # complexity-compliant values for any that are unset so a clean `up`
+  # (including after `nuke`) provisions the demo personas unattended.
+  ensure_env_password CITIUS_DEMO_CISO_PASSWORD
+  ensure_env_password CITIUS_DEMO_PRODUCER_PASSWORD
+  ensure_env_password CITIUS_DEMO_CONSUMER_PASSWORD
 
   # Re-source .env AFTER secret generation so that any value containing
   # `${POSTGRES_ADMIN_PASSWORD}` (notably ZITADEL_DATABASE_POSTGRES_DSN)
