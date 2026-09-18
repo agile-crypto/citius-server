@@ -573,15 +573,6 @@ which reaches the published port directly."
 # Subcommands
 # ---------------------------------------------------------------------------
 cmd_up() {
-  # Seed .env from the example on a clean checkout (e.g. after `nuke`) so a
-  # full `up` runs unattended. All secrets left blank in the example are
-  # generated below; the example's demo passwords are public dev defaults.
-  if [[ ! -f "$ENV_FILE" && -f "$ENV_EXAMPLE" ]]; then
-    log "seeding .env from .env.example"
-    cp "$ENV_EXAMPLE" "$ENV_FILE"
-    chmod 600 "$ENV_FILE"
-  fi
-
   preflight
 
   ensure_env_secret ZITADEL_MASTERKEY
@@ -706,6 +697,15 @@ main() {
         warn ".env not found; copying from .env.example"
         cp "$ENV_EXAMPLE" "$ENV_FILE"
         chmod 600 "$ENV_FILE"
+        # The containerized server reaches Zitadel over the in-network proxy on
+        # :443, so the issuer must advertise :443. A fresh .env for
+        # CITIUS_SERVER=1 therefore publishes HTTPS on the privileged host port.
+        # The HTTP port stays unprivileged (it is not part of the issuer and 80
+        # is often already bound on the host).
+        if [[ "${1:-up}" == "up" && "${CITIUS_SERVER:-0}" == "1" ]]; then
+          warn "setting ZITADEL_HTTPS_PORT=443 for CITIUS_SERVER=1"
+          persist_env ZITADEL_HTTPS_PORT 443
+        fi
       fi
       ;;
   esac
