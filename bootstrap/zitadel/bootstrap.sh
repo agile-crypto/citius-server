@@ -516,7 +516,6 @@ emit_stack_config() {
 start_citius_server() {
   [[ "${CITIUS_SERVER:-0}" == "1" ]] || return 0
   [[ -f "$GENERATED_CONFIG" ]] || die "${GENERATED_CONFIG} not found"
-  log "starting containerized citius-server"
 
   local https_port="${ZITADEL_HTTPS_PORT:-443}" issuer_url project_id
   project_id="$(jq -r '.project_id' "$GENERATED_CONFIG")"
@@ -524,8 +523,17 @@ start_citius_server() {
     issuer_url="https://${ZITADEL_DOMAIN}"
   else
     issuer_url="https://${ZITADEL_DOMAIN}:${https_port}"
+    # The issuer carries the host-published port. Inside the compose network the
+    # proxy listens on :443, so the containerized server cannot reach the issuer
+    # at a non-443 port. Fail fast with actionable guidance instead of letting
+    # the container crash-loop on OIDC discovery.
+    die "CITIUS_SERVER=1 requires ZITADEL_HTTPS_PORT=443 so the in-network issuer
+matches the proxy port (current: ${https_port}). Either set ZITADEL_HTTPS_PORT=443
+in .env, or run the server on the host with 'make run-dev-tls' (scripts/run_server.sh),
+which reaches the published port directly."
   fi
 
+  log "starting containerized citius-server"
   export CITIUS_SERVER_ISSUER="$issuer_url"
   export CITIUS_SERVER_INTROSPECT_ID="$(jq -r '.api_app.ClientID' "$GENERATED_CONFIG")"
   export CITIUS_SERVER_INTROSPECT_SECRET="$(jq -r '.api_app.ClientSecret' "$GENERATED_CONFIG")"
@@ -566,7 +574,15 @@ cmd_up() {
   chmod 755 "$PAT_DIR"   # must be world-executable so the container UID can write into it
 
   log "${ENGINE} compose up"
-  compose up -d --wait
+  if [[ "${CITIUS_SERVER:-0}" == "1" ]]; then
+    # Bring up only Zitadel first. citius-server is started later by
+    # start_citius_server(), once its introspection env is populated from the
+    # provisioned generated-config.json — otherwise it would crash-loop on
+    # empty ZITADEL_ISSUER/INTROSPECT_ID/INTROSPECT_SECRET.
+    compose up -d --wait proxy zitadel-api zitadel-login postgres
+  else
+    compose up -d --wait
+  fi
 
   wait_for_setup
   run_setup_sdk

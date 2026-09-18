@@ -17,6 +17,13 @@
 services:
   # Alias the Zitadel public domain to the Traefik proxy inside the network so
   # the issuer URL used by the browser also resolves from the server container.
+  #
+  # IMPORTANT: the containerized server introspects tokens against the issuer
+  # URL, which carries the HOST-published HTTPS port. For in-network dialling to
+  # reach the proxy on the same port, run the stack with ZITADEL_HTTPS_PORT=443
+  # (issuer https://${ZITADEL_DOMAIN} with no custom port). When a non-443 host
+  # port is required, run the server on the host with scripts/run_server.sh
+  # instead of this overlay — the host reaches the published port directly.
   proxy:
     networks:
       zitadel:
@@ -29,6 +36,10 @@ services:
       dockerfile: Dockerfile
     image: citius-server:local
     restart: unless-stopped
+    # Run as root so the container can read the mkcert cert/key/CA under
+    # ./certs, which bootstrap.sh writes mode 0600/0700 owned by the host user.
+    # This matches the zitadel-api/zitadel-login services in this stack.
+    user: "0"
     command:
       - -addr
       - ":50051"
