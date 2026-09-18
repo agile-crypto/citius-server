@@ -25,6 +25,8 @@ import (
 	"github.com/agile-crypto/citius-server/internal/cmd/server"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -41,6 +43,7 @@ func main() {
 		"register the gRPC reflection service. Default false; production deployments should leave it off. "+
 			"When true, reflection RPCs bypass authentication and authorization \u2014 a deliberate carve-out "+
 			"so `grpcurl list` works. Treat enabling this as exposing the API surface to anonymous callers.")
+	health := flag.Bool("grpc-health", false, "register the gRPC health service (default: false).")
 	// TODO(mtls): add -mtls-ca to enable client-cert authentication as a defence-in-depth
 	// layer alongside bearer-token introspection. Tracked in the auth roadmap.
 	flag.Parse()
@@ -101,12 +104,6 @@ func main() {
 		KeyManagement: true,
 	}
 
-	lis, err := net.Listen("tcp", *addr)
-	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", *addr, err)
-	}
-	defer lis.Close()
-
 	srv := grpc.NewServer(serverOpts...)
 	err = server.RegisterAll(ctx, srv, services, factorySet)
 	if err != nil {
@@ -116,19 +113,35 @@ func main() {
 		reflection.Register(srv)
 		log.Println("gRPC reflection registered")
 	}
+	// Register health server
+	if *health {
+		registerHealthServer(srv)
+	}
 
-	// Graceful shutdown: when ctx is cancelled, stop accepting new RPCs.
+	err = startServer(ctx, srv, *addr, authCfg)
+	if err != nil {
+		log.Fatalf("failed to start server: %v", err)
+	}
+}
+
+func startServer(ctx context.Context, srv *grpc.Server, addr string, authCfg auth.Config) error {
 	go func() {
 		<-ctx.Done()
 		log.Println("shutting down gRPC server...")
 		srv.GracefulStop()
 	}()
 
+	lis, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("failed to listen on %s: %w", addr, err)
+	}
+	defer lis.Close()
+
 	log.Printf("CaaS gRPC server listening on %s (auth_enabled=%t)", lis.Addr(), authCfg.Enabled)
 	if err := srv.Serve(lis); err != nil {
-		fmt.Fprintf(os.Stderr, "serve: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("failed to serve gRPC: %w", err)
 	}
+	return nil
 }
 
 // defaultCatalogPath returns the path to standard_algorithms.json relative
@@ -140,4 +153,13 @@ func defaultCatalogPath() string {
 		return "proto/standard_algorithms.json"
 	}
 	return filepath.Join(filepath.Dir(f), "..", "..", "..", "proto", "standard_algorithms.json")
+}
+
+// registerHealthServer registers the gRPC health service and sets the initial
+// status to SERVING for all services. This allows clients to check the health
+// of the server.
+func registerHealthServer(srv *grpc.Server) {
+	healthServer := health.NewServer()
+	healthpb.RegisterHealthServer(srv, healthServer)
+	healthServer.SetServingStatus("", healthpb.HealthCheckResponse_SERVING)
 }

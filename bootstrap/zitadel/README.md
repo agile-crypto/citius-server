@@ -87,6 +87,58 @@ make run
 
 ---
 
+## Configurations
+
+`bootstrap.sh` supports both Docker and Podman as the container engine
+(`ENGINE=docker` (default) or `ENGINE=podman`). No engine-specific compose
+overlay is needed — the same vendored `docker-compose.yml` works unmodified
+on both.
+
+**Troubleshooting**:
+
+On macOS, it has been observed that `./bootstrap.sh up` only works when **SELinux is disabled**.
+- Run `podman machine ssh -- setenforce 0` before a Zitadel command
+- Reset SELinux with `podman machine ssh -- setenforce 1`
+
+### Dev notes and findings
+
+**Traefix error 404**
+
+Traefik (the `proxy` service) discovers `zitadel-api` / `zitadel-login` and
+builds routers for `${ZITADEL_DOMAIN}` via its `--providers.docker=true`
+provider, which watches a container-engine API socket bind-mounted into the
+`proxy` container at `/var/run/docker.sock` (see the `traefik.http.*` labels
+on `zitadel-api`/`zitadel-login` in `docker-compose.yml`). If that socket is
+missing or points at the wrong thing, Traefik silently discovers nothing —
+no routers get created, and every request (including `setup-auth`'s gRPC
+calls to Zitadel) hits Traefik's own fallback and gets a plain-text 404, not
+an error from Zitadel itself.
+
+Where `/var/run/docker.sock` actually resolves to differs by engine and by
+host OS:
+
+| Host OS | Docker | Podman |
+|---|---|---|
+| **macOS** | `/var/run/docker.sock` is Docker Desktop's real daemon socket on the host. | Podman runs a Linux VM (`podman machine`). The VM image itself ships a compatibility symlink at `/var/run/docker.sock` → `/run/podman/podman.sock` (the real, systemd-managed API socket, live inside the VM). Bind-mount *source* paths in a compose `volumes:` entry are resolved by the engine that actually creates the container — i.e. **inside the VM** — so the literal, unmodified string `/var/run/docker.sock` already resolves correctly there. No overlay needed. |
+| **Linux** | `/var/run/docker.sock` is the real dockerd socket. | Podman ships the same `/var/run/docker.sock` compatibility symlink on native Linux installs too, pointing at the real Podman API socket. Same story: no overlay needed. |
+
+Note that the symlink `/var/run/docker.sock` → `/run/podman/podman.sock` with podman on macOS is present when Docker compatibility is enabled (POdman Desktop > Settings > Docker Compatibility). It is unknown whether the symlink is present when docker compatibility is not enabled.
+
+**The fix in practice**
+On macOS, podman runs in a VM called `podman-machine-default` and is accessed with the set of commands `podman machine [command]`. By default, SELinux is enabled (ie. "Restrictive") on the VM. It has been observed that the `./bootstrap.sh up` works when SELinux is disabled (`podman machine ssh -- setenforce 0`), with the mount:
+```
+volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+```
+However, when SELinux is enabled, it does not work. A first exploration with Claude could not determine what the root cause is. Also, Zitadel does not claim support for Podman. The Zitadel docs explicitly require Docker Engine 24+ (https://zitadel.com/docs/self-hosting/deploy/compose) for docker-compose.
+
+**Rootless Podman**
+
+Under Docker, not pinning `user:0` in the containers `zitadel-init` and `zitadel-setup` works fine. However, it does not work with rootless Podman and the boostrap fails with `open /zitadel/bootstrap/admin.pat: permission denied`, because the containers are rootless. 
+
+
+---
+
 ## Vendoring upstream compose
 
 The base + overlay compose files in this directory are placeholders until
