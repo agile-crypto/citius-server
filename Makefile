@@ -21,8 +21,8 @@
 #   hooks       — install .githooks/ as the local git hooks directory (run once per clone)
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
-.PHONY: fmt proto generate clean ci test-pkg run run-dev hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all test-integration-auth-e2e test-integration-auth-human-e2e
+.PHONY: fmt proto generate clean ci test-pkg run run-dev run-dev-tls hooks _hooks-check
+.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all test-integration-auth-e2e test-integration-auth-human-e2e test-integration-auth-e2e-macos-podman
 .PHONY: proto-update-api
 
 # Default goal: print help when `make` is run with no arguments.
@@ -51,7 +51,7 @@ help: ## Show this help (list all available targets)
 # ---------------------------------------------------------------------------
 # Server runtime defaults (override on the command line, e.g. `make run ADDR=:9000`)
 # ---------------------------------------------------------------------------
-ADDR    ?= :50051
+ADDR    ?= 127.0.0.1:50051
 CATALOG ?= proto/standard_algorithms.json
 BIN_DIR ?= bin
 SERVER_BIN := $(BIN_DIR)/caas-server
@@ -102,10 +102,32 @@ $(SERVER_BIN):
 	@mkdir -p $(BIN_DIR)
 	go build -o $(SERVER_BIN) $(SERVER_PKG)
 
+TLS_CERT_FOLDER := bootstrap/zitadel/certs
+TLS_CERT_FILE := $(TLS_CERT_FOLDER)/local.crt
+TLS_KEY_FILE  := $(TLS_CERT_FOLDER)/local.key
+
 # Fast-iteration variant: skips the binary, runs straight from source.
-run-dev: ## Run the gRPC server via 'go run' (no build artefact)
+run-dev: ## Run the gRPC server via 'go run' (no build artefact) with gRPC reflection and health service enabled
 	@echo "Starting CaaS gRPC server (go run) on $(ADDR)"
-	go run $(SERVER_PKG) -addr $(ADDR) -catalog $(CATALOG)
+	go run $(SERVER_PKG) -addr $(ADDR) -catalog $(CATALOG) -grpc-reflection -grpc-health
+
+ROOT_CA=$$(mkcert -CAROOT)/rootCA.pem ## Needs to be quoted because it contains spaces on macOS.
+run-dev-tls: ## Run the gRPC server via 'go run' (no build artefact) with TLS and gRPC reflection enabled. Requires TLS cert and key files to exist, and a root CA to be installed via mkcert.
+	@set -e; \
+	if [ ! -f $(TLS_CERT_FILE) ]; then \
+		echo "ERROR: TLS cert file $(TLS_CERT_FILE) not found. Run 'make zitadel-up' first."; \
+		exit 1; \
+	fi; \
+	if [ ! -f $(TLS_KEY_FILE) ]; then \
+		echo "ERROR: TLS key file $(TLS_KEY_FILE) not found. Run 'make zitadel-up' first."; \
+		exit 1; \
+	fi;
+	@echo "INFO: Starting CaaS gRPC server (go run) on $(ADDR) with TLS and gRPC reflection enabled"
+	@echo "INFO: Use 'grpcurl -cacert "$(ROOT_CA)" localhost:50051 list' to list services"
+	@echo "INFO: Use 'grpcurl -cacert "$(ROOT_CA)" 127.0.0.1:50051 grpc.health.v1.Health/Check' to check health"
+	@echo "INFO: TLS Setting used: TLS_CERT_FILE=$(TLS_CERT_FILE) TLS_KEY_FILE=$(TLS_KEY_FILE)"
+	go run $(SERVER_PKG) -addr $(ADDR) -catalog $(CATALOG) -tls-cert $(TLS_CERT_FILE) -tls-key $(TLS_KEY_FILE) -grpc-reflection -grpc-health
+
 
 # ---------------------------------------------------------------------------
 # Test
@@ -272,3 +294,27 @@ test-integration-auth-human-e2e: ## Run auth E2E with hosted-login tokens for al
 	@test -s $(ZITADEL_DIR)/tokens/citius-producer.token || (echo "ERROR: missing producer token; run make zitadel-login-all" && exit 1)
 	@test -s $(ZITADEL_DIR)/tokens/citius-consumer.token || (echo "ERROR: missing consumer token; run make zitadel-login-all" && exit 1)
 	@$(MAKE) test-integration-auth-e2e HUMAN_AUTH_ENV='CITIUS_CISO_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-ciso.token) CITIUS_PRODUCER_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-producer.token) CITIUS_CONSUMER_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-consumer.token)'
+
+test-integration-auth-e2e-macos-podman: ## One-shot (macOS/Podman): start caas-server via scripts/run_server.sh, run auth integration suite, tear server down
+	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run 'ENGINE=PODMAN make zitadel-up' first" && exit 1)
+	@bash -c '\
+	  set -e; \
+	  bash ./scripts/run_server.sh & \
+	  pid=$$!; \
+	  trap "kill $$pid 2>/dev/null; wait $$pid 2>/dev/null" EXIT INT TERM; \
+	  port=$$(printf "%s" "$(ADDR)" | sed "s/.*://"); \
+	  echo "waiting for caas-server (run_server.sh pid=$$pid) on :$$port ..."; \
+	  for i in $$(seq 1 100); do \
+	    if ! kill -0 $$pid 2>/dev/null; then echo "run_server.sh exited early"; exit 1; fi; \
+	    if (exec 3<>/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then exec 3<&-; exec 3>&-; break; fi; \
+	    sleep 0.1; \
+	  done; \
+	  if ! (exec 3<>/dev/tcp/127.0.0.1/$$port) 2>/dev/null; then echo "caas-server never listened on :$$port"; exit 1; fi; \
+	  exec 3<&-; exec 3>&-; \
+	  echo "caas-server up; running tests"; \
+	  set +e; \
+	  go test -tags "integration zitadel" -count=1 ./test/integration/auth/...; \
+	  rc=$$?; \
+	  echo "tests exited rc=$$rc; shutting caas-server down"; \
+	  exit $$rc \
+	'

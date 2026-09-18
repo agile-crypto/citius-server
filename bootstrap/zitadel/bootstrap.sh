@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 # bootstrap/zitadel/bootstrap.sh — lifecycle orchestrator for the Citius
 # Zitadel stack.
 #
@@ -30,6 +31,7 @@
 
 set -euo pipefail
 umask 077
+
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly ENV_FILE="${SCRIPT_DIR}/.env"
@@ -119,6 +121,8 @@ tls_overlay_path() {
   esac
 }
 
+# Engine is the container runtime to use. Default: docker.
+ENGINE="${ENGINE:-docker}"
 # Wrap `docker compose` with our project name and the active overlay set.
 # Set CITIUS_DEV_CONSOLE=1 to also include docker-compose.dev-console.yml,
 # which provisions a human admin account with known credentials for the UI.
@@ -130,14 +134,14 @@ compose() {
   if [[ "${CITIUS_SERVER:-0}" == "1" ]]; then
     extra_overlays+=(-f "$CITIUS_COMPOSE")
   fi
-  docker compose \
+  ${ENGINE} compose \
     --env-file "$ENV_FILE" \
     --project-name "$COMPOSE_PROJECT" \
     -f "$BASE_COMPOSE" \
     -f "$PRODLIKE_COMPOSE" \
     -f "$(tls_overlay_path)" \
     -f "${SCRIPT_DIR}/docker-compose.ports.yml" \
-    "${extra_overlays[@]}" \
+    "${extra_overlays[@]+"${extra_overlays[@]}"}" \
     "$@"
 }
 
@@ -146,11 +150,11 @@ compose() {
 # ---------------------------------------------------------------------------
 preflight() {
   log "preflight checks"
-  need_cmd docker
+  need_cmd ${ENGINE}
   need_cmd jq
   need_cmd curl
   need_cmd go
-  docker compose version >/dev/null 2>&1 || die "docker compose v2 plugin required"
+  ${ENGINE} compose version >/dev/null 2>&1 || die "${ENGINE} compose v2 plugin required"
 
   # Refuse to run while the vendor placeholder is still in place.
   if grep -q '^x-citius-vendor-placeholder: true' "$BASE_COMPOSE"; then
@@ -561,7 +565,7 @@ cmd_up() {
   mkdir -p "$PAT_DIR"
   chmod 755 "$PAT_DIR"   # must be world-executable so the container UID can write into it
 
-  log "docker compose up"
+  log "${ENGINE} compose up"
   compose up -d --wait
 
   wait_for_setup
@@ -591,7 +595,7 @@ cmd_down() {
     warn ".env absent; nothing to stop"
     return 0
   fi
-  log "docker compose down (volumes preserved)"
+  log "${ENGINE} compose down (volumes preserved)"
   compose down --remove-orphans
 }
 
@@ -601,7 +605,7 @@ cmd_down() {
 cmd_reset() {
   load_env --optional
   if [[ -f "$ENV_FILE" ]]; then
-    log "docker compose down -v (wiping data volumes)"
+    log "${ENGINE} compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
   rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV" "$STACK_CONFIG"
@@ -611,7 +615,7 @@ cmd_reset() {
 cmd_nuke() {
   load_env --optional
   if [[ -f "$ENV_FILE" ]]; then
-    log "docker compose down -v (wiping data volumes)"
+    log "${ENGINE} compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
   rm -rf "$PAT_DIR" "$TOKENS_DIR" "$GENERATED_CONFIG" "$UI_AUTH_CONFIG" "$OUT_ENV" "$STACK_CONFIG"
