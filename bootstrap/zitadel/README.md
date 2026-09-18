@@ -185,6 +185,24 @@ Additional toggles: `CITIUS_SERVER_PUBLISHED_PORT` (host port for gRPC, default
   and `CITIUS_TLS_CA` at the CA from `citius-stack.json`; the UI forwards a
   hosted-login token to the server per RPC.
 
+### Preflight: `smoke-test.sh`
+
+Before running the heavier integration suites, confirm the emitted
+`citius-stack.json` points at a reachable, CA-trusted stack:
+
+```bash
+make zitadel-smoke            # or: bootstrap/zitadel/smoke-test.sh
+```
+
+It reads only the **non-secret** `citius-stack.json` and checks the config
+fields, that the TLS CA is a valid PEM, that the gRPC endpoint completes a TLS
+handshake verified against that CA, and that the Zitadel OIDC discovery document
+is reachable over the same trust. It performs **no** authenticated RPC and is
+engine-agnostic (works the same under docker or podman). It complements — it does
+not replace — the server auth integration suite
+(`make test-integration-auth-e2e`, raw gRPC) and the SDK integration tests in the
+`citius-go-sdk` / `citius-python-sdk` repositories.
+
 > Note on networking: the Zitadel issuer URL (e.g.
 > `https://citius-auth.localhost:8443`) is used by both the browser and the
 > in-network server. The overlay aliases the domain to the Traefik proxy inside
@@ -273,6 +291,7 @@ non-secret JSON outputs.
 | `.env.example` | Template; copy to `.env`. |
 | `.env` | **gitignored** — runtime config + generated secrets. |
 | `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `verify` / `login` / `env`). |
+| `smoke-test.sh` | Preflight that verifies `citius-stack.json` points at a reachable, CA-trusted stack (no secrets, no RPC). |
 | `setup-auth/` | Go program that provisions and verifies the `citius-api` project, permission catalog, Web application, and machine/human users. |
 | `interactive-login/` | Operator-run hosted-login/PKCE acceptance helper; tokens are identity-checked and written only to `tokens/`. |
 | `pat/` | **gitignored** — bootstrap PAT mount target. |

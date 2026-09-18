@@ -22,7 +22,7 @@
 
 .PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev run-dev-tls hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all test-integration-auth-e2e test-integration-auth-human-e2e test-integration-auth-e2e-macos-podman
+.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all zitadel-smoke test-integration-auth-e2e test-integration-auth-human-e2e test-integration-auth-e2e-macos-podman
 .PHONY: proto-update-api
 
 # Default goal: print help when `make` is run with no arguments.
@@ -246,6 +246,9 @@ zitadel-nuke: ## Wipe everything including .env (next up regenerates all secrets
 
 zitadel-env: ## Print sourced env entries written by bootstrap.sh
 	$(ZITADEL_DIR)/bootstrap.sh env
+
+zitadel-smoke: ## Preflight: verify citius-stack.json points at a reachable, CA-trusted stack
+	$(ZITADEL_DIR)/smoke-test.sh
 
 zitadel-login: ## Complete hosted PKCE login for PERSONA=<demo username>
 	@test -n "$(PERSONA)" || (echo "ERROR: set PERSONA=citius-ciso, citius-producer, or citius-consumer" && exit 1)
