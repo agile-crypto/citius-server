@@ -86,12 +86,13 @@ func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.Cr
 	return &messagespb.CreateKeyResponse{
 		Success: true,
 		KeyMetadata: &messagespb.KeyMetadata{
-			Name:       md.Name,
-			Version:    md.Version,
-			Policy:     md.Policy,
-			KeyId:      md.KeyID,
-			TemplateId: md.TemplateID,
-			Provider:   md.Provider,
+			Name:           md.Name,
+			Version:        md.Version,
+			Policy:         md.Policy,
+			KeyId:          md.KeyID,
+			TemplateId:     md.TemplateID,
+			Provider:       md.Provider,
+			LifecycleState: md.LifecycleState,
 		},
 	}, nil
 }
@@ -116,12 +117,13 @@ func (h *KeyManagementHandler) ReadKey(ctx context.Context, req *messagespb.Read
 
 	return &messagespb.ReadKeyResponse{
 		KeyMetadata: &messagespb.KeyMetadata{
-			Name:       md.Name,
-			Version:    md.Version,
-			Policy:     md.Policy,
-			KeyId:      md.KeyID,
-			TemplateId: md.TemplateID,
-			Provider:   md.Provider,
+			Name:           md.Name,
+			Version:        md.Version,
+			Policy:         md.Policy,
+			KeyId:          md.KeyID,
+			TemplateId:     md.TemplateID,
+			Provider:       md.Provider,
+			LifecycleState: md.LifecycleState,
 		},
 	}, nil
 }
