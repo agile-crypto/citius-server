@@ -118,6 +118,7 @@ func TestKeyManagementHandler_CreateKey_Success(t *testing.T) {
 				Version:    1,
 				TemplateID: "ecdsa-p256-sha256-der",
 				Provider:   "software",
+				ScopeSpec:  &core.ScopeSpecification{Scope: core.ScopeSignatureStandard},
 			}, nil
 		},
 	}
@@ -144,6 +145,7 @@ func TestKeyManagementHandler_CreateKey_Success(t *testing.T) {
 	if !resp.GetSuccess() {
 		t.Error("expected Success: true in CreateKeyResponse")
 	}
+	require.Equal(t, typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, resp.GetKeyMetadata().GetScopeSpec().GetSignature().GetScope())
 }
 
 func TestKeyManagementHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) {
@@ -182,6 +184,29 @@ func TestKeyManagementHandler_ReadKey_NotFound_ReturnsNotFound(t *testing.T) {
 	if st.Code() != codes.NotFound {
 		t.Errorf("expected NotFound, got %s", st.Code())
 	}
+}
+
+func TestKeyManagementHandler_ReadKey_PreservesScopeMetadata(t *testing.T) {
+	ctx := context.Background()
+	km := &mockKeyOrchestrator{
+		readFn: func(_ context.Context, _ string) (*service.KeyMetadata, error) {
+			return &service.KeyMetadata{
+				Name:       "my-key",
+				KeyID:      "key_123",
+				Version:    2,
+				TemplateID: "ml-dsa-65",
+				Provider:   "software",
+				ScopeSpec:  &core.ScopeSpecification{Scope: core.ScopeSignatureStandard},
+			}, nil
+		},
+	}
+	h := wireKeys(t, km)
+
+	version := uint32(2)
+	resp, err := h.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: "my-key", Version: &version})
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), resp.GetKeyMetadata().GetVersion())
+	require.Equal(t, typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, resp.GetKeyMetadata().GetScopeSpec().GetSignature().GetScope())
 }
 
 func TestKeyManagementHandler_TransformKey_Success(t *testing.T) {

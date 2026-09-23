@@ -82,18 +82,14 @@ func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.Cr
 	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, createOp, err))
 	}
+	mdProto, err := md.ToProto(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, createOp, err))
+	}
 
 	return &messagespb.CreateKeyResponse{
-		Success: true,
-		KeyMetadata: &messagespb.KeyMetadata{
-			Name:           md.Name,
-			Version:        md.Version,
-			Policy:         md.Policy,
-			KeyId:          md.KeyID,
-			TemplateId:     md.TemplateID,
-			Provider:       md.Provider,
-			LifecycleState: md.LifecycleState,
-		},
+		Success:     true,
+		KeyMetadata: mdProto,
 	}, nil
 }
 
@@ -114,17 +110,13 @@ func (h *KeyManagementHandler) ReadKey(ctx context.Context, req *messagespb.Read
 	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, readOp, err))
 	}
+	mdProto, err := md.ToProto(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, readOp, err))
+	}
 
 	return &messagespb.ReadKeyResponse{
-		KeyMetadata: &messagespb.KeyMetadata{
-			Name:           md.Name,
-			Version:        md.Version,
-			Policy:         md.Policy,
-			KeyId:          md.KeyID,
-			TemplateId:     md.TemplateID,
-			Provider:       md.Provider,
-			LifecycleState: md.LifecycleState,
-		},
+		KeyMetadata: mdProto,
 	}, nil
 }
 
