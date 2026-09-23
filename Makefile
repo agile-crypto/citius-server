@@ -3,6 +3,7 @@
 # Targets:
 #   ci          — CI entry point: lint + test-race + smoke (merge gate)
 #   build       — compile all internal packages
+#   docker-build — build the local citius-server container image
 #   test        — run all tests (no race detector)
 #   test-race   — run all tests with race detector
 #   test-cover  — run tests with coverage report
@@ -18,11 +19,12 @@
 #   test-pkg    — run a specific package's tests (PKG=internal/core)
 #   run         — build and run the gRPC server (ADDR=:50051 CATALOG=path)
 #   run-dev     — go run the gRPC server (no build artefact)
+#   zitadel-up-server — boot Zitadel with the containerized Citius server
 #   hooks       — install .githooks/ as the local git hooks directory (run once per clone)
 
-.PHONY: help build test test-race test-cover smoke vet lint lint-go lint-proto
+.PHONY: help build docker-build test test-race test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev run-dev-tls hooks _hooks-check
-.PHONY: zitadel-up zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all zitadel-smoke test-integration-auth-e2e test-integration-auth-human-e2e test-integration-auth-e2e-macos-podman
+.PHONY: zitadel-up zitadel-up-server zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all zitadel-smoke test-integration-auth-e2e test-integration-auth-human-e2e test-integration-auth-e2e-macos-podman
 .PHONY: proto-update-api
 
 # Default goal: print help when `make` is run with no arguments.
@@ -41,6 +43,7 @@ help: ## Show this help (list all available targets)
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "ADDR"     "gRPC listen address"   "$(ADDR)"
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "CATALOG"  "algorithm catalog path" "$(CATALOG)"
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "BIN_DIR"  "build output directory" "$(BIN_DIR)"
+	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "CONTAINER_ENGINE" "container CLI for docker-build" "$(CONTAINER_ENGINE)"
 	@printf "  \033[33m%-14s\033[0m %s (default: %s)\n" "OPENSSL_PREFIX" "OpenSSL 3.5+ install used for cgo" "$(OPENSSL_PREFIX)"
 	@printf "  \033[33m%-14s\033[0m %s (e.g. PKG=internal/core)\n" "PKG" "package for test-pkg"
 	@printf "\n\033[1mExamples:\033[0m\n"
@@ -56,6 +59,7 @@ CATALOG ?= proto/standard_algorithms.json
 BIN_DIR ?= bin
 SERVER_BIN := $(BIN_DIR)/caas-server
 SERVER_PKG := ./internal/cmd/server/main
+CONTAINER_ENGINE ?= docker
 
 MODULE := github.com/agile-crypto/citius-server
 
@@ -88,6 +92,9 @@ _hooks-check:
 # ---------------------------------------------------------------------------
 build: ## Compile all internal packages (+ vault-storage, via the go.work workspace)
 	go build ./internal/... ./vault-storage/...
+
+docker-build: ## Build the local citius-server:local Docker image
+	command $(CONTAINER_ENGINE) build --tag citius-server:local .
 
 # ---------------------------------------------------------------------------
 # Run the gRPC server
@@ -228,6 +235,9 @@ ZITADEL_DIR := bootstrap/zitadel
 
 zitadel-up: ## Boot the local Zitadel stack and seed the citius project
 	$(ZITADEL_DIR)/bootstrap.sh up
+
+zitadel-up-server: ## Boot Zitadel with the containerized Citius server enabled
+	CITIUS_SERVER=1 $(ZITADEL_DIR)/bootstrap.sh up
 
 zitadel-up-dev: ## Like zitadel-up but also provisions a human console-UI admin account
 	CITIUS_DEV_CONSOLE=1 $(ZITADEL_DIR)/bootstrap.sh up
