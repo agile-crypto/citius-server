@@ -54,6 +54,88 @@ func TestE2E_AllSignatureTemplates_CreateKey_Sign_Verify(t *testing.T) {
 	}
 }
 
+// TestE2E_TransformKey_WithScopeSpecification exercises the real key-management
+// handler and verifies that a valid scope-aware transform no longer falls
+// through as UNIMPLEMENTED. The transformed version must also be immediately
+// usable by the crypto handler.
+func TestE2E_TransformKey_WithScopeSpecification(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+	policyName := seedPolicy(t, ctx, h, "e2e-transform-allow", []string{
+		"ecdsa-p256-sha256-der",
+		"ml-dsa-65",
+	})
+
+	scopeSpec := &typespb.ScopeSpecification{
+		ScopeSpec: &typespb.ScopeSpecification_Signature{
+			Signature: &typespb.SignatureScopeSpec{
+				Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+			},
+		},
+	}
+	initialTemplate := "ecdsa-p256-sha256-der"
+	createResp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name:       "e2e-transform-key",
+		Policy:     policyName,
+		ProviderId: "software",
+		ScopeSpec:  scopeSpec,
+		TemplateId: &initialTemplate,
+	})
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+
+	targetTemplate := "ml-dsa-65"
+	transformResp, err := h.KeysHandler.TransformKey(ctx, &messagespb.TransformKeyRequest{
+		Name:       createResp.GetKeyMetadata().GetName(),
+		ScopeSpec:  scopeSpec,
+		TemplateId: &targetTemplate,
+	})
+	if err != nil {
+		t.Fatalf("TransformKey: %v", err)
+	}
+	metadata := transformResp.GetKeyMetadata()
+	if !transformResp.GetSuccess() {
+		t.Fatal("TransformKey: success=false")
+	}
+	if metadata.GetVersion() != 2 {
+		t.Fatalf("TransformKey version: got %d, want 2", metadata.GetVersion())
+	}
+	if metadata.GetTemplateId() != targetTemplate {
+		t.Fatalf("TransformKey template: got %q, want %q", metadata.GetTemplateId(), targetTemplate)
+	}
+	if metadata.GetScopeSpec().GetSignature().GetScope() != typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD {
+		t.Fatalf("TransformKey scope: got %v, want SIGNATURE_SCOPE_STANDARD", metadata.GetScopeSpec())
+	}
+
+	payload := []byte("end-to-end transformed ML-DSA signature")
+	signResp, err := h.CryptoHandler.Sign(ctx, &messagespb.SignRequest{
+		KeyName:     metadata.GetName(),
+		Input:       payload,
+		ScopeParams: &messagespb.SignRequest_NoContext{NoContext: &typespb.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Sign transformed key: %v", err)
+	}
+	if signResp.GetMetadata().GetKeyVersion() != 2 {
+		t.Fatalf("Sign key version: got %d, want 2", signResp.GetMetadata().GetKeyVersion())
+	}
+
+	verifyResp, err := h.CryptoHandler.Verify(ctx, &messagespb.VerifyRequest{
+		KeyName:     metadata.GetName(),
+		Input:       payload,
+		Signature:   signResp.GetSignature(),
+		Metadata:    signResp.GetMetadata(),
+		ScopeParams: &messagespb.VerifyRequest_NoContext{NoContext: &typespb.NoParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Verify transformed key: %v", err)
+	}
+	if !verifyResp.GetValid() {
+		t.Fatal("Verify transformed key: valid=false")
+	}
+}
+
 // assertCreateKeySignVerifyRoundTrip creates a key for templateID, signs a
 // fixed payload, and verifies it — all through the real gRPC Handler.
 func assertCreateKeySignVerifyRoundTrip(t *testing.T, ctx context.Context, templateID string) {

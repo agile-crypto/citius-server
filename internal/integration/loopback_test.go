@@ -530,8 +530,9 @@ func TestIntegration_Loopback_TransformKey_Sign_Verify(t *testing.T) {
 
 	// Transform the key to ml-dsa-65 — should produce version 2.
 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
-		KeyName:    keyName,
-		TemplateID: "ml-dsa-65",
+		KeyName:            keyName,
+		TemplateID:         "ml-dsa-65",
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("TransformKey: %v", err)
