@@ -125,36 +125,42 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 		},
 		{
 			name:    "key name only",
-			wantErr: false,
+			wantErr: true,
+			errCode: errors.CodeInvalidArgument,
 			transformSpec: service.TransformKeySpec{
 				KeyName: "test-key-1",
 			},
 		},
-		// {
-		// 	name:             "with unchanged scope specification",
-		// 	initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
-		// 	wantErr:          false,
-		// 	transformSpec: service.TransformKeySpec{
-		// 		KeyName:            "test-key-2",
-		// 		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
-		// 	},
-		// },
+		{
+			name:             "with unchanged scope specification",
+			initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+			wantErr:          false,
+			transformSpec: service.TransformKeySpec{
+				KeyName:            "test-key-2",
+				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+			},
+		},
 		{
 			name:             "with changed scope specification",
 			initialScopeSpec: scopeSpecWithScope(t, core.ScopeSignatureStandard),
-			wantErr:          true,
-			errCode:          errors.CodeNotImplemented,
+			wantErr:          false,
 			transformSpec: service.TransformKeySpec{
-				KeyName:            "test-key-2",
-				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
+				KeyName: "test-key-2-changed",
+				ScopeSpecification: &core.ScopeSpecification{
+					Scope: core.ScopeSignatureStandard,
+					SecurityProps: &core.SecurityProperties{
+						QuantumSafe: true,
+					},
+				},
 			},
 		},
 		{
 			name:    "with template ID",
 			wantErr: false,
 			transformSpec: service.TransformKeySpec{
-				KeyName:    "test-key-3",
-				TemplateID: "ml-dsa-65",
+				KeyName:            "test-key-3",
+				TemplateID:         "ml-dsa-65",
+				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
 			},
 		},
 		{
@@ -162,8 +168,9 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			wantErr: true,
 			errCode: errors.CodeNotImplemented,
 			transformSpec: service.TransformKeySpec{
-				KeyName:     "test-key-4",
-				RetainBytes: true,
+				KeyName:            "test-key-4",
+				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+				RetainBytes:        true,
 			},
 		},
 		{
@@ -171,8 +178,9 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			wantErr: true,
 			errCode: errors.CodePolicyViolation,
 			transformSpec: service.TransformKeySpec{
-				KeyName:    "test-key-5",
-				TemplateID: "ml-dsa-65", // not allowed by policy
+				KeyName:            "test-key-5",
+				TemplateID:         "ml-dsa-65", // not allowed by policy
+				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
 			},
 			policyRules: &corepolicy.Rules{
 				Version:          "1",
@@ -209,9 +217,9 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			metadata, err := orch.TransformKey(ctx, tt.transformSpec)
 			if tt.wantErr {
 				require.Error(t, err)
-				if tt.errCode == errors.CodeNotImplemented {
-					require.True(t, errors.IsNotImplemented(err))
-				}
+				var coreErr *errors.Error
+				require.True(t, errors.As(err, &coreErr))
+				require.Equal(t, tt.errCode, coreErr.Code)
 				return
 			}
 			require.NoError(t, err)
@@ -240,9 +248,10 @@ func assertMatchTransformSpec(t *testing.T, expectedSpec service.TransformKeySpe
 		require.Equal(t, expectedSpec.TemplateID, v.TemplateId)
 	}
 	if expectedSpec.ScopeSpecification != nil {
-		// scope specification is updated
-		// TODO: this may be updated depending on the scope specification lifecycle rules
-		require.Equal(t, expectedSpec.ScopeSpecification, k.ScopeSpecification)
+		actual := &core.ScopeSpecification{}
+		require.NoError(t, actual.Deserialize(context.Background(), v.GetScopeSpecification()))
+		require.Equal(t, expectedSpec.ScopeSpecification, actual)
+		require.NotEmpty(t, oldVersion.GetScopeSpecification())
 	}
 	if expectedSpec.RetainBytes {
 		// bytes are retained
@@ -289,7 +298,8 @@ func TestKeyOrchestrator_TransformKey_SuccessiveTransforms(t *testing.T) {
 			for i := range tt.rounds {
 				// transform the key
 				metadata, err := orch.TransformKey(ctx, service.TransformKeySpec{
-					KeyName: keyName,
+					KeyName:            keyName,
+					ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
 				})
 				require.NoError(t, err)
 				k1, err := keys.GetKeyByName(ctx, keyName)
@@ -327,7 +337,7 @@ func seedPolicy(t *testing.T, ctx context.Context, engine corepolicy.Engine, nam
 func assertMetadataMatchKeyAndVersion(t *testing.T, ctx context.Context, metadata *service.KeyMetadata, k *corekey.Key, v *corekey.Version) {
 	specBytes, err := metadata.ScopeSpec.Serialize(ctx)
 	require.NoError(t, err)
-	require.Equal(t, k.ScopeSpecification, specBytes)
+	require.Equal(t, v.GetScopeSpecification(), specBytes)
 	require.Equal(t, k.PolicyId, metadata.Policy)
 	require.Equal(t, k.Name, metadata.Name)
 	require.Equal(t, k.Primitive, metadata.Primitive)
@@ -351,9 +361,9 @@ func setupFirstKeyVersion(t *testing.T, ctx context.Context, keyName string, key
 
 	// Create a key to transform
 	versionID := fmt.Sprintf("%s:%d", keyName, initVersion)
-	k0, err := corekey.NewKey(ctx, keyID, policyName, scopeSpec, initVersion, corekey.WithName(keyName))
+	k0, err := corekey.NewKey(ctx, keyID, policyName, scopeSpec.Scope.GetPrimitive(), initVersion, corekey.WithName(keyName))
 	require.NoError(t, err)
-	v0, err := corekey.NewVersion(ctx, versionID, keyID, initTemplateID, provider0.Name(), initVersion, keyMaterial, corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	v0, err := corekey.NewVersion(ctx, versionID, keyID, initTemplateID, provider0.Name(), initVersion, keyMaterial, scopeSpec, corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(t, err)
 	err = keys.CreateKey(ctx, k0, v0)
 	require.NoError(t, err)

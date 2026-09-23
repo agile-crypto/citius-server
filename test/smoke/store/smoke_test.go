@@ -25,10 +25,10 @@ func validator(t *testing.T) protovalidate.Validator {
 
 func TestKey_roundtrip(t *testing.T) {
 	orig := &storepb.Key{
-		PublicId:           "key_01HXYZ",
-		Name:               "my-signing-key",
-		ScopeSpecification: []byte("scope-spec"),
-		State:              typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
+		PublicId:  "key_01HXYZ",
+		Name:      "my-signing-key",
+		Primitive: "signature",
+		State:     typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE,
 	}
 	b, err := proto.Marshal(orig)
 	if err != nil {
@@ -55,13 +55,14 @@ func TestKeyVersion_fourFields(t *testing.T) {
 	// also means a future proto change that removes a field fails to compile here.
 	// Only one of plaintext_material / ciphertext_material should be populated at a time.
 	orig := &storepb.KeyVersion{
-		PublicId:      "ver_01HXYZ",
-		KeyId:         "key_01HXYZ",
-		KeyMaterial:   []byte("secret"),
-		CtKeyMaterial: nil,
-		Digest:        []byte("mac"),
-		WrappingKeyId: "",
-		ProviderId:    "software",
+		PublicId:           "ver_01HXYZ",
+		KeyId:              "key_01HXYZ",
+		KeyMaterial:        []byte("secret"),
+		CtKeyMaterial:      nil,
+		Digest:             []byte("mac"),
+		WrappingKeyId:      "",
+		ProviderId:         "software",
+		ScopeSpecification: []byte("scope-spec"),
 	}
 	b, err := proto.Marshal(orig)
 	if err != nil {
@@ -91,6 +92,9 @@ func TestKeyVersion_fourFields(t *testing.T) {
 	}
 	if got.ProviderId != orig.ProviderId {
 		t.Errorf("provider_id: got %q want %q", got.ProviderId, orig.ProviderId)
+	}
+	if !bytes.Equal(got.ScopeSpecification, orig.ScopeSpecification) {
+		t.Errorf("scope_specification: got %q want %q", got.ScopeSpecification, orig.ScopeSpecification)
 	}
 }
 
@@ -212,7 +216,7 @@ func TestKey_noMaterialFields(t *testing.T) {
 	// If this compiles, Key has no material fields (they would fail to compile if present).
 	_ = k.PublicId
 	_ = k.Name
-	_ = k.ScopeSpecification
+	_ = k.Primitive
 	_ = k.PolicyId
 	_ = k.State
 	_ = k.CurrentVersion

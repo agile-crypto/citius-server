@@ -24,7 +24,11 @@ func defaultKeyVersionID(keyID string, version uint32) string {
 // helper: create a valid Key domain object.
 func newTestKey(publicID, name string, scopeSpec *core.ScopeSpecification, opts ...corekey.Option) (*corekey.Key, error) {
 	opts = append(opts, corekey.WithName(name))
-	return corekey.NewKey(context.Background(), publicID, "policy-test", scopeSpec, 1, opts...)
+	return corekey.NewKey(context.Background(), publicID, "policy-test", scopeSpec.Scope.GetPrimitive(), 1, opts...)
+}
+
+func signatureScopeSpec() *core.ScopeSpecification {
+	return &core.ScopeSpecification{Scope: core.ScopeSignatureStandard}
 }
 
 func mustNewCreateKeyInputs(
@@ -37,7 +41,7 @@ func mustNewCreateKeyInputs(
 	status types.KeyLifecycleState,
 ) (*corekey.Key, *corekey.Version) {
 	t.Helper()
-	k, err := corekey.NewKey(ctx, publicID, policyID, scopeSpec, initialVersion, corekey.WithName(name), corekey.WithState(status))
+	k, err := corekey.NewKey(ctx, publicID, policyID, scopeSpec.Scope.GetPrimitive(), initialVersion, corekey.WithName(name), corekey.WithState(status))
 	if err != nil {
 		t.Fatalf("newKey(%s): %v", publicID, err)
 	}
@@ -49,6 +53,7 @@ func mustNewCreateKeyInputs(
 		providerID,
 		initialVersion,
 		keyMaterial,
+		scopeSpec,
 		corekey.WithState(status),
 	)
 	if err != nil {
@@ -235,13 +240,13 @@ func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	v2 := v.Clone()
 	v2.Version = v.Version + 1
 	v2.PublicId = "ver_02"
-	vNext, err := corekey.NewVersion(ctx, defaultKeyVersionID(kid, 2), kid, "template", "software", 2, []byte("key_version_1"), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	vNext, err := corekey.NewVersion(ctx, defaultKeyVersionID(kid, 2), kid, "template", "software", 2, []byte("key_version_1"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(err, "error creating key version 2")
 	err = r.AddVersion(ctx, vNext)
 	if err != nil {
 		t.Fatalf("AddVersion: %v", err)
 	}
-	vNext2, err := corekey.NewVersion(ctx, defaultKeyVersionID(kid, 3), kid, "template", "software", 3, []byte("key_version_2"), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	vNext2, err := corekey.NewVersion(ctx, defaultKeyVersionID(kid, 3), kid, "template", "software", 3, []byte("key_version_2"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(err, "error creating key version 3")
 	err = r.AddVersion(ctx, vNext2)
 	require.NoError(err, "got error when adding second version")
@@ -335,11 +340,8 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetKey after update: %v", err)
 	}
-	sp := &core.ScopeSpecification{}
-	err = sp.Deserialize(ctx, got.ScopeSpecification)
-	require.NoError(t, err)
 	// Same key but state is different
-	updated, err := corekey.NewKey(ctx, got.PublicId, got.PolicyId, sp, got.CurrentVersion, corekey.WithName(got.Name),
+	updated, err := corekey.NewKey(ctx, got.PublicId, got.PolicyId, core.PrimitiveSignature, got.CurrentVersion, corekey.WithName(got.Name),
 		corekey.WithLabels(got.Labels), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED))
 	require.NoError(t, err)
 	if err = r.UpdateKey(ctx, updated); err != nil {
@@ -383,7 +385,7 @@ func Test_VaultRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", core.ScopeSignatureStandard)
 
-	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(t, err, "error creating key version input")
 	err = r.AddVersion(ctx, v)
 	require.NoErrorf(t, err, "error when adding version (%s,%d)", "key_01", 2)
@@ -399,7 +401,7 @@ func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", core.ScopeSignatureStandard)
 
-	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key_version_2"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(t, err, "error creating key version input")
 	err = r.AddVersion(ctx, v)
 	if err != nil {
@@ -448,7 +450,7 @@ func Test_VaultRepository_AddVersion_returnsClone(t *testing.T) {
 func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
-	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_missing", 1), "key_missing", "template", "software", 1, []byte("key_material"), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_missing", 1), "key_missing", "template", "software", 1, []byte("key_material"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(t, err, "error creating key version input")
 	err = r.AddVersion(ctx, v)
 	if err == nil {
@@ -503,11 +505,8 @@ func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T)
 
 	got, err := r.GetKeyByName(ctx, "signing-key")
 	require.NoError(t, err)
-	sp := &core.ScopeSpecification{}
-	err = sp.Deserialize(ctx, got.ScopeSpecification)
-	require.NoError(t, err)
 	// Same key but state is different
-	updated, err := corekey.NewKey(ctx, got.PublicId, got.PolicyId, sp, got.CurrentVersion, corekey.WithName(got.Name),
+	updated, err := corekey.NewKey(ctx, got.PublicId, got.PolicyId, core.PrimitiveSignature, got.CurrentVersion, corekey.WithName(got.Name),
 		corekey.WithLabels(got.Labels), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED))
 	require.NoError(t, err)
 	err = r.UpdateKey(ctx, updated)
@@ -567,11 +566,8 @@ func Test_VaultRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
 
 	got, err := r.GetKeyByName(ctx, "original-name")
 	require.NoError(t, err)
-	sp := &core.ScopeSpecification{}
-	err = sp.Deserialize(ctx, got.ScopeSpecification)
-	require.NoError(t, err)
 	// Same key but state is different
-	renamed, err := corekey.NewKey(ctx, got.PublicId, got.PolicyId, sp, got.CurrentVersion, corekey.WithName("new-name"),
+	renamed, err := corekey.NewKey(ctx, got.PublicId, got.PolicyId, core.PrimitiveSignature, got.CurrentVersion, corekey.WithName("new-name"),
 		corekey.WithLabels(got.Labels), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED))
 	require.NoError(t, err)
 	err = r.UpdateKey(ctx, renamed)
@@ -584,7 +580,7 @@ func Test_VaultRepository_GetKeyByName_afterAddVersion_returnsUpdatedCurrentVers
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "my-key", core.ScopeSignatureStandard)
 
-	v2, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key-v2-bytes"), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+	v2, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_01", 2), "key_01", "template", "software", 2, []byte("key-v2-bytes"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 	require.NoError(t, err)
 	require.NoError(t, r.AddVersion(ctx, v2))
 
@@ -621,7 +617,7 @@ func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
 			require.NoErrorf(err, "GetCurrentVersion error for key %s: %v", tc.keyID, err)
 			assert.Equal(uint32(0), v0.Version, "initial version should be 0")
 			for i := 1; i < tc.additionalVersions; i++ {
-				nextVersion, err := corekey.NewVersion(ctx, defaultKeyVersionID(tc.keyID, uint32(i)), tc.keyID, "template", "software", uint32(i), km, corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
+				nextVersion, err := corekey.NewVersion(ctx, defaultKeyVersionID(tc.keyID, uint32(i)), tc.keyID, "template", "software", uint32(i), km, signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
 				require.NoErrorf(err, "newVersion error for version %d of key %s: %v", i, tc.keyID, err)
 				err = r.AddVersion(ctx, nextVersion)
 				require.NoErrorf(err, "AddVersion error for version %d of key %s: %v", i, tc.keyID, err)

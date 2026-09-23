@@ -490,7 +490,7 @@ func TestIntegration_Software_ReadKey_AfterCreate(t *testing.T) {
 	t.Log(" ReadKey after CreateKey: PASSED")
 }
 
-func TestIntegration_Software_TransformKey_Sign_Verify(t *testing.T) {
+func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
 	store := &logical.InmemStorage{}
@@ -542,8 +542,9 @@ func TestIntegration_Software_TransformKey_Sign_Verify(t *testing.T) {
 
 	// Transform the key from ecdsa-p256-sha256-der to ml-dsa-65 (post-quantum).
 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
-		KeyName:    keyName,
-		TemplateID: "ml-dsa-65",
+		KeyName:            keyName,
+		TemplateID:         "ml-dsa-65",
+		ScopeSpecification: sigScopeSpec(),
 	})
 	if err != nil {
 		t.Fatalf("TransformKey: %v", err)
@@ -554,7 +555,23 @@ func TestIntegration_Software_TransformKey_Sign_Verify(t *testing.T) {
 	if transformedMeta.Version != 2 {
 		t.Errorf("TransformKey: expected version 2, got %d", transformedMeta.Version)
 	}
+	if transformedMeta.ScopeSpec == nil || transformedMeta.ScopeSpec.Scope != core.ScopeSignatureStandard {
+		t.Fatalf("TransformKey: expected signature-standard scope on version 2, got %#v", transformedMeta.ScopeSpec)
+	}
 	t.Logf("Transformed key: %s -> template=%s version=%d", keyName, transformedMeta.TemplateID, transformedMeta.Version)
+
+	// A historical operation must still authorize against version 1's scope,
+	// even though version 2 is now current.
+	verifyHistorical, err := requestScope.Crypto().Verify(ctx, crypto.VerifyRequest{
+		KeyName:              keyName,
+		KeyVersion:           signV1.KeyVersion,
+		Payload:              payload,
+		Signature:            signV1.Signature,
+		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &api.NoParams{}},
+	})
+	if err != nil || !verifyHistorical.Valid {
+		t.Fatalf("Verify (historical v1 after transform) failed: err=%v valid=%v", err, verifyHistorical.Valid)
+	}
 
 	// Sign+Verify round-trip on the transformed (current) ML-DSA-65 version.
 	signV2, err := requestScope.Crypto().Sign(ctx, crypto.SignRequest{
