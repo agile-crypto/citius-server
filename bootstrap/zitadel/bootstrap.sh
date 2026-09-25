@@ -57,6 +57,19 @@ log()  { printf '\033[1;34m[bootstrap]\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33m[bootstrap]\033[0m %s\n' "$*" >&2; }
 die()  { printf '\033[1;31m[bootstrap]\033[0m %s\n' "$*" >&2; exit 1; }
 
+# require_credential fails with recovery guidance when a client ID or secret
+# from generated-config.json is empty. Zitadel reveals a client secret only when
+# the client is created, so a lost or overwritten secret cannot be read back.
+require_credential() {
+  local what="$1" value="$2"
+  [[ -n "$value" && "$value" != "null" ]] && return 0
+  die "${what} is empty in ${GENERATED_CONFIG}.
+Zitadel returns client secrets only at creation time, so it cannot be recovered
+from an already-provisioned instance. Restore the previous generated-config.json
+if you have it, or recreate the identities with 'make zitadel-reset' (wipes
+Zitadel data: users, project, apps, and issued tokens)."
+}
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -369,7 +382,8 @@ mint_tokens() {
   while IFS= read -r user; do
     cid="$(jq -r --arg u "$user" '.users[$u].ClientID'     "$GENERATED_CONFIG")"
     csecret="$(jq -r --arg u "$user" '.users[$u].ClientSecret' "$GENERATED_CONFIG")"
-    [[ -n "$cid" && -n "$csecret" ]] || die "user ${user}: missing ClientID/ClientSecret"
+    [[ -n "$cid" && "$cid" != "null" ]] || die "user ${user}: missing ClientID in ${GENERATED_CONFIG}"
+    require_credential "service user ${user} ClientSecret" "$csecret"
 
     resp="$(curl -sS "${curl_insecure[@]}" -X POST "$token_url" \
       -u "${cid}:${csecret}" \
@@ -561,6 +575,7 @@ which reaches the published port directly."
   log "starting containerized citius-server"
   export CITIUS_SERVER_ISSUER="$issuer_url"
   export CITIUS_SERVER_INTROSPECT_ID="$(jq -r '.api_app.ClientID' "$GENERATED_CONFIG")"
+  require_credential "api_app ClientSecret (server introspection)" "$CITIUS_SERVER_INTROSPECT_SECRET"
   export CITIUS_SERVER_INTROSPECT_SECRET="$(jq -r '.api_app.ClientSecret' "$GENERATED_CONFIG")"
   export CITIUS_SERVER_PROJECT_ID="$project_id"
   export CITIUS_SERVER_EXPECTED_AUDIENCE="$project_id"

@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -304,4 +306,27 @@ func TestPreserveKnownSecrets_changedAPIClient(t *testing.T) {
 		t.Fatalf("api secret = %q, want empty for a changed client ID", next.APIApp.ClientSecret)
 	}
 	preserveKnownSecrets(nil, next)
+}
+
+func TestWriteFileAtomic(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "generated-config.json")
+	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeFileAtomic(path, []byte(`{"project_id":"p"}`), 0o600); err != nil {
+		t.Fatalf("writeFileAtomic: %v", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil || string(got) != `{"project_id":"p"}` {
+		t.Fatalf("content = %q, err = %v", got, err)
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode = %v, err = %v", info.Mode().Perm(), err)
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Fatalf("temporary files left behind: %v", entries)
+	}
 }

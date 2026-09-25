@@ -604,7 +604,35 @@ func writeGeneratedConfig(c generatedConfig) error {
 	if err != nil {
 		return fmt.Errorf("marshal: %w", err)
 	}
-	return os.WriteFile(generatedConfigPath, data, 0o600)
+	return writeFileAtomic(generatedConfigPath, data, 0o600)
+}
+
+// writeFileAtomic writes data to a temporary file in the target directory and
+// renames it into place, so an interrupted run never leaves a truncated
+// generated-config.json (which holds the only copy of the client secrets).
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if err := tmp.Chmod(perm); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 // preserveKnownSecrets carries client secrets from a previous
