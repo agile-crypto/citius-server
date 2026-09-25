@@ -16,6 +16,7 @@ package status
 import (
 	"context"
 	stderrors "errors"
+	"log/slog"
 
 	"google.golang.org/grpc/codes"
 	grpcstatus "google.golang.org/grpc/status"
@@ -26,6 +27,11 @@ import (
 // ToStatusError converts a domain error to a gRPC status error, returning nil
 // when err is nil. The code mapping comes from engerr.GRPCCode, so the switch
 // table is not duplicated here.
+//
+// Only the outermost domain error's Message reaches the caller; wrapped inner
+// causes stay server-side. A non-domain error is unexpected by definition and
+// may carry implementation details (paths, driver or library messages), so the
+// caller receives a generic message and the full error is logged instead.
 //
 // Note this mapping is many-to-one and therefore lossy: CodeKeyNotFound,
 // CodePolicyNotFound and CodeTemplateNotFound all become codes.NotFound, and Op
@@ -40,8 +46,12 @@ func ToStatusError(err error) error {
 	if stderrors.As(err, &e) {
 		return grpcstatus.Error(engerr.GRPCCode(err), e.Message)
 	}
-	return grpcstatus.Error(codes.Internal, err.Error())
+	slog.Error("unexpected non-domain error returned to gRPC caller", "error", err)
+	return grpcstatus.Error(codes.Internal, internalErrorMessage)
 }
+
+// internalErrorMessage is the only text a caller sees for a non-domain error.
+const internalErrorMessage = "internal error"
 
 // AuthorizeKeyName checks whether the caller may act on the named key,
 // returning nil when it may. Implementations must return an error already in

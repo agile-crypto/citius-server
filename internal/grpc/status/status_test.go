@@ -98,6 +98,24 @@ func TestToStatusError_UnknownError_ReturnsInternal(t *testing.T) {
 	if st.Code() != codes.Internal {
 		t.Errorf("expected Internal, got %s", st.Code())
 	}
+	if st.Message() != internalErrorMessage {
+		t.Errorf("message = %q, want %q (non-domain details must not reach callers)", st.Message(), internalErrorMessage)
+	}
+}
+
+func TestToStatusError_WrappedDomainError_ExposesOnlyOuterMessage(t *testing.T) {
+	ctx := context.Background()
+	inner := engerr.New(ctx, "inner", engerr.CodeFailedPrecondition, "inner specifics")
+	st, ok := status.FromError(ToStatusError(engerr.Wrap(ctx, "outer", inner)))
+	if !ok {
+		t.Fatal("expected gRPC status error")
+	}
+	if st.Code() != codes.FailedPrecondition {
+		t.Errorf("expected FailedPrecondition, got %s", st.Code())
+	}
+	if st.Message() != "" {
+		t.Errorf("message = %q, want the (empty) outer message only", st.Message())
+	}
 }
 
 // plainError is a minimal error type that is NOT *engerr.Error.
