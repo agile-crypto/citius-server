@@ -62,16 +62,16 @@ func encryptAESCTR(ctx context.Context, keyMaterial, plaintext []byte, params *t
 		return nil, nil, err
 	}
 
-	// iv is the initial counter block: nonce || zero-initialized counter.
-	// Only the nonce portion is randomized — the counter starts at zero and
+	// iv is the initial counter block: random nonce || zero-initialized
+	// counter. Only the nonce is randomized — the counter starts at zero and
 	// cipher.NewCTR increments the whole 16-byte block as it consumes
 	// keystream, which is exactly the 96-bit-nonce/32-bit-counter split
 	// checkAESCTRParamsValid enforces.
-	iv = make([]byte, aes.BlockSize)
-	nonceSizeBytes := params.GetNonceSizeBits() / 8
-	if _, err = rand.Read(iv[:nonceSizeBytes]); err != nil {
+	nonce := make([]byte, params.GetNonceSizeBits()/8)
+	if _, err = rand.Read(nonce); err != nil {
 		return nil, nil, errors.Wrap(ctx, op, err)
 	}
+	iv = append(nonce, make([]byte, aes.BlockSize-len(nonce))...)
 
 	ciphertext = make([]byte, len(plaintext))
 	cipher.NewCTR(block, iv).XORKeyStream(ciphertext, plaintext)
