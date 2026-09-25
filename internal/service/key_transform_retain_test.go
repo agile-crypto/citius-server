@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"testing"
 
@@ -77,6 +78,95 @@ func TestTransformKey_retainBytes_ECDSA(t *testing.T) {
 	require.Equal(t, v1Before.GetKeyMaterial(), v1.GetKeyMaterial())
 	require.Equal(t, source, v1.GetTemplateId())
 	require.Equal(t, v1Before.GetScopeSpecification(), v1.GetScopeSpecification())
+}
+
+// TestTransformKey_retainBytes_ECDSADigestSign proves that the retained
+// prehashed version is usable for digest operations and shares the key pair
+// with version 1: a version-1 full-message ECDSA-P256-SHA256 signature
+// verifies as a digest signature over SHA-256(message) under version 2.
+func TestTransformKey_retainBytes_ECDSADigestSign(t *testing.T) {
+	ctx := context.Background()
+	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
+	const (
+		source = "ecdsa-p256-sha256-der"
+		target = "ecdsa-p256-prehashed-der"
+	)
+	seedRetainPolicy(t, ctx, pol, "retain-ecdsa-digest", []string{source, target},
+		core.OperationSign, core.OperationVerify, core.OperationDigestSign, core.OperationDigestVerify)
+
+	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:               "retain-ecdsa-digest",
+		TemplateID:         source,
+		PolicyID:           "retain-ecdsa-digest",
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
+	})
+	require.NoError(t, err)
+
+	message := []byte("signed before transformation")
+	digest := sha256.Sum256(message)
+	noContext := crypto.SignatureScopeFields{NoContext: &types.NoParams{}}
+	v1Sig, err := ops.Sign(ctx, crypto.SignRequest{KeyName: created.Name, Payload: message, SignatureScopeFields: noContext})
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), v1Sig.KeyVersion)
+
+	_, err = keyOrch.TransformKey(ctx, service.TransformKeySpec{
+		KeyName:            created.Name,
+		TemplateID:         target,
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
+		RetainBytes:        true,
+	})
+	require.NoError(t, err)
+
+	digestVerify := func(sig crypto.SignResult, version uint32) bool {
+		t.Helper()
+		result, verifyErr := ops.DigestVerify(ctx, crypto.DigestVerifyRequest{
+			KeyName:              created.Name,
+			KeyVersion:           version,
+			Digest:               digest[:],
+			Signature:            sig.Signature,
+			HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+			Output:               sig.Output,
+			SignatureScopeFields: noContext,
+		})
+		require.NoError(t, verifyErr)
+		return result.Valid
+	}
+
+	require.True(t, digestVerify(v1Sig, 2), "version-1 signature must verify under the retained version-2 key")
+
+	v2Sig, err := ops.DigestSign(ctx, crypto.DigestSignRequest{
+		KeyName:              created.Name,
+		Digest:               digest[:],
+		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		SignatureScopeFields: noContext,
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), v2Sig.KeyVersion)
+	require.True(t, digestVerify(v2Sig, 2))
+
+	// Version 1 keeps its original template and scope: full-message Verify
+	// works, and digest operations are refused for its standard scope.
+	verified, err := ops.Verify(ctx, crypto.VerifyRequest{
+		KeyName:              created.Name,
+		KeyVersion:           1,
+		Payload:              message,
+		Signature:            v2Sig.Signature,
+		Output:               v2Sig.Output,
+		SignatureScopeFields: noContext,
+	})
+	require.NoError(t, err)
+	require.True(t, verified.Valid, "version-2 digest signature must verify as a full-message signature under version 1")
+
+	_, err = ops.DigestVerify(ctx, crypto.DigestVerifyRequest{
+		KeyName:              created.Name,
+		KeyVersion:           1,
+		Digest:               digest[:],
+		Signature:            v1Sig.Signature,
+		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		Output:               v1Sig.Output,
+		SignatureScopeFields: noContext,
+	})
+	require.True(t, errors.IsInvalidArgument(err), "digest ops on a standard-scoped version must be refused: %v", err)
 }
 
 // TestTransformKey_retainBytes_RSA proves that a retained RSA-2048 key signs
