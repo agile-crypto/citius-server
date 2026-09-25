@@ -258,3 +258,50 @@ func (f *fakeIdentityAdmin) OnboardHuman(_ context.Context, in admin.HumanOnboar
 	f.humanPassword = in.InitialPassword
 	return &admin.HumanOnboardResult{UserID: "human-user", LoginName: "alice@example.test"}, nil
 }
+
+func TestPreserveKnownSecrets(t *testing.T) {
+	previous := &generatedConfig{
+		APIApp: admin.AppCredentials{ClientID: "api", ClientSecret: "api-secret"},
+		Users: map[string]admin.OnboardResult{
+			"kept":    {UserID: "1", ClientID: "kept", ClientSecret: "kept-secret"},
+			"renamed": {UserID: "2", ClientID: "old-client", ClientSecret: "old-secret"},
+			"fresh":   {UserID: "3", ClientID: "fresh", ClientSecret: "stale-secret"},
+		},
+	}
+	next := &generatedConfig{
+		APIApp: admin.AppCredentials{ClientID: "api"},
+		Users: map[string]admin.OnboardResult{
+			"kept":    {UserID: "1", ClientID: "kept"},
+			"renamed": {UserID: "2", ClientID: "new-client"},
+			"fresh":   {UserID: "3", ClientID: "fresh", ClientSecret: "new-secret"},
+			"added":   {UserID: "4", ClientID: "added"},
+		},
+	}
+
+	preserveKnownSecrets(previous, next)
+
+	if next.APIApp.ClientSecret != "api-secret" {
+		t.Errorf("api secret = %q, want preserved", next.APIApp.ClientSecret)
+	}
+	want := map[string]string{
+		"kept":    "kept-secret", // same client, secret not returned: preserve
+		"renamed": "",            // client ID changed: never reuse the old secret
+		"fresh":   "new-secret",  // newly minted secret wins
+		"added":   "",            // no previous credential
+	}
+	for name, secret := range want {
+		if got := next.Users[name].ClientSecret; got != secret {
+			t.Errorf("%s secret = %q, want %q", name, got, secret)
+		}
+	}
+}
+
+func TestPreserveKnownSecrets_changedAPIClient(t *testing.T) {
+	previous := &generatedConfig{APIApp: admin.AppCredentials{ClientID: "old", ClientSecret: "old-secret"}}
+	next := &generatedConfig{APIApp: admin.AppCredentials{ClientID: "new"}}
+	preserveKnownSecrets(previous, next)
+	if next.APIApp.ClientSecret != "" {
+		t.Fatalf("api secret = %q, want empty for a changed client ID", next.APIApp.ClientSecret)
+	}
+	preserveKnownSecrets(nil, next)
+}

@@ -231,6 +231,9 @@ func runApply(args []string) int {
 		Users:          identities.MachineUsers,
 		HumanUsers:     identities.HumanUsers,
 	}
+	if previous, readErr := readGeneratedConfig(); readErr == nil {
+		preserveKnownSecrets(previous, &out)
+	}
 	wroteUI, err := writeBootstrapConfigs(out, acl, issuerFromEnvironment(domain, port, insecure))
 	if err != nil {
 		log.Printf("write bootstrap configuration: %v", err)
@@ -288,12 +291,18 @@ func runUsers(args []string) int {
 	// Merge over any users that disappeared from the ACL but stay in the
 	// file. We deliberately do NOT delete users from Zitadel here — that
 	// is destructive and should be an explicit operator action.
+	previous := *existing
+	previous.Users = make(map[string]admin.OnboardResult, len(existing.Users))
+	for k, v := range existing.Users {
+		previous.Users[k] = v
+	}
 	if existing.Users == nil {
 		existing.Users = map[string]admin.OnboardResult{}
 	}
 	for k, v := range identities.MachineUsers {
 		existing.Users[k] = v
 	}
+	preserveKnownSecrets(&previous, existing)
 	if existing.HumanUsers == nil {
 		existing.HumanUsers = map[string]admin.HumanOnboardResult{}
 	}
@@ -596,6 +605,28 @@ func writeGeneratedConfig(c generatedConfig) error {
 		return fmt.Errorf("marshal: %w", err)
 	}
 	return os.WriteFile(generatedConfigPath, data, 0o600)
+}
+
+// preserveKnownSecrets carries client secrets from a previous
+// generated-config.json into next. Zitadel returns a client secret only when
+// the machine user or API application is created, so re-running apply/users
+// against an already provisioned instance yields empty secrets. A previous
+// secret is kept only when next has none and the client ID is unchanged; a
+// new client ID means a new credential, whose old secret must not be reused.
+func preserveKnownSecrets(previous, next *generatedConfig) {
+	if previous == nil || next == nil {
+		return
+	}
+	if next.APIApp.ClientSecret == "" && next.APIApp.ClientID == previous.APIApp.ClientID {
+		next.APIApp.ClientSecret = previous.APIApp.ClientSecret
+	}
+	for name, user := range next.Users {
+		old, ok := previous.Users[name]
+		if ok && user.ClientSecret == "" && user.ClientID == old.ClientID {
+			user.ClientSecret = old.ClientSecret
+			next.Users[name] = user
+		}
+	}
 }
 
 func readGeneratedConfig() (*generatedConfig, error) {
