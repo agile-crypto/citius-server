@@ -164,9 +164,9 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 			},
 		},
 		{
-			name:    "with retain bytes",
+			name:    "with retain bytes and no template ID",
 			wantErr: true,
-			errCode: errors.CodeNotImplemented,
+			errCode: errors.CodeInvalidArgument,
 			transformSpec: service.TransformKeySpec{
 				KeyName:            "test-key-4",
 				ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),

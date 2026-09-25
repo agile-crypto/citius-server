@@ -5,8 +5,8 @@ go 1.26.0
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
 	buf.build/go/protovalidate v1.4.0
-	github.com/agile-crypto/citius-api-go v0.1.0
-	github.com/agile-crypto/citius-core v0.2.1
+	github.com/agile-crypto/citius-api-go v0.2.0
+	github.com/agile-crypto/citius-core v0.2.2
 	github.com/agile-crypto/citius-provider-go v0.1.0
 	github.com/agile-crypto/ossl-go v0.1.0
 	github.com/agile-crypto/vault-storage v0.0.0-00010101000000-000000000000
@@ -14,7 +14,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0
 	github.com/hashicorp/vault/sdk v0.25.1
 	github.com/stretchr/testify v1.12.1
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
 
@@ -40,7 +40,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260908043556-f8649ddbbfe6 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
 )
 
 require (
@@ -108,7 +108,7 @@ require (
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260904194346-d0f1323225a4 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260918162117-cecb64721679 // indirect
 )
 
 // vault-storage is a local-only L2 adapter module (item 4.5) -- it is never
