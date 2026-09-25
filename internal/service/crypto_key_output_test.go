@@ -97,7 +97,7 @@ func setupWithCapturingSigner(t *testing.T) (service.CryptoOrchestrator, service
 
 	rules := &corepolicy.Rules{
 		Version:          "1",
-		AllowedTemplates: []string{"ecdsa-p256-sha256-der", "aes-256-gcm-128-96"},
+		AllowedTemplates: []string{"ecdsa-p256-sha256-der", "ecdsa-p256-prehashed-der", "aes-256-gcm-128-96"},
 		AllowedOperations: &corepolicy.OperationRule{
 			KeyOperations: []string{
 				string(core.OperationCreateKey),
@@ -134,6 +134,16 @@ func setupWithCapturingSigner(t *testing.T) (service.CryptoOrchestrator, service
 		ScopeSpecification: defaultScopeSpec(t),
 	}); err != nil {
 		t.Fatalf("CreateKey: %v", err)
+	}
+
+	// DigestSign requires a prehashed-scoped key whose template declares it.
+	if _, err = keyOrch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:               "key-output-test-digest-key",
+		TemplateID:         "ecdsa-p256-prehashed-der",
+		PolicyID:           policyName,
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
+	}); err != nil {
+		t.Fatalf("CreateKey (digest): %v", err)
 	}
 
 	if _, err = keyOrch.CreateKey(ctx, core.KeyCreationSpec{
@@ -176,7 +186,7 @@ func TestDigestSign_threadsKeyEncodingFromStoredGenerateKeyResponse(t *testing.T
 	ctx := context.Background()
 
 	_, err := ops.DigestSign(ctx, crypto.DigestSignRequest{
-		KeyName:              "key-output-test-key",
+		KeyName:              "key-output-test-digest-key",
 		Digest:               make([]byte, 32),
 		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},

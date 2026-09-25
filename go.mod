@@ -6,7 +6,7 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
 	buf.build/go/protovalidate v1.4.0
 	github.com/agile-crypto/citius-api-go v0.2.0
-	github.com/agile-crypto/citius-core v0.2.2
+	github.com/agile-crypto/citius-core v0.2.3
 	github.com/agile-crypto/citius-provider-go v0.1.0
 	github.com/agile-crypto/ossl-go v0.1.0
 	github.com/agile-crypto/vault-storage v0.0.0-00010101000000-000000000000

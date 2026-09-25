@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/agile-crypto/citius-api-go v0.2.0
-	github.com/agile-crypto/citius-core v0.2.2
+	github.com/agile-crypto/citius-core v0.2.3
 	github.com/hashicorp/vault/sdk v0.25.1
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/protobuf v1.36.12

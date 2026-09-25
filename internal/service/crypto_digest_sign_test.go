@@ -11,20 +11,21 @@ import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 )
 
 // digestSignPolicyName is the name of the policy that allows create_key,
-// digest_sign, and digest_verify for ecdsa-p256-sha256-der.
+// digest_sign, and digest_verify for ecdsa-p256-prehashed-der.
 const digestSignPolicyName = "test-digest-sign-allow"
 
-// seedDigestSignPolicy creates a policy that allows ecdsa-p256-sha256-der
+// seedDigestSignPolicy creates a policy that allows ecdsa-p256-prehashed-der
 // with create_key, digest_sign, and digest_verify operations.
 func seedDigestSignPolicy(t *testing.T, ctx context.Context, pol policy.Engine) {
 	t.Helper()
 	rules := &policy.Rules{
 		Version:          "1",
-		AllowedTemplates: []string{"ecdsa-p256-sha256-der"},
+		AllowedTemplates: []string{"ecdsa-p256-prehashed-der"},
 		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{
 				string(core.OperationCreateKey),
@@ -46,7 +47,7 @@ func seedDigestSignPolicy(t *testing.T, ctx context.Context, pol policy.Engine) 
 
 // setupDigestSignWithKey creates a wired service.CryptoOrchestrator, seeds a policy
 // that allows create_key + digest_sign + digest_verify for
-// ecdsa-p256-sha256-der, creates a key, and returns the service.CryptoOrchestrator
+// ecdsa-p256-prehashed-der, creates a key, and returns the service.CryptoOrchestrator
 // and the key's name.
 //
 // ECDSA is used (not ML-DSA) because the software provider's SignDigest is
@@ -61,9 +62,9 @@ func setupDigestSignWithKey(t *testing.T) (service.CryptoOrchestrator, string) {
 
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:               "digest-sign-test-key",
-		TemplateID:         "ecdsa-p256-sha256-der",
+		TemplateID:         "ecdsa-p256-prehashed-der",
 		PolicyID:           digestSignPolicyName,
-		ScopeSpecification: defaultScopeSpec(t),
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -204,7 +205,7 @@ func TestDigestSign_policyDeniesDigestSign_returnsError(t *testing.T) {
 
 	rules := &policy.Rules{
 		Version:          "1",
-		AllowedTemplates: []string{"ecdsa-p256-sha256-der"},
+		AllowedTemplates: []string{"ecdsa-p256-prehashed-der"},
 		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey), string(core.OperationSign)}, // no digest_sign
 		},
@@ -221,9 +222,9 @@ func TestDigestSign_policyDeniesDigestSign_returnsError(t *testing.T) {
 
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:               "sign-only-key",
-		TemplateID:         "ecdsa-p256-sha256-der",
+		TemplateID:         "ecdsa-p256-prehashed-der",
 		PolicyID:           signOnlyPolicy,
-		ScopeSpecification: defaultScopeSpec(t),
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
 	})
 	if err != nil {
 		t.Fatalf("CreateKey: %v", err)
@@ -238,5 +239,8 @@ func TestDigestSign_policyDeniesDigestSign_returnsError(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected policy violation: digest_sign not granted by a sign-only policy")
+	}
+	if !errors.IsPolicyViolation(err) {
+		t.Errorf("expected CodePolicyViolation, got: %v", err)
 	}
 }

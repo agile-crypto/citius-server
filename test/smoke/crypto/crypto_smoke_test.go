@@ -139,18 +139,20 @@ func createAEADKey(t *testing.T, ctx context.Context, h *server.TestableHandler,
 	return resp.GetKeyMetadata().GetName()
 }
 
-// createECDSAKey creates an ecdsa-p256-sha256-der key via the real Handler.
+// createECDSAKey creates an ecdsa-p256-prehashed-der key (prehashed scope,
+// which is where the catalog declares DigestSign/DigestVerify) via the real
+// Handler.
 func createECDSAKey(t *testing.T, ctx context.Context, h *server.TestableHandler, name, policyName string) string {
 	t.Helper()
 
-	templateID := "ecdsa-p256-sha256-der"
+	templateID := "ecdsa-p256-prehashed-der"
 	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
 		Name:   name,
 		Policy: policyName,
 		ScopeSpec: &typespb.ScopeSpecification{
 			ScopeSpec: &typespb.ScopeSpecification_Signature{
 				Signature: &typespb.SignatureScopeSpec{
-					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+					Scope: typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED,
 				},
 			},
 		},
@@ -260,7 +262,7 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 	ctx := context.Background()
 	h := buildServer(t)
 
-	policyName := seedPolicy(t, ctx, h, "ecdsa-digest-allow", []string{"ecdsa-p256-sha256-der"},
+	policyName := seedPolicy(t, ctx, h, "ecdsa-digest-allow", []string{"ecdsa-p256-prehashed-der"},
 		[]string{"create_key", "digest_sign", "digest_verify"})
 	keyName := createECDSAKey(t, ctx, h, "smoke-ecdsa-key", policyName)
 
