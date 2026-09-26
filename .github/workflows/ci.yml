@@ -59,6 +59,10 @@ jobs:
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
+          # Pinned: an unpinned install picks up new linters/rules (e.g. gosec
+          # G407 in 2.14.0) and can break main without a code change. Bump
+          # deliberately, together with any fixes the new version requires.
+          version: v2.14.0
           install-mode: binary
           skip-cache: false
           install-only: true
