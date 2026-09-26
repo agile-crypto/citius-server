@@ -595,9 +595,6 @@ func TestCryptoHandler_DigestSign_Success(t *testing.T) {
 			if req.HashAlgorithm != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
 				t.Errorf("expected HashAlgorithm SHA256, got %s", req.HashAlgorithm)
 			}
-			if req.HashAlgorithmOID != "1.2.3" {
-				t.Errorf("expected HashAlgorithmOID 1.2.3, got %q", req.HashAlgorithmOID)
-			}
 			if len(req.Digest) != len(digest) {
 				t.Errorf("expected digest of length %d, got %d", len(digest), len(req.Digest))
 			}
@@ -607,16 +604,16 @@ func TestCryptoHandler_DigestSign_Success(t *testing.T) {
 				Algorithm:    "ecdsa-p256-sha256-der",
 				ProviderName: "software",
 				Output:       providerOutput,
+				DigestHash:   req.HashAlgorithm,
 			}, nil
 		},
 	}
 	h := wireCrypto(t, cr)
 
 	resp, err := h.DigestSign(ctx, &messagespb.DigestSignRequest{
-		KeyName:          "key_123",
-		Digest:           digest,
-		HashAlgorithm:    typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
-		HashAlgorithmOid: "1.2.3",
+		KeyName:       "key_123",
+		Digest:        digest,
+		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
 		ScopeParams: &messagespb.DigestSignRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},
@@ -635,6 +632,9 @@ func TestCryptoHandler_DigestSign_Success(t *testing.T) {
 	}
 	if resp.GetMetadata().GetProviderOutput() == nil {
 		t.Error("DigestSign response: Metadata.ProviderOutput must not be nil")
+	}
+	if got := resp.GetMetadata().GetDigestHash(); got != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+		t.Errorf("DigestSign response: expected Metadata.DigestHash SHA256, got %s", got)
 	}
 }
 
@@ -721,8 +721,8 @@ func TestCryptoHandler_DigestVerify_Valid(t *testing.T) {
 			if req.Output == nil {
 				t.Error("expected Output to be set from metadata.provider_output")
 			}
-			if req.HashAlgorithm != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
-				t.Errorf("expected HashAlgorithm SHA256, got %s", req.HashAlgorithm)
+			if req.DigestHash != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+				t.Errorf("expected DigestHash SHA256 from metadata.digest_hash, got %s", req.DigestHash)
 			}
 			return crypto.VerifyResult{Valid: true, Output: providerOutput}, nil
 		},
@@ -736,8 +736,8 @@ func TestCryptoHandler_DigestVerify_Valid(t *testing.T) {
 		Metadata: &messagespb.OperationMetadata{
 			KeyVersion:     2,
 			ProviderOutput: providerOutput,
+			DigestHash:     typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
 		},
-		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
 		ScopeParams: &messagespb.DigestVerifyRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},

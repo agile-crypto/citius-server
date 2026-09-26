@@ -190,10 +190,9 @@ func (h *CryptoHandler) DigestSign(ctx context.Context, req *messagespb.DigestSi
 	}
 
 	digestSignReq := crypto.DigestSignRequest{
-		KeyName:          req.GetKeyName(),
-		Digest:           req.GetDigest(),
-		HashAlgorithm:    req.GetHashAlgorithm(),
-		HashAlgorithmOID: req.GetHashAlgorithmOid(),
+		KeyName:       req.GetKeyName(),
+		Digest:        req.GetDigest(),
+		HashAlgorithm: req.GetHashAlgorithm(),
 	}
 	extractDigestSignScopeParams(req.GetScopeParams(), &digestSignReq)
 
@@ -207,6 +206,7 @@ func (h *CryptoHandler) DigestSign(ctx context.Context, req *messagespb.DigestSi
 		Metadata: &messagespb.OperationMetadata{
 			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
+			DigestHash:     result.DigestHash,
 		},
 	}, nil
 }
@@ -225,14 +225,15 @@ func (h *CryptoHandler) DigestVerify(ctx context.Context, req *messagespb.Digest
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, digestVerifyOp, err))
 	}
 
+	// The digest hash comes from DigestSign's metadata, like the key version
+	// and provider output: the caller passes that metadata back unchanged.
 	digestVerifyReq := crypto.DigestVerifyRequest{
-		KeyName:          req.GetKeyName(),
-		KeyVersion:       req.GetMetadata().GetKeyVersion(),
-		Digest:           req.GetDigest(),
-		Signature:        req.GetSignature(),
-		HashAlgorithm:    req.GetHashAlgorithm(),
-		HashAlgorithmOID: req.GetHashAlgorithmOid(),
-		Output:           req.GetMetadata().GetProviderOutput(),
+		KeyName:    req.GetKeyName(),
+		KeyVersion: req.GetMetadata().GetKeyVersion(),
+		Digest:     req.GetDigest(),
+		Signature:  req.GetSignature(),
+		DigestHash: req.GetMetadata().GetDigestHash(),
+		Output:     req.GetMetadata().GetProviderOutput(),
 	}
 	extractDigestVerifyScopeParams(req.GetScopeParams(), &digestVerifyReq)
 

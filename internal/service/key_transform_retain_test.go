@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/json"
 	"testing"
 
@@ -34,97 +35,41 @@ func seedRetainPolicy(t *testing.T, ctx context.Context, pol policy.Engine, name
 	require.NoError(t, err)
 }
 
-// TestTransformKey_retainBytes_ECDSA proves that retain mode stores the
-// version-1 payload byte-for-byte under the target template and scope, and
-// leaves version 1 untouched.
-func TestTransformKey_retainBytes_ECDSA(t *testing.T) {
-	ctx := context.Background()
-	keyOrch, keys, _, pol, _ := setupOrchestratorFull(t)
-	const (
-		source = "ecdsa-p256-sha256-der"
-		target = "ecdsa-p256-prehashed-der"
-	)
-	seedRetainPolicy(t, ctx, pol, "retain-ecdsa", []string{source, target})
-
-	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:               "retain-ecdsa",
-		TemplateID:         source,
-		PolicyID:           "retain-ecdsa",
-		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
-	})
-	require.NoError(t, err)
-	v1Before, err := keys.GetVersion(ctx, created.KeyID, 1)
-	require.NoError(t, err)
-
-	md, err := keyOrch.TransformKey(ctx, service.TransformKeySpec{
-		KeyName:            created.Name,
-		TemplateID:         target,
-		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
-		RetainBytes:        true,
-	})
-	require.NoError(t, err)
-	require.Equal(t, uint32(2), md.Version)
-	require.Equal(t, target, md.TemplateID)
-	require.Equal(t, created.Provider, md.Provider)
-	require.Equal(t, created.KeyID, md.KeyID)
-	require.Equal(t, created.Primitive, md.Primitive)
-	require.Equal(t, core.ScopeSignaturePrehashed, md.ScopeSpec.Scope)
-
-	v1, err := keys.GetVersion(ctx, created.KeyID, 1)
-	require.NoError(t, err)
-	v2, err := keys.GetVersion(ctx, created.KeyID, 2)
-	require.NoError(t, err)
-	require.Equal(t, v1Before.GetKeyMaterial(), v2.GetKeyMaterial(), "retained payload must be byte-for-byte identical")
-	require.Equal(t, v1Before.GetKeyMaterial(), v1.GetKeyMaterial())
-	require.Equal(t, source, v1.GetTemplateId())
-	require.Equal(t, v1Before.GetScopeSpecification(), v1.GetScopeSpecification())
-}
-
-// TestTransformKey_retainBytes_ECDSADigestSign proves that the retained
-// prehashed version is usable for digest operations and shares the key pair
-// with version 1: a version-1 full-message ECDSA-P256-SHA256 signature
-// verifies as a digest signature over SHA-256(message) under version 2.
-func TestTransformKey_retainBytes_ECDSADigestSign(t *testing.T) {
+// TestTransformKey_retainBytes_ECDSADigestNarrowed retains a prehashed ECDSA
+// key under the same template while narrowing its accepted digest hashes. The
+// new version keeps the key pair (a version-1 digest signature verifies under
+// version 2) and accepts only the narrowed hash; version 1 keeps its list.
+func TestTransformKey_retainBytes_ECDSADigestNarrowed(t *testing.T) {
 	ctx := context.Background()
 	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
-	const (
-		source = "ecdsa-p256-sha256-der"
-		target = "ecdsa-p256-prehashed-der"
-	)
-	seedRetainPolicy(t, ctx, pol, "retain-ecdsa-digest", []string{source, target},
-		core.OperationSign, core.OperationVerify, core.OperationDigestSign, core.OperationDigestVerify)
+	const tmpl = "ecdsa-p256-prehashed-der"
+	seedRetainPolicy(t, ctx, pol, "retain-ecdsa-digest", []string{tmpl},
+		core.OperationDigestSign, core.OperationDigestVerify)
 
 	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
 		Name:               "retain-ecdsa-digest",
-		TemplateID:         source,
+		TemplateID:         tmpl,
 		PolicyID:           "retain-ecdsa-digest",
-		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignatureStandard),
-	})
-	require.NoError(t, err)
-
-	message := []byte("signed before transformation")
-	digest := sha256.Sum256(message)
-	noContext := crypto.SignatureScopeFields{NoContext: &types.NoParams{}}
-	v1Sig, err := ops.Sign(ctx, crypto.SignRequest{KeyName: created.Name, Payload: message, SignatureScopeFields: noContext})
-	require.NoError(t, err)
-	require.Equal(t, uint32(1), v1Sig.KeyVersion)
-
-	_, err = keyOrch.TransformKey(ctx, service.TransformKeySpec{
-		KeyName:            created.Name,
-		TemplateID:         target,
 		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed),
-		RetainBytes:        true,
 	})
 	require.NoError(t, err)
 
+	noContext := crypto.SignatureScopeFields{NoContext: &types.NoParams{}}
+	sha256Digest := sha256.Sum256([]byte("signed before transformation"))
+	sha384Digest := sha512.Sum384([]byte("signed before transformation"))
+	digestSign := func(hash types.HashAlgorithm, digest []byte) (crypto.SignResult, error) {
+		return ops.DigestSign(ctx, crypto.DigestSignRequest{
+			KeyName: created.Name, Digest: digest, HashAlgorithm: hash, SignatureScopeFields: noContext,
+		})
+	}
 	digestVerify := func(sig crypto.SignResult, version uint32) bool {
 		t.Helper()
 		result, verifyErr := ops.DigestVerify(ctx, crypto.DigestVerifyRequest{
 			KeyName:              created.Name,
 			KeyVersion:           version,
-			Digest:               digest[:],
+			Digest:               sha256Digest[:],
 			Signature:            sig.Signature,
-			HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+			DigestHash:           sig.DigestHash,
 			Output:               sig.Output,
 			SignatureScopeFields: noContext,
 		})
@@ -132,41 +77,34 @@ func TestTransformKey_retainBytes_ECDSADigestSign(t *testing.T) {
 		return result.Valid
 	}
 
+	v1Sig, err := digestSign(types.HashAlgorithm_HASH_ALGORITHM_SHA256, sha256Digest[:])
+	require.NoError(t, err)
+	require.Equal(t, uint32(1), v1Sig.KeyVersion)
+
+	md, err := keyOrch.TransformKey(ctx, service.TransformKeySpec{
+		KeyName:    created.Name,
+		TemplateID: tmpl,
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed).WithAcceptedDigestHashes(
+			[]types.HashAlgorithm{types.HashAlgorithm_HASH_ALGORITHM_SHA256}),
+		RetainBytes: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, uint32(2), md.Version)
+	require.Equal(t, []types.HashAlgorithm{types.HashAlgorithm_HASH_ALGORITHM_SHA256}, md.ScopeSpec.AcceptedDigestHashes())
+
 	require.True(t, digestVerify(v1Sig, 2), "version-1 signature must verify under the retained version-2 key")
 
-	v2Sig, err := ops.DigestSign(ctx, crypto.DigestSignRequest{
-		KeyName:              created.Name,
-		Digest:               digest[:],
-		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
-		SignatureScopeFields: noContext,
-	})
+	v2Sig, err := digestSign(types.HashAlgorithm_HASH_ALGORITHM_SHA256, sha256Digest[:])
 	require.NoError(t, err)
 	require.Equal(t, uint32(2), v2Sig.KeyVersion)
-	require.True(t, digestVerify(v2Sig, 2))
+	require.True(t, digestVerify(v2Sig, 1), "version-2 signature must verify under version 1")
 
-	// Version 1 keeps its original template and scope: full-message Verify
-	// works, and digest operations are refused for its standard scope.
-	verified, err := ops.Verify(ctx, crypto.VerifyRequest{
-		KeyName:              created.Name,
-		KeyVersion:           1,
-		Payload:              message,
-		Signature:            v2Sig.Signature,
-		Output:               v2Sig.Output,
-		SignatureScopeFields: noContext,
-	})
+	_, err = digestSign(types.HashAlgorithm_HASH_ALGORITHM_SHA384, sha384Digest[:])
+	require.True(t, errors.IsInvalidArgument(err), "version 2 accepts only SHA-256: %v", err)
+
+	v1, err := keyOrch.ReadKey(ctx, created.Name, 1)
 	require.NoError(t, err)
-	require.True(t, verified.Valid, "version-2 digest signature must verify as a full-message signature under version 1")
-
-	_, err = ops.DigestVerify(ctx, crypto.DigestVerifyRequest{
-		KeyName:              created.Name,
-		KeyVersion:           1,
-		Digest:               digest[:],
-		Signature:            v1Sig.Signature,
-		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
-		Output:               v1Sig.Output,
-		SignatureScopeFields: noContext,
-	})
-	require.True(t, errors.IsInvalidArgument(err), "digest ops on a standard-scoped version must be refused: %v", err)
+	require.Len(t, v1.ScopeSpec.AcceptedDigestHashes(), 3, "version 1 keeps the catalog's list")
 }
 
 // TestTransformKey_retainBytes_RSA proves that a retained RSA-2048 key signs
@@ -225,61 +163,6 @@ func TestTransformKey_retainBytes_RSA(t *testing.T) {
 	}
 }
 
-// TestTransformKey_retainBytes_AES proves that an AES-256-GCM key can be
-// retained as AES-256-CBC: both versions decrypt their own ciphertexts.
-func TestTransformKey_retainBytes_AES(t *testing.T) {
-	ctx := context.Background()
-	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
-	const (
-		source = "aes-256-gcm-128-96"
-		target = "aes-256-cbc-pkcs7-128"
-	)
-	seedRetainPolicy(t, ctx, pol, "retain-aes", []string{source, target},
-		core.OperationEncrypt, core.OperationDecrypt)
-
-	created, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
-		Name:               "retain-aes",
-		TemplateID:         source,
-		PolicyID:           "retain-aes",
-		ScopeSpecification: scopeSpecWithScope(t, core.ScopeAeadStandard),
-	})
-	require.NoError(t, err)
-
-	aead := crypto.EncryptionScopeFields{AeadParams: &types.AeadEncryptParams{}}
-	block := crypto.EncryptionScopeFields{NoParams: &types.NoParams{}}
-	v1Plain := []byte("encrypted before transformation")
-	v1Enc, err := ops.Encrypt(ctx, crypto.EncryptRequest{KeyName: created.Name, Plaintext: v1Plain, EncryptionScopeFields: aead})
-	require.NoError(t, err)
-
-	md, err := keyOrch.TransformKey(ctx, service.TransformKeySpec{
-		KeyName:            created.Name,
-		TemplateID:         target,
-		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSymmetricCipherBlock),
-		RetainBytes:        true,
-	})
-	require.NoError(t, err)
-	require.Equal(t, uint32(2), md.Version)
-	require.Equal(t, target, md.TemplateID)
-
-	v2Plain := []byte("encrypted after transformation")
-	v2Enc, err := ops.Encrypt(ctx, crypto.EncryptRequest{KeyName: created.Name, Plaintext: v2Plain, EncryptionScopeFields: block})
-	require.NoError(t, err)
-	require.Equal(t, uint32(2), v2Enc.KeyVersion)
-	v2Dec, err := ops.Decrypt(ctx, crypto.DecryptRequest{
-		KeyName: created.Name, KeyVersion: 2, Ciphertext: v2Enc.Ciphertext,
-		Output: v2Enc.Output, EncryptionScopeFields: block,
-	})
-	require.NoError(t, err)
-	require.Equal(t, v2Plain, v2Dec.Plaintext)
-
-	v1Dec, err := ops.Decrypt(ctx, crypto.DecryptRequest{
-		KeyName: created.Name, KeyVersion: 1, Ciphertext: v1Enc.Ciphertext,
-		Output: v1Enc.Output, EncryptionScopeFields: aead,
-	})
-	require.NoError(t, err)
-	require.Equal(t, v1Plain, v1Dec.Plaintext)
-}
-
 func TestTransformKey_retainBytes_rejectsIncompatibleMaterial(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -291,6 +174,9 @@ func TestTransformKey_retainBytes_rejectsIncompatibleMaterial(t *testing.T) {
 		{"ECDSA P-256 to P-384", "ecdsa-p256-sha256-der", core.ScopeSignatureStandard, "ecdsa-p384-sha384-der", core.ScopeSignatureStandard},
 		{"ECDSA to RSA", "ecdsa-p256-sha256-der", core.ScopeSignatureStandard, "rsa-pss-sha256-mgf1-32-2048", core.ScopeSignatureStandard},
 		{"AES-128 to AES-256", "aes-128-gcm-128-96", core.ScopeAeadStandard, "aes-256-gcm-128-96", core.ScopeAeadStandard},
+		// Same key material, but a transform must keep the key's scope.
+		{"ECDSA standard to prehashed scope", "ecdsa-p256-sha256-der", core.ScopeSignatureStandard, "ecdsa-p256-prehashed-der", core.ScopeSignaturePrehashed},
+		{"AES-GCM to AES-CBC scope", "aes-256-gcm-128-96", core.ScopeAeadStandard, "aes-256-cbc-pkcs7-128", core.ScopeSymmetricCipherBlock},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

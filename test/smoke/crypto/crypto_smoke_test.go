@@ -282,13 +282,15 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 	if len(digestSignResp.GetSignature()) == 0 {
 		t.Fatal("DigestSign returned empty signature")
 	}
+	if got := digestSignResp.GetMetadata().GetDigestHash(); got != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+		t.Fatalf("DigestSign metadata: digest hash = %s, want SHA256", got)
+	}
 
 	digestVerifyResp, err := h.CryptoHandler.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
-		KeyName:       keyName,
-		Digest:        digest[:],
-		Signature:     digestSignResp.GetSignature(),
-		Metadata:      digestSignResp.GetMetadata(),
-		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		KeyName:   keyName,
+		Digest:    digest[:],
+		Signature: digestSignResp.GetSignature(),
+		Metadata:  digestSignResp.GetMetadata(),
 		ScopeParams: &messagespb.DigestVerifyRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},
@@ -303,11 +305,10 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 	// Negative control: a digest over different data must fail verification.
 	wrongDigest := sha256.Sum256([]byte("a different message entirely"))
 	digestVerifyBad, err := h.CryptoHandler.DigestVerify(ctx, &messagespb.DigestVerifyRequest{
-		KeyName:       keyName,
-		Digest:        wrongDigest[:],
-		Signature:     digestSignResp.GetSignature(),
-		Metadata:      digestSignResp.GetMetadata(),
-		HashAlgorithm: typespb.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		KeyName:   keyName,
+		Digest:    wrongDigest[:],
+		Signature: digestSignResp.GetSignature(),
+		Metadata:  digestSignResp.GetMetadata(),
 		ScopeParams: &messagespb.DigestVerifyRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},

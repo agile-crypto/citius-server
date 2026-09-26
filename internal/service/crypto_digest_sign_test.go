@@ -3,7 +3,9 @@ package service_test
 import (
 	"context"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"github.com/agile-crypto/citius-core/service"
@@ -100,6 +102,9 @@ func TestDigestSign_ECDSA_happyPath(t *testing.T) {
 	if result.Output.GetAlgorithmOutput() == nil {
 		t.Error("Output.algorithm_output must be set (provider contract)")
 	}
+	if result.DigestHash != types.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+		t.Errorf("DigestHash: got %s want SHA256", result.DigestHash)
+	}
 }
 
 func TestDigestSign_DigestVerify_roundtrip(t *testing.T) {
@@ -123,7 +128,7 @@ func TestDigestSign_DigestVerify_roundtrip(t *testing.T) {
 		KeyVersion:           signResult.KeyVersion,
 		Digest:               digest[:],
 		Signature:            signResult.Signature,
-		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		DigestHash:           signResult.DigestHash,
 		Output:               signResult.Output,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -156,7 +161,7 @@ func TestDigestVerify_tamperedDigest_returnsFalse(t *testing.T) {
 		KeyVersion:           signResult.KeyVersion,
 		Digest:               tampered[:],
 		Signature:            signResult.Signature,
-		HashAlgorithm:        types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		DigestHash:           signResult.DigestHash,
 		Output:               signResult.Output,
 		SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
 	})
@@ -242,5 +247,92 @@ func TestDigestSign_policyDeniesDigestSign_returnsError(t *testing.T) {
 	}
 	if !errors.IsPolicyViolation(err) {
 		t.Errorf("expected CodePolicyViolation, got: %v", err)
+	}
+}
+
+// TestDigestSign_acceptedDigestHashes checks that a prehashed key accepts only
+// its version's digest hashes: the catalog's list by default, or the narrower
+// list requested at creation.
+func TestDigestSign_acceptedDigestHashes(t *testing.T) {
+	ctx := context.Background()
+	ops, keyOrch, pol := setupCryptoOrchestratorFull(t)
+	seedDigestSignPolicy(t, ctx, pol)
+
+	create := func(name string, hashes ...types.HashAlgorithm) *service.KeyMetadata {
+		t.Helper()
+		spec := scopeSpecWithScope(t, core.ScopeSignaturePrehashed)
+		if len(hashes) > 0 {
+			spec = spec.WithAcceptedDigestHashes(hashes)
+		}
+		md, err := keyOrch.CreateKey(ctx, core.KeyCreationSpec{
+			Name:               name,
+			TemplateID:         "ecdsa-p256-prehashed-der",
+			PolicyID:           digestSignPolicyName,
+			ScopeSpecification: spec,
+		})
+		if err != nil {
+			t.Fatalf("CreateKey(%s): %v", name, err)
+		}
+		return md
+	}
+	sign := func(keyName string, hash types.HashAlgorithm, digest []byte) (crypto.SignResult, error) {
+		return ops.DigestSign(ctx, crypto.DigestSignRequest{
+			KeyName:              keyName,
+			Digest:               digest,
+			HashAlgorithm:        hash,
+			SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		})
+	}
+	sha256Digest := sha256.Sum256([]byte("payload"))
+	sha384Digest := sha512.Sum384([]byte("payload"))
+
+	all := create("digest-hashes-catalog")
+	wantAll := []types.HashAlgorithm{
+		types.HashAlgorithm_HASH_ALGORITHM_SHA256,
+		types.HashAlgorithm_HASH_ALGORITHM_SHA384,
+		types.HashAlgorithm_HASH_ALGORITHM_SHA512,
+	}
+	if got := all.ScopeSpec.AcceptedDigestHashes(); !slices.Equal(got, wantAll) {
+		t.Fatalf("catalog key: accepted digest hashes %v, want %v", got, wantAll)
+	}
+	if _, err := sign(all.Name, types.HashAlgorithm_HASH_ALGORITHM_SHA384, sha384Digest[:]); err != nil {
+		t.Fatalf("DigestSign SHA-384 on catalog key: %v", err)
+	}
+
+	narrowed := create("digest-hashes-narrowed", types.HashAlgorithm_HASH_ALGORITHM_SHA256)
+	if _, err := sign(narrowed.Name, types.HashAlgorithm_HASH_ALGORITHM_SHA384, sha384Digest[:]); !errors.IsInvalidArgument(err) {
+		t.Fatalf("DigestSign SHA-384 on SHA-256-only key: want INVALID_ARGUMENT, got %v", err)
+	}
+	signed, err := sign(narrowed.Name, types.HashAlgorithm_HASH_ALGORITHM_SHA256, sha256Digest[:])
+	if err != nil {
+		t.Fatalf("DigestSign SHA-256 on SHA-256-only key: %v", err)
+	}
+
+	verify := func(hash types.HashAlgorithm) (crypto.VerifyResult, error) {
+		return ops.DigestVerify(ctx, crypto.DigestVerifyRequest{
+			KeyName:              narrowed.Name,
+			KeyVersion:           signed.KeyVersion,
+			Digest:               sha256Digest[:],
+			Signature:            signed.Signature,
+			DigestHash:           hash,
+			Output:               signed.Output,
+			SignatureScopeFields: crypto.SignatureScopeFields{NoContext: &types.NoParams{}},
+		})
+	}
+	if _, err = verify(types.HashAlgorithm_HASH_ALGORITHM_UNSPECIFIED); !errors.IsInvalidArgument(err) {
+		t.Fatalf("DigestVerify without a digest hash: want INVALID_ARGUMENT, got %v", err)
+	}
+	if _, err = verify(types.HashAlgorithm_HASH_ALGORITHM_SHA384); !errors.IsInvalidArgument(err) {
+		t.Fatalf("DigestVerify with an unaccepted digest hash: want INVALID_ARGUMENT, got %v", err)
+	}
+
+	if _, err = keyOrch.CreateKey(ctx, core.KeyCreationSpec{
+		Name:       "digest-hashes-unoffered",
+		TemplateID: "ecdsa-p256-prehashed-der",
+		PolicyID:   digestSignPolicyName,
+		ScopeSpecification: scopeSpecWithScope(t, core.ScopeSignaturePrehashed).WithAcceptedDigestHashes(
+			[]types.HashAlgorithm{types.HashAlgorithm_HASH_ALGORITHM_SHA3_256}),
+	}); err == nil {
+		t.Fatal("CreateKey with a digest hash the template does not accept must fail")
 	}
 }
