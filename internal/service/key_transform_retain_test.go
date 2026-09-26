@@ -80,6 +80,9 @@ func TestTransformKey_retainBytes_ECDSADigestNarrowed(t *testing.T) {
 	v1Sig, err := digestSign(types.HashAlgorithm_HASH_ALGORITHM_SHA256, sha256Digest[:])
 	require.NoError(t, err)
 	require.Equal(t, uint32(1), v1Sig.KeyVersion)
+	v1SHA384Sig, err := digestSign(types.HashAlgorithm_HASH_ALGORITHM_SHA384, sha384Digest[:])
+	require.NoError(t, err)
+	require.Equal(t, types.HashAlgorithm_HASH_ALGORITHM_SHA384, v1SHA384Sig.DigestHash)
 
 	md, err := keyOrch.TransformKey(ctx, service.TransformKeySpec{
 		KeyName:    created.Name,
@@ -101,6 +104,21 @@ func TestTransformKey_retainBytes_ECDSADigestNarrowed(t *testing.T) {
 
 	_, err = digestSign(types.HashAlgorithm_HASH_ALGORITHM_SHA384, sha384Digest[:])
 	require.True(t, errors.IsInvalidArgument(err), "version 2 accepts only SHA-256: %v", err)
+
+	// Narrowing affects only new signatures. DigestVerify checks the hash
+	// against the version that made the signature (metadata.key_version), so a
+	// version-1 SHA-384 signature made before the transform still verifies.
+	v1SHA384, verifyErr := ops.DigestVerify(ctx, crypto.DigestVerifyRequest{
+		KeyName:              created.Name,
+		KeyVersion:           v1SHA384Sig.KeyVersion,
+		Digest:               sha384Digest[:],
+		Signature:            v1SHA384Sig.Signature,
+		DigestHash:           v1SHA384Sig.DigestHash,
+		Output:               v1SHA384Sig.Output,
+		SignatureScopeFields: noContext,
+	})
+	require.NoError(t, verifyErr)
+	require.True(t, v1SHA384.Valid, "a version-1 SHA-384 signature must still verify after narrowing")
 
 	v1, err := keyOrch.ReadKey(ctx, created.Name, 1)
 	require.NoError(t, err)
