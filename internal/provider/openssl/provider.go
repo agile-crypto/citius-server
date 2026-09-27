@@ -116,8 +116,9 @@ func (p *Provider) FIPSEnabled() bool {
 
 // GenerateKey dispatches to the algorithm-specific key generator. Structure
 // mirrors software.Provider.GenerateKey: each case sets the shared
-// pubDER/privDER/encoding variables and falls through to one response
-// construction, rather than each case building its own.
+// pubDER/privDER/pubEnc variables and falls through to one response
+// construction, rather than each case building its own. The private key's
+// encoding depends only on the algorithm (see privateKeyEncoding).
 func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	const op errors.Op = "openssl.(Provider).GenerateKey"
 
@@ -128,7 +129,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	var (
 		pubDER  []byte
 		privDER []byte
-		privEnc providerpb.PrivateKeyEncoding
 		pubEnc  providerpb.PublicKeyEncoding
 		err     error
 	)
@@ -142,28 +142,24 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		// The two halves differ: SEC1 (RFC 5915) for the private key, SPKI
 		// (RFC 5280) for the public key — the same split software's ECDSA
 		// path uses, for the same reason (see generateECDSAKey's doc).
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_RsaPss:
 		pubDER, privDER, err = generateRSAKeyForTemplate(ctx, p.libctx, req.GetAlgorithm(), alg.RsaPss.GetKeySizeBits())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_RsaPkcs1V15:
 		pubDER, privDER, err = generateRSAKeyForTemplate(ctx, p.libctx, req.GetAlgorithm(), alg.RsaPkcs1V15.GetKeySizeBits())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_Ed25519:
 		pubDER, privDER, err = generateEd25519Key(ctx, p.libctx)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_MlDsa:
 		pubDER, privDER, err = generateMLDSAKey(ctx, p.libctx, alg.MlDsa.GetParameterSet())
@@ -175,7 +171,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		// SPKI parser for ML-DSA, only CIRCL's raw packed format, so RAW is
 		// what makes this genuinely interoperate rather than what would be
 		// the more obvious choice by analogy with ECDSA/RSA/Ed25519.
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
 	case *types.AlgorithmDetails_AesGcm, *types.AlgorithmDetails_AesCbc, *types.AlgorithmDetails_AesCtr, *types.AlgorithmDetails_Chacha20Poly1305:
 		privDER, err = generateSymmetricKey(ctx, req.GetAlgorithm())
@@ -183,7 +178,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		// Symmetric: no public half -- pubDER/pubEnc stay at their zero values.
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -193,7 +187,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		PublicKeyBytes:      pubDER,
 		KeyMaterial:         privDER,
 		Output:              provider.NoOutputUnencoded(),
-		KeyMaterialEncoding: privEnc,
+		KeyMaterialEncoding: privateKeyEncoding(req.GetAlgorithm()),
 		PublicKeyEncoding:   pubEnc,
 	}, nil
 }
