@@ -11,6 +11,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
+	"github.com/agile-crypto/citius-server/internal/cmd/server"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -174,6 +175,47 @@ func TestSmoke_CreateKey_intentBasedProviderRequirements(t *testing.T) {
 				t.Errorf("CreateKey: %s, want %s", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestSmoke_CreateKey_fipsInstance_scopeFIPSApprovalDoesNotChooseIt
+// records decision DT-027 with a FIPS instance registered: a scope's
+// fips_approved selects algorithms, so with no provider requirement the
+// first registered instance (software) serves the key; only a FIPS 140
+// provider requirement selects openssl-fips. Skips without a FIPS module.
+func TestSmoke_CreateKey_fipsInstance_scopeFIPSApprovalDoesNotChooseIt(t *testing.T) {
+	ctx := context.Background()
+	h, err := server.NewTestableServer(ctx, server.Config{
+		CatalogPath:    catalogPath(),
+		FIPSConfigPath: activatingFIPSConfig(t),
+	})
+	if err != nil {
+		t.Fatalf("NewTestableServer: %v", err)
+	}
+	pol := seedPolicy(t, ctx, h, "fips-scope", []string{aeadTemplate}, []string{"create_key"})
+	fipsApproved := &typespb.ScopeSpecification{ScopeSpec: &typespb.ScopeSpecification_Aead{
+		Aead: &typespb.AeadScopeSpec{
+			Scope:    typespb.AeadScope_AEAD_SCOPE_STANDARD,
+			Security: &typespb.UniversalSecurityProperties{FipsApproved: proto.Bool(true)},
+		},
+	}}
+
+	for i, tt := range []struct {
+		requirements *typespb.ProviderRequirements
+		want         string
+	}{
+		{nil, "software"},
+		{&typespb.ProviderRequirements{Fips_140Certified: proto.Bool(true)}, "openssl-fips"},
+	} {
+		resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+			Name: fmt.Sprintf("fips-scope-key-%d", i), Policy: pol, ScopeSpec: fipsApproved, ProviderRequirements: tt.requirements,
+		})
+		if err != nil {
+			t.Fatalf("CreateKey (requirements %v): %v", tt.requirements, err)
+		}
+		if got := resp.GetKeyMetadata().GetProvider(); got != tt.want {
+			t.Errorf("CreateKey (requirements %v): provider = %q, want %q", tt.requirements, got, tt.want)
+		}
 	}
 }
 
