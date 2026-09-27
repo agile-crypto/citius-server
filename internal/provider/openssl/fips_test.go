@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/ossl-go/ossl"
 
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
@@ -81,6 +82,9 @@ func TestNew_withFIPS_reportsFIPSApproved(t *testing.T) {
 	}
 	if !fips.GetCertified() {
 		t.Error("Fips_140.Certified: got false, want true")
+	}
+	if fips.GetLevel() != types.Fips140Level_FIPS_140_LEVEL_1 {
+		t.Errorf("Fips_140.Level: got %v, want FIPS_140_LEVEL_1", fips.GetLevel())
 	}
 }
 

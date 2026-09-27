@@ -161,7 +161,10 @@ func (p *Provider) ImplementationProperties() *types.ImplementationProperties {
 		HardwareAccelerated:    proto.Bool(true),
 	}
 	if p.FIPSEnabled() {
-		props.Fips_140 = &types.Fips140Certification{Certified: true}
+		// The OpenSSL FIPS provider is a software module, validated at
+		// overall security level 1: the level is a property of the module
+		// itself, so it is reported without a certificate number.
+		props.Fips_140 = &types.Fips140Certification{Certified: true, Level: types.Fips140Level_FIPS_140_LEVEL_1}
 	}
 	return props
 }
