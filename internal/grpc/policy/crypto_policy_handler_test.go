@@ -62,6 +62,9 @@ func (m *mockPolicyManager) ValidateKeyCreation(_ context.Context, _ string, _ *
 func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ *core.ScopeSpecification) ([]string, error) {
 	panic("mockPolicyManager.AllowedTemplates: not implemented")
 }
+func (m *mockPolicyManager) ProviderRequirements(_ context.Context, _ string) (core.ProviderRequirements, error) {
+	panic("mockPolicyManager.ProviderRequirements: not implemented")
+}
 
 // wirePolicy builds the handler under test over a fixed policy engine.
 func wirePolicy(t *testing.T, engine policy.Engine) *policygrpc.CryptoPolicyHandler {
