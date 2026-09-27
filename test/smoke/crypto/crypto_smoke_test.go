@@ -327,7 +327,7 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 // provider_id on CreateKeyRequest is honoured end-to-end through the real
 // gRPC handler and proto (de)serialization -- not just at the
 // KeyOrchestrator layer (internal/service/key_create_test.go's provider_id
-// tests) or the Registry layer (internal/provider/match_test.go's
+// tests) or the Registry layer (citius-core's provider/match_test.go
 // fake-provider tests). buildProviderRegistry registers "software" before
 // "openssl", so this fails if the pin is silently dropped and registration
 // order wins instead.
@@ -367,7 +367,7 @@ func TestSmoke_CreateKey_providerID_pinned_honoured(t *testing.T) {
 // TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance proves a FIPS 140
 // provider requirement correctly selects the real openssl-fips instance
 // over "software" (registered first) through the real gRPC handler — the
-// end-to-end path match_test.go's fake-provider FIPS test and
+// end-to-end path citius-core's provider/match_test.go FIPS tests and
 // wire_internal_test.go's direct-Backend-call FIPS test don't individually
 // cover, since neither goes through CreateKey -> Match with a real
 // multi-provider registry. Only the provider requirement forces a FIPS
