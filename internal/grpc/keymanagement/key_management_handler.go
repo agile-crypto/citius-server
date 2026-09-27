@@ -190,9 +190,41 @@ func (h *KeyManagementHandler) UpdateKeyPolicy(ctx context.Context, req *message
 	return h.UnimplementedKeyManagementServiceServer.UpdateKeyPolicy(ctx, req)
 }
 
-// MigrateKey handles the MigrateKey RPC.
+// MigrateKey handles the MigrateKey RPC: moving a key to another provider
+// instance as a new current version, keeping its template and scope.
+//
+// Proto mapping:
+//
+//	messages.MigrateKeyRequest.name                        => service.MigrateKeySpec.KeyName
+//	messages.MigrateKeyRequest.target_instance_id          => service.MigrateKeySpec.TargetInstanceID (oneof)
+//	messages.MigrateKeyRequest.provider_target.provider_id => service.MigrateKeySpec.TargetProviderID (oneof)
+//	messages.MigrateKeyRequest.strategy                    => service.MigrateKeySpec.Strategy
 func (h *KeyManagementHandler) MigrateKey(ctx context.Context, req *messagespb.MigrateKeyRequest) (*messagespb.MigrateKeyResponse, error) {
-	return h.UnimplementedKeyManagementServiceServer.MigrateKey(ctx, req)
+	const op engerr.Op = keyManagementHandlerOp + ".MigrateKey"
+
+	if err := h.authorizeKey(ctx, op, req.GetName()); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
+
+	var spec service.MigrateKeySpec
+	if err := spec.FromProto(ctx, req); err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+
+	keys, err := h.keys(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+
+	res, err := keys.MigrateKey(ctx, spec)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	resp, err := res.ToProto(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	return resp, nil
 }
 
 // ValidateKeyOperation handles the ValidateKeyOperation RPC.

@@ -29,6 +29,7 @@ type mockKeyOrchestrator struct {
 	readFn               func(ctx context.Context, name string) (*service.KeyMetadata, error)
 	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
 	transformFn          func(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error)
+	migrateFn            func(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationResult, error)
 }
 
 func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
@@ -84,7 +85,10 @@ func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.Tra
 	panic("mockKeyOrchestrator.TransformKey: not implemented")
 }
 
-func (m *mockKeyOrchestrator) MigrateKey(_ context.Context, _ service.MigrateKeySpec) (*service.MigrationResult, error) {
+func (m *mockKeyOrchestrator) MigrateKey(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationResult, error) {
+	if m.migrateFn != nil {
+		return m.migrateFn(ctx, spec)
+	}
 	panic("mockKeyOrchestrator.MigrateKey: not implemented")
 }
 
@@ -266,4 +270,91 @@ func TestKeyManagementHandler_TransformKey_WithErrors(t *testing.T) {
 	require.NotNil(t, err)
 	st, _ := status.FromError(err)
 	require.Equal(t, codes.InvalidArgument, st.Code())
+}
+
+func TestKeyManagementHandler_MigrateKey_Success(t *testing.T) {
+	ctx := context.Background()
+	strategy := messagespb.MigrationStrategy_MIGRATION_STRATEGY_REKEY_AND_ARCHIVE
+	km := &mockKeyOrchestrator{
+		migrateFn: func(_ context.Context, spec service.MigrateKeySpec) (*service.MigrationResult, error) {
+			require.Equal(t, service.MigrateKeySpec{KeyName: "key_123", TargetInstanceID: "openssl", Strategy: strategy}, spec)
+			return &service.MigrationResult{
+				Key: &service.KeyMetadata{
+					Name: spec.KeyName, KeyID: "key-id", Version: 2,
+					TemplateID: "ecdsa-p256-sha256-der", Provider: "openssl",
+				},
+				Strategy:         strategy,
+				SourceProviderID: "software",
+				SourceInstanceID: "software",
+				SourceVersion:    1,
+				TargetProviderID: "openssl",
+				TargetInstanceID: "openssl",
+			}, nil
+		},
+	}
+	h := wireKeys(t, km)
+
+	resp, err := h.MigrateKey(ctx, &messagespb.MigrateKeyRequest{
+		Name:     "key_123",
+		Target:   &messagespb.MigrateKeyRequest_TargetInstanceId{TargetInstanceId: "openssl"},
+		Strategy: strategy,
+	})
+	require.NoError(t, err)
+	require.True(t, resp.GetSuccess())
+	require.Equal(t, uint32(2), resp.GetKeyMetadata().GetVersion())
+	require.Equal(t, "openssl", resp.GetKeyMetadata().GetProvider())
+	require.Equal(t, strategy, resp.GetResult().GetStrategyUsed())
+	require.False(t, resp.GetResult().GetKeyBytesPreserved())
+	require.Equal(t, "software", resp.GetResult().GetSourceInstanceId())
+	require.Equal(t, "openssl", resp.GetResult().GetTargetInstanceId())
+	require.Equal(t, "key_123", resp.GetArchivedKeyInfo().GetArchivedKeyName())
+	require.Equal(t, "software", resp.GetArchivedKeyInfo().GetProviderId())
+}
+
+func TestKeyManagementHandler_MigrateKey_Errors(t *testing.T) {
+	ctx := context.Background()
+	templateID := "ecdsa-p256-sha256-der"
+	tests := []struct {
+		name     string
+		req      *messagespb.MigrateKeyRequest
+		migrate  func(context.Context, service.MigrateKeySpec) (*service.MigrationResult, error)
+		wantCode codes.Code
+	}{
+		{
+			name:     "template change is refused before the orchestrator",
+			req:      &messagespb.MigrateKeyRequest{Name: "key_123", TemplateId: &templateID},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "orchestrator error is mapped",
+			req: &messagespb.MigrateKeyRequest{
+				Name:     "key_123",
+				Target:   &messagespb.MigrateKeyRequest_TargetInstanceId{TargetInstanceId: "software"},
+				Strategy: messagespb.MigrationStrategy_MIGRATION_STRATEGY_PROVIDER_SWITCH,
+			},
+			migrate: func(ctx context.Context, _ service.MigrateKeySpec) (*service.MigrationResult, error) {
+				return nil, engerr.New(ctx, "test", engerr.CodeFailedPrecondition, "already on provider instance")
+			},
+			wantCode: codes.FailedPrecondition,
+		},
+		{
+			name: "unimplemented strategy",
+			req: &messagespb.MigrateKeyRequest{
+				Name:     "key_123",
+				Target:   &messagespb.MigrateKeyRequest_TargetInstanceId{TargetInstanceId: "openssl"},
+				Strategy: messagespb.MigrationStrategy_MIGRATION_STRATEGY_WRAPPED_TRANSFER,
+			},
+			migrate: func(ctx context.Context, _ service.MigrateKeySpec) (*service.MigrationResult, error) {
+				return nil, engerr.New(ctx, "test", engerr.CodeNotImplemented, "not implemented")
+			},
+			wantCode: codes.Unimplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := wireKeys(t, &mockKeyOrchestrator{migrateFn: tt.migrate})
+			_, err := h.MigrateKey(ctx, tt.req)
+			require.Equal(t, tt.wantCode, status.Code(err), "%v", err)
+		})
+	}
 }
