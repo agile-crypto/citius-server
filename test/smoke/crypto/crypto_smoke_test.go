@@ -364,13 +364,14 @@ func TestSmoke_CreateKey_providerID_pinned_honoured(t *testing.T) {
 	}
 }
 
-// TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance proves a scope that
-// requires FIPS approval correctly selects the real openssl-fips instance
+// TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance proves a FIPS 140
+// provider requirement correctly selects the real openssl-fips instance
 // over "software" (registered first) through the real gRPC handler — the
 // end-to-end path match_test.go's fake-provider FIPS test and
 // wire_internal_test.go's direct-Backend-call FIPS test don't individually
 // cover, since neither goes through CreateKey -> Match with a real
-// multi-provider registry.
+// multi-provider registry. Only the provider requirement forces a FIPS
+// provider; the scope's fips_approved selects algorithms (decision DT-027).
 func TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance(t *testing.T) {
 	ctx := context.Background()
 	fipsCfgPath := activatingFIPSConfig(t)
@@ -394,13 +395,11 @@ func TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance(t *testing.T) {
 			ScopeSpec: &typespb.ScopeSpecification_Aead{
 				Aead: &typespb.AeadScopeSpec{
 					Scope: typespb.AeadScope_AEAD_SCOPE_STANDARD,
-					Security: &typespb.UniversalSecurityProperties{
-						FipsApproved: proto.Bool(true),
-					},
 				},
 			},
 		},
-		TemplateId: &templateID,
+		TemplateId:           &templateID,
+		ProviderRequirements: &typespb.ProviderRequirements{Fips_140Certified: proto.Bool(true)},
 	})
 	if err != nil {
 		t.Fatalf("CreateKey (FIPS required): %v", err)
@@ -410,6 +409,6 @@ func TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance(t *testing.T) {
 	}
 	const wantProvider = "openssl-fips"
 	if got := resp.GetKeyMetadata().GetProvider(); got != wantProvider {
-		t.Errorf("CreateKey: provider = %q, want %q — a FIPS-required scope must select the FIPS instance, not the first-registered provider", got, wantProvider)
+		t.Errorf("CreateKey: provider = %q, want %q — a FIPS 140 provider requirement must select the FIPS instance, not the first-registered provider", got, wantProvider)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	keygrpc "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // mockKeyOrchestrator stubs KeyOrchestrator for tests.
@@ -154,6 +155,39 @@ func TestKeyManagementHandler_CreateKey_Success(t *testing.T) {
 		t.Error("expected Success: true in CreateKeyResponse")
 	}
 	require.Equal(t, typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, resp.GetKeyMetadata().GetScopeSpec().GetSignature().GetScope())
+}
+
+func TestKeyManagementHandler_CreateKey_MapsProviderRequirements(t *testing.T) {
+	ctx := context.Background()
+	var got core.ProviderRequirements
+	km := &mockKeyOrchestrator{
+		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
+			got = spec.ProviderRequirements
+			return &service.KeyMetadata{Name: spec.Name, Version: 1}, nil
+		},
+	}
+	h := wireKeys(t, km)
+
+	_, err := h.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name: "my-key",
+		ProviderRequirements: &typespb.ProviderRequirements{
+			Fips_140Certified:         proto.Bool(true),
+			MinFipsLevel:              typespb.Fips140Level_FIPS_140_LEVEL_1,
+			PreferHardwareAccelerated: proto.Bool(true),
+		},
+	})
+	require.NoError(t, err)
+	require.Equal(t, core.ProviderRequirements{FIPS140Certified: true, MinFIPS140Level: 1, PreferHardwareAccelerated: true}, got)
+}
+
+func TestKeyManagementHandler_CreateKey_UnenforceableProviderRequirements_ReturnsInvalidArgument(t *testing.T) {
+	h := wireKeys(t, &mockKeyOrchestrator{}) // CreateKey must not be reached
+
+	_, err := h.CreateKey(context.Background(), &messagespb.CreateKeyRequest{
+		Name:                 "my-key",
+		ProviderRequirements: &typespb.ProviderRequirements{Additional: map[string]string{"vendor": "acme"}},
+	})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
 
 func TestKeyManagementHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) {

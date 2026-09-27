@@ -43,6 +43,7 @@ const keyManagementHandlerOp = engerr.Op("grpc.(KeyManagementHandler)")
 //	messages.CreateKeyRequest.provider_id => core.KeyCreationSpec.ProviderInstanceID
 //	messages.CreateKeyRequest.template_id => core.KeyCreationSpec.TemplateID (oneof)
 //	messages.CreateKeyRequest.scope_spec  => core.KeyCreationSpec.ScopeSpecification (oneof)
+//	messages.CreateKeyRequest.provider_requirements => core.KeyCreationSpec.ProviderRequirements
 func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.CreateKeyRequest) (*messagespb.CreateKeyResponse, error) {
 	const createOp engerr.Op = keyManagementHandlerOp + ".CreateKey"
 
@@ -77,6 +78,11 @@ func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.Cr
 		}
 		spec.ScopeSpecification = scopeSpec
 	}
+	providerReqs, err := core.ProviderRequirementsFromProto(ctx, req.GetProviderRequirements())
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, createOp, err, engerr.WithMessage("invalid provider_requirements")))
+	}
+	spec.ProviderRequirements = providerReqs
 
 	md, err := keys.CreateKey(ctx, spec)
 	if err != nil {
