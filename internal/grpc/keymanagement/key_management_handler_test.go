@@ -84,6 +84,10 @@ func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec service.Tra
 	panic("mockKeyOrchestrator.TransformKey: not implemented")
 }
 
+func (m *mockKeyOrchestrator) MigrateKey(_ context.Context, _ service.MigrateKeySpec) (*service.MigrationResult, error) {
+	panic("mockKeyOrchestrator.MigrateKey: not implemented")
+}
+
 // wireKeys builds the handler under test over a fixed orchestrator. The factory
 // ignores its context and returns the same mock every call, which is exactly
 // what a startup-wired (SQL or embedded) deployment does.
