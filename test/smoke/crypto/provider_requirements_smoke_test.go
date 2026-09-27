@@ -1,0 +1,250 @@
+package crypto_test
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"regexp"
+	"slices"
+	"testing"
+
+	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
+)
+
+const aeadTemplate = "aes-256-gcm-128-96"
+
+func aeadScope() *typespb.ScopeSpecification {
+	return &typespb.ScopeSpecification{ScopeSpec: &typespb.ScopeSpecification_Aead{
+		Aead: &typespb.AeadScopeSpec{Scope: typespb.AeadScope_AEAD_SCOPE_STANDARD},
+	}}
+}
+
+func signatureScope(scope typespb.SignatureScope, security *typespb.UniversalSecurityProperties) *typespb.ScopeSpecification {
+	return &typespb.ScopeSpecification{ScopeSpec: &typespb.ScopeSpecification_Signature{
+		Signature: &typespb.SignatureScopeSpec{Scope: scope, Security: security},
+	}}
+}
+
+// providerRulePolicy returns the rules of a policy allowing templates and
+// operations, with an optional provider_requirements section.
+func providerRulePolicy(t *testing.T, templates, operations []string, providerRequirements map[string]any) string {
+	t.Helper()
+	rules := map[string]any{
+		"version":            "1",
+		"allowed_templates":  templates,
+		"allowed_operations": map[string]any{"key_operations": operations},
+	}
+	if providerRequirements != nil {
+		rules["provider_requirements"] = providerRequirements
+	}
+	b, err := json.Marshal(rules)
+	if err != nil {
+		t.Fatalf("marshal policy rules: %v", err)
+	}
+	return string(b)
+}
+
+// TestSmoke_CreateKey_providerRequirementsChooseTheProvider proves the
+// provider_requirements of a CreateKey request choose among the software
+// (memory-safe, registered first) and openssl (hardware-accelerated)
+// instances, and that a pin contradicting a requirement is refused.
+func TestSmoke_CreateKey_providerRequirementsChooseTheProvider(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+	pol := seedPolicy(t, ctx, h, "aead", []string{aeadTemplate}, []string{"create_key"})
+
+	tests := []struct {
+		name         string
+		pin          string
+		requirements *typespb.ProviderRequirements
+		wantProvider string
+		wantCode     codes.Code
+	}{
+		{name: "none: registration order", wantProvider: "software"},
+		{name: "memory safe", requirements: &typespb.ProviderRequirements{MemorySafe: proto.Bool(true)}, wantProvider: "software"},
+		{name: "prefer hardware acceleration", requirements: &typespb.ProviderRequirements{PreferHardwareAccelerated: proto.Bool(true)}, wantProvider: "openssl"},
+		{name: "FIPS 140 without a FIPS instance", requirements: &typespb.ProviderRequirements{Fips_140Certified: proto.Bool(true)}, wantCode: codes.NotFound},
+		{name: "pin contradicts a requirement", pin: "openssl", requirements: &typespb.ProviderRequirements{MemorySafe: proto.Bool(true)}, wantCode: codes.FailedPrecondition},
+		{name: "unenforceable requirement", requirements: &typespb.ProviderRequirements{Additional: map[string]string{"vendor": "acme"}}, wantCode: codes.InvalidArgument},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tid := aeadTemplate
+			resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+				Name:                 fmt.Sprintf("key-%d", i),
+				Policy:               pol,
+				TemplateId:           &tid,
+				ScopeSpec:            aeadScope(),
+				ProviderId:           tt.pin,
+				ProviderRequirements: tt.requirements,
+			})
+			if tt.wantCode != codes.OK {
+				if got := status.Code(err); got != tt.wantCode {
+					t.Fatalf("CreateKey: code = %s, want %s (err %v)", got, tt.wantCode, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("CreateKey: %v", err)
+			}
+			if got := resp.GetKeyMetadata().GetProvider(); got != tt.wantProvider {
+				t.Errorf("CreateKey: provider = %q, want %q", got, tt.wantProvider)
+			}
+		})
+	}
+}
+
+// TestSmoke_CreateKey_scopeFIPSApprovalSelectsAlgorithmsOnly records
+// decision DT-027: fips_approved in a scope selects a FIPS-approved
+// algorithm (ML-DSA, FIPS 204) and does not force a FIPS 140 certified
+// provider, so the pinned software provider serves it.
+func TestSmoke_CreateKey_scopeFIPSApprovalSelectsAlgorithmsOnly(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+	pol := seedPolicy(t, ctx, h, "pqc", []string{"ml-dsa-65"}, []string{"create_key"})
+
+	tid := "ml-dsa-65"
+	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name:       "pqc-key",
+		Policy:     pol,
+		TemplateId: &tid,
+		ProviderId: "software",
+		ScopeSpec: signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD,
+			&typespb.UniversalSecurityProperties{FipsApproved: proto.Bool(true), QuantumSafe: proto.Bool(true)}),
+		ProviderRequirements: &typespb.ProviderRequirements{MemorySafe: proto.Bool(true)},
+	})
+	if err != nil {
+		t.Fatalf("CreateKey: %v", err)
+	}
+	if got := resp.GetKeyMetadata().GetProvider(); got != "software" {
+		t.Errorf("CreateKey: provider = %q, want software", got)
+	}
+}
+
+// TestSmoke_PolicyProviderRequirements_governTheKeyLifecycle proves a
+// policy's provider_requirements rule (DT-029) applies to every key under
+// the policy, whenever a version is placed on a provider: a key on openssl
+// can no longer be transformed in place once the policy requires a
+// memory-safe provider, may migrate to software, and may not migrate back.
+func TestSmoke_PolicyProviderRequirements_governTheKeyLifecycle(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+	ops := []string{"create_key", "read_key", "encrypt", "decrypt"}
+	pol := seedPolicy(t, ctx, h, "governed", []string{aeadTemplate}, ops)
+
+	tid := aeadTemplate
+	if _, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name: "governed-key", Policy: pol, TemplateId: &tid, ScopeSpec: aeadScope(), ProviderId: "openssl",
+	}); err != nil {
+		t.Fatalf("CreateKey on openssl: %v", err)
+	}
+	enc, err := h.CryptoHandler.Encrypt(ctx, &messagespb.EncryptRequest{
+		KeyName: "governed-key", Plaintext: []byte("before the rule"),
+		ScopeParams: &messagespb.EncryptRequest_AeadParams{AeadParams: &typespb.AeadEncryptParams{}},
+	})
+	if err != nil {
+		t.Fatalf("Encrypt: %v", err)
+	}
+
+	if _, err = h.PolicyHandler.UpdateCryptoPolicy(ctx, &messagespb.UpdateCryptoPolicyRequest{
+		Name:           pol,
+		PolicyDocument: providerRulePolicy(t, []string{aeadTemplate}, ops, map[string]any{"memory_safe": true}),
+		Format:         "json",
+	}); err != nil {
+		t.Fatalf("UpdateCryptoPolicy: %v", err)
+	}
+
+	if _, err = h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name: "refused-key", Policy: pol, TemplateId: &tid, ScopeSpec: aeadScope(), ProviderId: "openssl",
+	}); status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("CreateKey on openssl under the rule: code = %s, want FailedPrecondition", status.Code(err))
+	}
+	if _, err = h.KeysHandler.TransformKey(ctx, &messagespb.TransformKeyRequest{
+		Name: "governed-key", TemplateId: &tid, ScopeSpec: aeadScope(),
+	}); status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("TransformKey on openssl under the rule: code = %s, want FailedPrecondition", status.Code(err))
+	}
+
+	migrate := func(target string) error {
+		_, mErr := h.KeysHandler.MigrateKey(ctx, &messagespb.MigrateKeyRequest{
+			Name:     "governed-key",
+			Target:   &messagespb.MigrateKeyRequest_TargetInstanceId{TargetInstanceId: target},
+			Strategy: messagespb.MigrationStrategy_MIGRATION_STRATEGY_PROVIDER_SWITCH,
+		})
+		return mErr
+	}
+	if err = migrate("software"); err != nil {
+		t.Fatalf("MigrateKey to software: %v", err)
+	}
+	if err = migrate("openssl"); status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("MigrateKey back to openssl: code = %s, want FailedPrecondition", status.Code(err))
+	}
+
+	dec, err := h.CryptoHandler.Decrypt(ctx, &messagespb.DecryptRequest{
+		KeyName: "governed-key", Ciphertext: enc.GetCiphertext(), Metadata: enc.GetMetadata(),
+		ScopeParams: &messagespb.DecryptRequest_AeadParams{AeadParams: &typespb.AeadEncryptParams{}},
+	})
+	if err != nil || string(dec.GetPlaintext()) != "before the rule" {
+		t.Errorf("Decrypt after migration: %q, %v", dec.GetPlaintext(), err)
+	}
+}
+
+// catalogTemplateIDs returns every template ID in the catalog, in order.
+func catalogTemplateIDs(t *testing.T) []string {
+	t.Helper()
+	b, err := os.ReadFile(catalogPath())
+	if err != nil {
+		t.Fatalf("read catalog: %v", err)
+	}
+	var ids []string
+	for _, m := range regexp.MustCompile(`"templateId":\s*"([^"]+)"`).FindAllStringSubmatch(string(b), -1) {
+		if !slices.Contains(ids, m[1]) {
+			ids = append(ids, m[1])
+		}
+	}
+	return ids
+}
+
+// TestSmoke_CreateKey_wholeCatalogPolicy_selectsServableTemplates proves
+// intent-based creation under a policy allowing the whole catalog (DT-026):
+// templates listed before a servable one but implemented by no provider
+// (hybrids) or not by the pinned provider are skipped, not selected and
+// then refused.
+func TestSmoke_CreateKey_wholeCatalogPolicy_selectsServableTemplates(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+	pol := seedPolicy(t, ctx, h, "catalog", catalogTemplateIDs(t), []string{"create_key"})
+	quantumSafe := &typespb.UniversalSecurityProperties{QuantumSafe: proto.Bool(true)}
+
+	tests := []struct {
+		name  string
+		pin   string
+		scope *typespb.ScopeSpecification
+	}{
+		{"signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, nil)},
+		{"quantum-safe signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, quantumSafe)},
+		{"prehashed signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil)},
+		{"prehashed signature on openssl", "openssl", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil)},
+		{"AEAD", "", aeadScope()},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+				Name: fmt.Sprintf("catalog-key-%d", i), Policy: pol, ScopeSpec: tt.scope, ProviderId: tt.pin,
+			})
+			if err != nil {
+				t.Fatalf("CreateKey: %v", err)
+			}
+			md := resp.GetKeyMetadata()
+			if tt.pin != "" && md.GetProvider() != tt.pin {
+				t.Errorf("CreateKey: provider = %q, want %q", md.GetProvider(), tt.pin)
+			}
+			t.Logf("%s -> %s@%s", tt.name, md.GetTemplateId(), md.GetProvider())
+		})
+	}
+}
