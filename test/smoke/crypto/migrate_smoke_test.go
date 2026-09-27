@@ -113,7 +113,7 @@ func TestSmoke_MigrateKey_RekeyAndArchive_ECDSA(t *testing.T) {
 	const templateID = "ecdsa-p256-sha256-der"
 	policyName := seedPolicy(t, ctx, h, "ecdsa-migrate", []string{templateID},
 		[]string{"create_key", "sign", "verify"})
-	keyName := createSignatureKey(t, ctx, h, "migrate-ecdsa-key", policyName, templateID)
+	keyName := createSignatureKey(t, ctx, h, "migrate-ecdsa-key", policyName, templateID, "")
 
 	payload := []byte("signed before the key moved to openssl")
 	noContext := &typespb.NoParams{}
@@ -176,6 +176,55 @@ func TestSmoke_MigrateKey_RekeyAndArchive_ECDSA(t *testing.T) {
 	}
 }
 
+// TestSmoke_MigrateKey_ProviderSwitch_SignatureTemplates copies the key bytes
+// of every standard signature template both providers offer, in both
+// directions, then signs on the target and verifies that signature with the
+// source version: the two providers must read each other's key encodings, or
+// the migrated version would be unusable.
+func TestSmoke_MigrateKey_ProviderSwitch_SignatureTemplates(t *testing.T) {
+	templates := []string{
+		"ecdsa-p256-sha256-der", "ecdsa-p384-sha384-der", "ecdsa-p521-sha512-der",
+		"rsa-pss-sha256-mgf1-32-2048", "rsa-pkcs1v15-sha256-2048",
+		"ed25519", "ml-dsa-44", "ml-dsa-65", "ml-dsa-87",
+	}
+	noContext := &typespb.NoParams{}
+	payload := []byte("signed on the target, verified on the source")
+	for _, move := range [][2]string{{"software", "openssl"}, {"openssl", "software"}} {
+		for _, templateID := range templates {
+			t.Run(move[0]+"->"+move[1]+"/"+templateID, func(t *testing.T) {
+				ctx := context.Background()
+				h := buildServer(t)
+				policyName := seedPolicy(t, ctx, h, "switch", []string{templateID}, []string{"create_key", "sign", "verify"})
+				keyName := createSignatureKey(t, ctx, h, "switch-key", policyName, templateID, move[0])
+
+				if _, err := h.KeysHandler.MigrateKey(ctx, &messagespb.MigrateKeyRequest{
+					Name:     keyName,
+					Target:   &messagespb.MigrateKeyRequest_TargetInstanceId{TargetInstanceId: move[1]},
+					Strategy: messagespb.MigrationStrategy_MIGRATION_STRATEGY_PROVIDER_SWITCH,
+				}); err != nil {
+					t.Fatalf("MigrateKey: %v", err)
+				}
+				signed, err := h.CryptoHandler.Sign(ctx, &messagespb.SignRequest{
+					KeyName: keyName, Input: payload,
+					ScopeParams: &messagespb.SignRequest_NoContext{NoContext: noContext},
+				})
+				if err != nil {
+					t.Fatalf("Sign on %s with the copied bytes: %v", move[1], err)
+				}
+				md := proto.Clone(signed.GetMetadata()).(*messagespb.OperationMetadata)
+				md.KeyVersion = 1
+				verified, err := h.CryptoHandler.Verify(ctx, &messagespb.VerifyRequest{
+					KeyName: keyName, Input: payload, Signature: signed.GetSignature(), Metadata: md,
+					ScopeParams: &messagespb.VerifyRequest_NoContext{NoContext: noContext},
+				})
+				if err != nil || !verified.GetValid() {
+					t.Fatalf("Verify on %s (version 1): valid=%v err=%v", move[0], verified.GetValid(), err)
+				}
+			})
+		}
+	}
+}
+
 // TestSmoke_MigrateKey_TargetLacksTemplate refuses to migrate a key to a
 // provider that does not offer its template (openssl has no prehashed ECDSA
 // template), and leaves the key where it was.
@@ -205,12 +254,14 @@ func TestSmoke_MigrateKey_TargetLacksTemplate(t *testing.T) {
 	}
 }
 
-// createSignatureKey creates a standard-scope signature key from templateID.
-func createSignatureKey(t *testing.T, ctx context.Context, h *server.TestableHandler, name, policyName, templateID string) string {
+// createSignatureKey creates a standard-scope signature key from templateID,
+// pinned to providerID when it is non-empty.
+func createSignatureKey(t *testing.T, ctx context.Context, h *server.TestableHandler, name, policyName, templateID, providerID string) string {
 	t.Helper()
 	resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
-		Name:   name,
-		Policy: policyName,
+		Name:       name,
+		Policy:     policyName,
+		ProviderId: providerID,
 		ScopeSpec: &typespb.ScopeSpecification{
 			ScopeSpec: &typespb.ScopeSpecification_Signature{
 				Signature: &typespb.SignatureScopeSpec{Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD},
