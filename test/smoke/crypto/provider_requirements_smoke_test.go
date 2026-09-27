@@ -214,7 +214,8 @@ func catalogTemplateIDs(t *testing.T) []string {
 // intent-based creation under a policy allowing the whole catalog (DT-026):
 // templates listed before a servable one but implemented by no provider
 // (hybrids) or not by the pinned provider are skipped, not selected and
-// then refused.
+// then refused. The expected templates are the first servable ones in
+// catalog order.
 func TestSmoke_CreateKey_wholeCatalogPolicy_selectsServableTemplates(t *testing.T) {
 	ctx := context.Background()
 	h := buildServer(t)
@@ -225,12 +226,13 @@ func TestSmoke_CreateKey_wholeCatalogPolicy_selectsServableTemplates(t *testing.
 		name  string
 		pin   string
 		scope *typespb.ScopeSpecification
+		want  string // template@provider
 	}{
-		{"signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, nil)},
-		{"quantum-safe signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, quantumSafe)},
-		{"prehashed signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil)},
-		{"prehashed signature on openssl", "openssl", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil)},
-		{"AEAD", "", aeadScope()},
+		{"signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, nil), "ml-dsa-44@software"},
+		{"quantum-safe signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, quantumSafe), "ml-dsa-44@software"},
+		{"prehashed signature", "", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil), "ed25519ph@software"},
+		{"prehashed signature on openssl", "openssl", signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil), "ed25519ph@openssl"},
+		{"AEAD", "", aeadScope(), "aes-128-gcm-128-96@software"},
 	}
 	for i, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -241,10 +243,9 @@ func TestSmoke_CreateKey_wholeCatalogPolicy_selectsServableTemplates(t *testing.
 				t.Fatalf("CreateKey: %v", err)
 			}
 			md := resp.GetKeyMetadata()
-			if tt.pin != "" && md.GetProvider() != tt.pin {
-				t.Errorf("CreateKey: provider = %q, want %q", md.GetProvider(), tt.pin)
+			if got := md.GetTemplateId() + "@" + md.GetProvider(); got != tt.want {
+				t.Errorf("CreateKey: %s, want %s", got, tt.want)
 			}
-			t.Logf("%s -> %s@%s", tt.name, md.GetTemplateId(), md.GetProvider())
 		})
 	}
 }
