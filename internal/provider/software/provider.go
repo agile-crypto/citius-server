@@ -76,7 +76,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 	var (
 		pubDER  []byte
 		privDER []byte
-		privEnc providerpb.PrivateKeyEncoding
 		pubEnc  providerpb.PublicKeyEncoding
 		err     error
 	)
@@ -90,7 +89,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		}
 		// The two halves differ: x509.MarshalECPrivateKey writes SEC1
 		// (RFC 5915) while x509.MarshalPKIXPublicKey writes SPKI (RFC 5280).
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_MlDsa:
 		pubDER, privDER, err = generateMLDSAKey(ctx, alg.MlDsa.GetParameterSet())
@@ -100,28 +98,24 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		// Private half: PKCS#8 wrapping the seed (see generateMLDSAKey).
 		// Public half: no seed-vs-expanded distinction exists for it, so it
 		// stays in CIRCL's native packed form — not yet SPKI.
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_RAW
 	case *types.AlgorithmDetails_RsaPss:
 		pubDER, privDER, err = generateRSAKey(ctx, alg.RsaPss.GetKeySizeBits())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_RsaPkcs1V15:
 		pubDER, privDER, err = generateRSAKey(ctx, alg.RsaPkcs1V15.GetKeySizeBits())
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_Ed25519:
 		pubDER, privDER, err = generateEd25519Key(ctx)
 		if err != nil {
 			return nil, errors.Wrap(ctx, op, err)
 		}
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8
 		pubEnc = providerpb.PublicKeyEncoding_PUBLIC_KEY_ENCODING_SPKI
 	case *types.AlgorithmDetails_AesGcm, *types.AlgorithmDetails_AesCbc, *types.AlgorithmDetails_AesCtr, *types.AlgorithmDetails_Chacha20Poly1305:
 		privDER, err = generateSymmetricKey(ctx, req.GetAlgorithm())
@@ -129,7 +123,6 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 			return nil, errors.Wrap(ctx, op, err)
 		}
 		// Symmetric: no public half — pubDER/pubEnc stay at their zero values.
-		privEnc = providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW
 	default:
 		return nil, errors.New(ctx, op, errors.CodeNotImplemented,
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
@@ -142,7 +135,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 		PublicKeyBytes:      pubDER,
 		KeyMaterial:         privDER,
 		Output:              provider.NoOutputUnencoded(),
-		KeyMaterialEncoding: privEnc,
+		KeyMaterialEncoding: privateKeyEncoding(req.GetAlgorithm()),
 		PublicKeyEncoding:   pubEnc,
 	}, nil
 }
