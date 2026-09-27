@@ -126,6 +126,57 @@ func TestSmoke_CreateKey_scopeFIPSApprovalSelectsAlgorithmsOnly(t *testing.T) {
 	}
 }
 
+// TestSmoke_CreateKey_intentBasedProviderRequirements proves provider
+// requirements apply to intent-based creation (a scope and no template or
+// pin): the template comes from the policy's list, the provider from the
+// requirements. A preference never skips a template the policy lists first,
+// and a requirement no instance meets leaves no template to select.
+func TestSmoke_CreateKey_intentBasedProviderRequirements(t *testing.T) {
+	ctx := context.Background()
+	h := buildServer(t)
+	// ecdsa-p256-prehashed-der is implemented by software only.
+	pol := seedPolicy(t, ctx, h, "intent",
+		[]string{"ecdsa-p256-prehashed-der", "ed25519ph", aeadTemplate}, []string{"create_key"})
+	prehashed := signatureScope(typespb.SignatureScope_SIGNATURE_SCOPE_PREHASHED, nil)
+
+	tests := []struct {
+		name         string
+		scope        *typespb.ScopeSpecification
+		requirements *typespb.ProviderRequirements
+		want         string // template@provider
+		wantCode     codes.Code
+	}{
+		{name: "memory safe", scope: prehashed,
+			requirements: &typespb.ProviderRequirements{MemorySafe: proto.Bool(true)}, want: "ecdsa-p256-prehashed-der@software"},
+		{name: "a preference does not skip a template", scope: prehashed,
+			requirements: &typespb.ProviderRequirements{PreferHardwareAccelerated: proto.Bool(true)}, want: "ecdsa-p256-prehashed-der@software"},
+		{name: "prefer hardware acceleration", scope: aeadScope(),
+			requirements: &typespb.ProviderRequirements{PreferHardwareAccelerated: proto.Bool(true)}, want: aeadTemplate + "@openssl"},
+		{name: "FIPS 140 without a FIPS instance", scope: aeadScope(),
+			requirements: &typespb.ProviderRequirements{Fips_140Certified: proto.Bool(true)}, wantCode: codes.NotFound},
+	}
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp, err := h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+				Name: fmt.Sprintf("intent-key-%d", i), Policy: pol, ScopeSpec: tt.scope, ProviderRequirements: tt.requirements,
+			})
+			if tt.wantCode != codes.OK {
+				if got := status.Code(err); got != tt.wantCode {
+					t.Fatalf("CreateKey: code = %s, want %s (err %v)", got, tt.wantCode, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("CreateKey: %v", err)
+			}
+			md := resp.GetKeyMetadata()
+			if got := md.GetTemplateId() + "@" + md.GetProvider(); got != tt.want {
+				t.Errorf("CreateKey: %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
 // TestSmoke_PolicyProviderRequirements_governTheKeyLifecycle proves a
 // policy's provider_requirements rule (DT-029) applies to every key under
 // the policy, whenever a version is placed on a provider: a key on openssl
