@@ -141,9 +141,12 @@ run-dev-tls: ## Run the gRPC server via 'go run' (no build artefact) with TLS an
 # ---------------------------------------------------------------------------
 test: ## Run all unit tests (no race detector)
 	go test ./internal/... ./vault-storage/... ./bootstrap/zitadel/interactive-login -count=1
+	cd bootstrap/zitadel/setup-auth && GOWORK=off go test ./... -count=1
 
 test-race: ## Run all unit tests with the race detector
 	go test ./internal/... ./vault-storage/... ./bootstrap/zitadel/interactive-login -race -count=1
+	# setup-auth is its own module, outside go.work.
+	cd bootstrap/zitadel/setup-auth && GOWORK=off go test ./... -race -count=1
 
 test-cover: ## Run tests and generate HTML coverage report
 	go test ./internal/... ./vault-storage/... -coverprofile=coverage.out -count=1
