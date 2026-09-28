@@ -34,8 +34,11 @@
 #
 # key_access / policy_access patterns are glob-style (* matches any segment).
 # An empty `allow:` list means the user has NO key/policy access at all
-# (denies don't grant). Omit the section entirely to skip emitting any
-# resource-scoping claim for that user (server treats it as unscoped).
+# (denies don't grant). Omitting the section entirely emits no
+# resource-scoping claim, which the server treats the same way: with auth
+# enabled, a user without key_access can read or use no key (ReadKey is
+# PERMISSION_DENIED, ListKeys lists nothing), and one without policy_access
+# no policy. Grant `allow: ["*"]` for unscoped access.
 
 version: 1
 
