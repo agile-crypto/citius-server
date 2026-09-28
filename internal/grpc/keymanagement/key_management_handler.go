@@ -143,11 +143,6 @@ func (h *KeyManagementHandler) ReadKey(ctx context.Context, req *messagespb.Read
 	}, nil
 }
 
-// ListKeys handles the ListKeys RPC.
-func (h *KeyManagementHandler) ListKeys(ctx context.Context, req *messagespb.ListKeysRequest) (*messagespb.ListKeysResponse, error) {
-	return h.UnimplementedKeyManagementServiceServer.ListKeys(ctx, req)
-}
-
 // DeleteKey handles the DeleteKey RPC.
 func (h *KeyManagementHandler) DeleteKey(ctx context.Context, req *messagespb.DeleteKeyRequest) (*messagespb.DeleteKeyResponse, error) {
 	return h.UnimplementedKeyManagementServiceServer.DeleteKey(ctx, req)

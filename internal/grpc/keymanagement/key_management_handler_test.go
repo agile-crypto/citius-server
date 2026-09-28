@@ -33,6 +33,7 @@ type mockKeyOrchestrator struct {
 	transformFn          func(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error)
 	migrateFn            func(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationResult, error)
 	validateMigrationFn  func(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationValidation, error)
+	listFn               func(ctx context.Context) ([]*service.KeyMetadata, error)
 }
 
 func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
@@ -50,7 +51,10 @@ func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version 
 }
 
 // Stub the rest of the interface.
-func (m *mockKeyOrchestrator) ListKeys(_ context.Context) ([]*service.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) ListKeys(ctx context.Context) ([]*service.KeyMetadata, error) {
+	if m.listFn != nil {
+		return m.listFn(ctx)
+	}
 	panic("mockKeyOrchestrator.ListKeys: not implemented")
 }
 func (m *mockKeyOrchestrator) DeleteKey(_ context.Context, _ string) error {
