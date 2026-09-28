@@ -26,11 +26,6 @@ var _ servicespb.AlgorithmDiscoveryServiceServer = (*AlgorithmDiscoveryHandler)(
 
 const algorithmDiscoveryHandlerOp = engerr.Op("grpc.(AlgorithmDiscoveryHandler)")
 
-// GetTemplate handles the GetTemplate RPC.
-func (h *AlgorithmDiscoveryHandler) GetTemplate(ctx context.Context, req *servicespb.GetTemplateRequest) (*servicespb.GetTemplateResponse, error) {
-	return h.UnimplementedAlgorithmDiscoveryServiceServer.GetTemplate(ctx, req)
-}
-
 // ListScopes handles the ListScopes RPC.
 func (h *AlgorithmDiscoveryHandler) ListScopes(ctx context.Context, req *servicespb.ListScopesRequest) (*servicespb.ListScopesResponse, error) {
 	return h.UnimplementedAlgorithmDiscoveryServiceServer.ListScopes(ctx, req)
