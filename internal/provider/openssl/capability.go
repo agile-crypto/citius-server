@@ -151,20 +151,34 @@ func (p *Provider) VerifyCapabilities(ctx context.Context) error {
 // instances (which share this same method) report correctly and
 // differently despite calling identical code.
 //
-// Only the FIPS provider's activation state is substantiated here — no
-// certificate number, module name, or validation date is fabricated; this
-// reports what libctx can prove about itself, nothing more.
+// Whether the FIPS provider is active is what libctx proves about itself;
+// the security level is not (see fips140Certification). No certificate
+// number, module name, or validation date is fabricated.
 func (p *Provider) ImplementationProperties() *types.ImplementationProperties {
+	return implementationProperties(p.FIPSEnabled())
+}
+
+// implementationProperties is ImplementationProperties for an instance
+// whose context does, or does not, restrict it to the FIPS provider.
+func implementationProperties(fipsEnabled bool) *types.ImplementationProperties {
 	props := &types.ImplementationProperties{
 		ImplementationLanguage: "c",
 		MemorySafeLanguage:     proto.Bool(false),
 		HardwareAccelerated:    proto.Bool(true),
 	}
-	if p.FIPSEnabled() {
-		// The OpenSSL FIPS provider is a software module, validated at
-		// overall security level 1: the level is a property of the module
-		// itself, so it is reported without a certificate number.
-		props.Fips_140 = &types.Fips140Certification{Certified: true, Level: types.Fips140Level_FIPS_140_LEVEL_1}
+	if fipsEnabled {
+		props.Fips_140 = fips140Certification()
 	}
 	return props
+}
+
+// fips140Certification is what a FIPS instance reports. The level is not
+// read from the loaded module: it comes from the module's CMVP validations,
+// every one of which rates the OpenSSL FIPS provider, a software module, at
+// overall security level 1. Nothing here checks that the loaded fips.so is
+// a validated version. Level 1 lets plaintext keys enter and leave the
+// module, so the stored-payload channel stays open (see
+// provider.TransferOf).
+func fips140Certification() *types.Fips140Certification {
+	return &types.Fips140Certification{Certified: true, Level: types.Fips140Level_FIPS_140_LEVEL_1}
 }
