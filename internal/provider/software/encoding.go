@@ -2,6 +2,7 @@ package software
 
 import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
+	"github.com/agile-crypto/citius-core/provider"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 )
 
@@ -23,3 +24,20 @@ func privateKeyEncoding(alg *types.AlgorithmDetails) providerpb.PrivateKeyEncodi
 		return providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_UNSPECIFIED
 	}
 }
+
+// TransferCapabilities advertises the stored-payload channel for alg: the
+// stored payload is the self-contained key bytes GenerateKey emits, which
+// this provider can release to another provider, and it accepts another
+// provider's payload in the same encoding. It exports, imports and wraps no
+// key.
+func (p *Provider) TransferCapabilities(alg *types.AlgorithmDetails) provider.Transfer {
+	encoding := privateKeyEncoding(alg)
+	if encoding == providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_UNSPECIFIED {
+		return provider.Transfer{}
+	}
+	stored := provider.Channels{StoredPayload: []providerpb.PrivateKeyEncoding{encoding}}
+	return provider.Transfer{Emit: stored, Accept: stored}
+}
+
+// Compile-time assertion: Provider implements TransferDescriber.
+var _ provider.TransferDescriber = (*Provider)(nil)

@@ -31,6 +31,7 @@ type mockKeyOrchestrator struct {
 	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
 	transformFn          func(ctx context.Context, spec service.TransformKeySpec) (*service.KeyMetadata, error)
 	migrateFn            func(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationResult, error)
+	validateMigrationFn  func(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationValidation, error)
 }
 
 func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*service.KeyMetadata, error) {
@@ -91,6 +92,13 @@ func (m *mockKeyOrchestrator) MigrateKey(ctx context.Context, spec service.Migra
 		return m.migrateFn(ctx, spec)
 	}
 	panic("mockKeyOrchestrator.MigrateKey: not implemented")
+}
+
+func (m *mockKeyOrchestrator) ValidateMigration(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationValidation, error) {
+	if m.validateMigrationFn != nil {
+		return m.validateMigrationFn(ctx, spec)
+	}
+	panic("mockKeyOrchestrator.ValidateMigration: not implemented")
 }
 
 // wireKeys builds the handler under test over a fixed orchestrator. The factory
