@@ -36,7 +36,7 @@ func (h *ProviderHandler) ListProviderInstances(ctx context.Context, req *servic
 		if p := req.GetProviderId(); p != "" && b.Type() != p {
 			continue
 		}
-		if !noRequirements(required) && !provider.Meets(b, required) {
+		if !provider.Meets(b, required) {
 			continue
 		}
 		matched = append(matched, b)
@@ -69,10 +69,6 @@ func (h *ProviderHandler) GetProviderInstance(ctx context.Context, req *services
 	b, err := reg.Get(ctx, req.GetInstanceId())
 	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
-	}
-	if b == nil {
-		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeProviderNotFound,
-			"provider instance not found: %s", req.GetInstanceId()))
 	}
 	return &servicespb.GetProviderInstanceResponse{Instance: instanceInfo(b)}, nil
 }

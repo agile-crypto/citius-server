@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
-	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/provider"
 	"google.golang.org/protobuf/proto"
 )
@@ -46,10 +45,4 @@ func instanceInfo(b provider.Backend) *typespb.ProviderInstance {
 		DisplayName:            b.Name(),
 		ImplementationOverride: implementationOf(b),
 	}
-}
-
-// noRequirements reports whether r asks for nothing, so that a filter on it
-// can be skipped.
-func noRequirements(r core.ProviderRequirements) bool {
-	return r == core.ProviderRequirements{}
 }
