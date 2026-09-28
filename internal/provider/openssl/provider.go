@@ -183,13 +183,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
 
-	return &providerpb.GenerateKeyResponse{
-		PublicKeyBytes:      pubDER,
-		KeyMaterial:         privDER,
-		Output:              provider.NoOutputUnencoded(),
-		KeyMaterialEncoding: privateKeyEncoding(req.GetAlgorithm()),
-		PublicKeyEncoding:   pubEnc,
-	}, nil
+	return generatedKey(ctx, op, req.GetAlgorithm(), pubDER, privDER, pubEnc)
 }
 
 // Sign dispatches to the algorithm-specific sign implementation.

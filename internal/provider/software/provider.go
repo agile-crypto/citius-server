@@ -128,16 +128,7 @@ func (p *Provider) GenerateKey(ctx context.Context, req *providerpb.GenerateKeyR
 			fmt.Sprintf("unsupported algorithm type: %T", req.GetAlgorithm().GetAlgorithm()))
 	}
 
-	// Return key material to caller — provider is stateless, orchestrator stores the bytes.
-	// Output carries no encoding: key generation produces no operation artifact,
-	// and the key encodings are declared by the typed fields below.
-	return &providerpb.GenerateKeyResponse{
-		PublicKeyBytes:      pubDER,
-		KeyMaterial:         privDER,
-		Output:              provider.NoOutputUnencoded(),
-		KeyMaterialEncoding: privateKeyEncoding(req.GetAlgorithm()),
-		PublicKeyEncoding:   pubEnc,
-	}, nil
+	return generatedKey(ctx, op, req.GetAlgorithm(), pubDER, privDER, pubEnc)
 }
 
 // Sign dispatches to the algorithm-specific sign implementation.

@@ -1,15 +1,20 @@
 package openssl
 
 import (
+	"context"
+	"fmt"
+
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
+	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/provider"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 )
 
 // privateKeyEncoding returns the encoding of the private key GenerateKey
-// emits for alg, or UNSPECIFIED for an algorithm this provider does not
+// emits for alg's algorithm family, or UNSPECIFIED for a family it does not
 // generate: SEC1 (RFC 5915) for ECDSA, PKCS#8 for RSA, Ed25519 and ML-DSA
-// (wrapping the seed), and the raw key bytes for symmetric algorithms.
+// (the seed and the expanded key), and the raw key bytes for symmetric algorithms. Which
+// parameters within a family are supported is SupportedAlgorithms' concern.
 func privateKeyEncoding(alg *types.AlgorithmDetails) providerpb.PrivateKeyEncoding {
 	switch alg.GetAlgorithm().(type) {
 	case *types.AlgorithmDetails_Ecdsa:
@@ -41,3 +46,24 @@ func (p *Provider) TransferCapabilities(alg *types.AlgorithmDetails) provider.Tr
 
 // Compile-time assertion: Provider implements TransferDescriber.
 var _ provider.TransferDescriber = (*Provider)(nil)
+
+// generatedKey is GenerateKey's response for the key it generated for alg.
+// Output carries no encoding: key generation produces no operation artifact,
+// and the key encodings are declared by the typed fields. Every family
+// GenerateKey generates must have a private-key encoding: a payload that
+// records none can be neither parsed reliably nor transferred.
+func generatedKey(ctx context.Context, op errors.Op, alg *types.AlgorithmDetails,
+	pubDER, privDER []byte, pubEnc providerpb.PublicKeyEncoding) (*providerpb.GenerateKeyResponse, error) {
+	privEnc := privateKeyEncoding(alg)
+	if privEnc == providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_UNSPECIFIED {
+		return nil, errors.New(ctx, op, errors.CodeInternal,
+			fmt.Sprintf("no private-key encoding for algorithm type %T", alg.GetAlgorithm()))
+	}
+	return &providerpb.GenerateKeyResponse{
+		PublicKeyBytes:      pubDER,
+		KeyMaterial:         privDER,
+		Output:              provider.NoOutputUnencoded(),
+		KeyMaterialEncoding: privEnc,
+		PublicKeyEncoding:   pubEnc,
+	}, nil
+}
