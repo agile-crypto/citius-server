@@ -3,13 +3,13 @@ package keygrpc
 import (
 	"context"
 	"slices"
-	"strconv"
 	"strings"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/service"
+	"github.com/agile-crypto/citius-server/internal/grpc/paging"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 )
 
@@ -32,14 +32,6 @@ func (h *KeyManagementHandler) ListKeys(ctx context.Context, req *messagespb.Lis
 		return nil, grpcstatus.ToStatusError(engerr.New(ctx, listOp, engerr.CodeInvalidArgument,
 			"filtering by scope_spec is not supported"))
 	}
-	if req.GetPageSize() < 0 {
-		return nil, grpcstatus.ToStatusError(engerr.New(ctx, listOp, engerr.CodeInvalidArgument,
-			"page_size must not be negative"))
-	}
-	start, err := parsePageToken(req.GetPageToken())
-	if err != nil {
-		return nil, grpcstatus.ToStatusError(engerr.New(ctx, listOp, engerr.CodeInvalidArgument, "invalid page_token"))
-	}
 
 	keys, err := h.keys(ctx)
 	if err != nil {
@@ -55,25 +47,18 @@ func (h *KeyManagementHandler) ListKeys(ctx context.Context, req *messagespb.Lis
 		return nil, grpcstatus.ToStatusError(err)
 	}
 
-	if start > len(matched) {
-		return nil, grpcstatus.ToStatusError(engerr.New(ctx, listOp, engerr.CodeInvalidArgument,
-			"page_token is past the end of the listing"))
-	}
-	end := len(matched)
-	if size := int(req.GetPageSize()); size > 0 && start+size < end {
-		end = start + size
+	start, end, next, err := paging.Window(len(matched), req.GetPageSize(), req.GetPageToken())
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.New(ctx, listOp, engerr.CodeInvalidArgument, err.Error()))
 	}
 
-	resp := &messagespb.ListKeysResponse{Keys: make([]*messagespb.KeyMetadata, 0, end-start)}
+	resp := &messagespb.ListKeysResponse{Keys: make([]*messagespb.KeyMetadata, 0, end-start), NextPageToken: next}
 	for _, md := range matched[start:end] {
 		p, perr := md.ToProto(ctx)
 		if perr != nil {
 			return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, listOp, perr))
 		}
 		resp.Keys = append(resp.Keys, p)
-	}
-	if end < len(matched) {
-		resp.NextPageToken = strconv.Itoa(end)
 	}
 	return resp, nil
 }
@@ -111,20 +96,4 @@ func listFilterMatches(req *messagespb.ListKeysRequest, md *service.KeyMetadata)
 		return false
 	}
 	return true
-}
-
-// parsePageToken decodes a page token into the offset it stands for; the
-// empty token is the first page.
-func parsePageToken(token string) (int, error) {
-	if token == "" {
-		return 0, nil
-	}
-	n, err := strconv.Atoi(token)
-	if err != nil {
-		return 0, err
-	}
-	if n < 0 {
-		return 0, strconv.ErrRange
-	}
-	return n, nil
 }
