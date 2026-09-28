@@ -400,3 +400,81 @@ func TestKeyManagementHandler_MigrateKey_Errors(t *testing.T) {
 		})
 	}
 }
+
+func TestKeyManagementHandler_ValidateKeyOperation_Migrate(t *testing.T) {
+	ctx := context.Background()
+	strategy := messagespb.MigrationStrategy_MIGRATION_STRATEGY_PROVIDER_SWITCH
+	km := &mockKeyOrchestrator{
+		validateMigrationFn: func(_ context.Context, spec service.MigrateKeySpec) (*service.MigrationValidation, error) {
+			require.Equal(t, service.MigrateKeySpec{KeyName: "key_123", TargetProviderID: "openssl", Strategy: strategy}, spec)
+			return &service.MigrationValidation{
+				TemplateID:       "ecdsa-p256-sha256-der",
+				SourceProviderID: "software",
+				SourceInstanceID: "software",
+				Extractable:      true,
+				Options: []service.StrategyAssessment{
+					{Strategy: strategy, Feasible: true, TargetInstanceID: "openssl", SecurityNotes: []string{"note"}},
+				},
+				Recommended:          strategy,
+				RecommendationReason: "reason",
+			}, nil
+		},
+	}
+	h := wireKeys(t, km)
+
+	resp, err := h.ValidateKeyOperation(ctx, &messagespb.ValidateKeyOperationRequest{
+		Name: "key_123",
+		Intent: &messagespb.ValidateKeyOperationRequest_Migrate{Migrate: &messagespb.ValidateMigrateIntent{
+			Target:            &messagespb.ValidateMigrateIntent_TargetProviderId{TargetProviderId: "openssl"},
+			PreferredStrategy: strategy,
+		}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, "software", resp.GetCurrentState().GetInstanceId())
+	require.True(t, resp.GetCurrentState().GetExtractable())
+	require.Len(t, resp.GetOptions(), 1)
+	require.True(t, resp.GetOptions()[0].GetFeasible())
+	require.Equal(t, []string{"note"}, resp.GetOptions()[0].GetSecurityNotes())
+	require.Equal(t, strategy, resp.GetRecommendedStrategy())
+	require.Equal(t, "reason", resp.GetRecommendationReason())
+}
+
+func TestKeyManagementHandler_ValidateKeyOperation_Errors(t *testing.T) {
+	ctx := context.Background()
+	migrate := &messagespb.ValidateKeyOperationRequest_Migrate{Migrate: &messagespb.ValidateMigrateIntent{
+		Target: &messagespb.ValidateMigrateIntent_TargetInstanceId{TargetInstanceId: "openssl"},
+	}}
+	tests := []struct {
+		name     string
+		req      *messagespb.ValidateKeyOperationRequest
+		validate func(context.Context, service.MigrateKeySpec) (*service.MigrationValidation, error)
+		wantCode codes.Code
+	}{
+		{
+			name:     "no intent",
+			req:      &messagespb.ValidateKeyOperationRequest{Name: "key_123"},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "transform intent",
+			req: &messagespb.ValidateKeyOperationRequest{Name: "key_123",
+				Intent: &messagespb.ValidateKeyOperationRequest_Transform{Transform: &messagespb.ValidateTransformIntent{}}},
+			wantCode: codes.Unimplemented,
+		},
+		{
+			name: "orchestrator error is mapped",
+			req:  &messagespb.ValidateKeyOperationRequest{Name: "nope", Intent: migrate},
+			validate: func(ctx context.Context, _ service.MigrateKeySpec) (*service.MigrationValidation, error) {
+				return nil, engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
+			},
+			wantCode: codes.NotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := wireKeys(t, &mockKeyOrchestrator{validateMigrationFn: tt.validate})
+			_, err := h.ValidateKeyOperation(ctx, tt.req)
+			require.Equal(t, tt.wantCode, status.Code(err))
+		})
+	}
+}

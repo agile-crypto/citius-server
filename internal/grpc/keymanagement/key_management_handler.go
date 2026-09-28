@@ -233,9 +233,50 @@ func (h *KeyManagementHandler) MigrateKey(ctx context.Context, req *messagespb.M
 	return resp, nil
 }
 
-// ValidateKeyOperation handles the ValidateKeyOperation RPC.
+// ValidateKeyOperation handles the ValidateKeyOperation RPC: reporting,
+// without side effects, whether each migration strategy can move a key to a
+// target. The transform intent is not implemented.
+//
+// Proto mapping (migrate intent):
+//
+//	messages.ValidateKeyOperationRequest.name                       => service.MigrateKeySpec.KeyName
+//	messages.ValidateMigrateIntent.target_instance_id               => service.MigrateKeySpec.TargetInstanceID (oneof)
+//	messages.ValidateMigrateIntent.target_provider_id               => service.MigrateKeySpec.TargetProviderID (oneof)
+//	messages.ValidateMigrateIntent.preferred_strategy (optional)    => service.MigrateKeySpec.Strategy
 func (h *KeyManagementHandler) ValidateKeyOperation(ctx context.Context, req *messagespb.ValidateKeyOperationRequest) (*messagespb.ValidateKeyOperationResponse, error) {
-	return h.UnimplementedKeyManagementServiceServer.ValidateKeyOperation(ctx, req)
+	const op engerr.Op = keyManagementHandlerOp + ".ValidateKeyOperation"
+
+	if err := h.authorizeKey(ctx, op, req.GetName()); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
+
+	var intent *messagespb.ValidateMigrateIntent
+	switch i := req.GetIntent().(type) {
+	case *messagespb.ValidateKeyOperationRequest_Migrate:
+		intent = i.Migrate
+	case *messagespb.ValidateKeyOperationRequest_Transform:
+		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeNotImplemented,
+			"validating a transform is not implemented"))
+	default:
+		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeInvalidArgument,
+			"an intent is required"))
+	}
+	spec := service.MigrateKeySpec{
+		KeyName:          req.GetName(),
+		TargetInstanceID: intent.GetTargetInstanceId(),
+		TargetProviderID: intent.GetTargetProviderId(),
+		Strategy:         intent.GetPreferredStrategy(),
+	}
+
+	keys, err := h.keys(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	v, err := keys.ValidateMigration(ctx, spec)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	return v.ToProto(), nil
 }
 
 // ExportKey handles the ExportKey RPC.
