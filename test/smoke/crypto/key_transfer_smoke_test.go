@@ -123,11 +123,13 @@ func TestSmoke_CreateKey_approvedGenerationNeedsAValidatedModule(t *testing.T) {
 // TestSmoke_KeyTransfer_FIPSInstance walks a key through the FIPS instance
 // with and without an approved lineage. Skips without a FIPS module.
 //
-//   - A key generated on openssl-fips, under a fips_140_certified policy,
-//     may not switch to software.
+//   - A key generated on openssl-fips is extractable, since the module is
+//     at level 1, but under a fips_140_certified policy may not switch to
+//     software.
 //   - A key generated on software may switch into openssl-fips, but its
 //     material then has no approved lineage: once the policy requires
-//     approved generation, a transform may not retain it.
+//     approved generation, a transform may not retain it, whereas it may
+//     retain the material of a key generated on openssl-fips.
 func TestSmoke_KeyTransfer_FIPSInstance(t *testing.T) {
 	ctx := context.Background()
 	h, err := server.NewTestableServer(ctx, server.Config{
@@ -160,6 +162,13 @@ func TestSmoke_KeyTransfer_FIPSInstance(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("CreateKey under fips_140_certified: %v", err)
 	}
+	read, err := h.KeysHandler.ReadKey(ctx, &messagespb.ReadKeyRequest{Name: "fips-held-key"})
+	if err != nil {
+		t.Fatalf("ReadKey: %v", err)
+	}
+	if md := read.GetKeyMetadata(); md.GetProvider() != "openssl-fips" || !md.GetExtractable() {
+		t.Errorf("fips-held-key on %q, extractable %v; want an extractable key on openssl-fips", md.GetProvider(), md.GetExtractable())
+	}
 	if err = switchTo("fips-held-key", "software"); status.Code(err) != codes.FailedPrecondition {
 		t.Errorf("MigrateKey openssl-fips -> software under fips_140_certified: code = %s, want FailedPrecondition", status.Code(err))
 	}
@@ -179,10 +188,22 @@ func TestSmoke_KeyTransfer_FIPSInstance(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("UpdateCryptoPolicy: %v", err)
 	}
-	if _, err = h.KeysHandler.TransformKey(ctx, &messagespb.TransformKeyRequest{
-		Name: "switched-in-key", TemplateId: &tid, ScopeSpec: aeadScope(), RetainKeyBytes: true,
-	}); status.Code(err) != codes.FailedPrecondition {
+	retain := func(keyName string) error {
+		_, tErr := h.KeysHandler.TransformKey(ctx, &messagespb.TransformKeyRequest{
+			Name: keyName, TemplateId: &tid, ScopeSpec: aeadScope(), RetainKeyBytes: true,
+		})
+		return tErr
+	}
+	if err = retain("switched-in-key"); status.Code(err) != codes.FailedPrecondition {
 		t.Errorf("TransformKey retaining material without an approved lineage: code = %s, want FailedPrecondition", status.Code(err))
+	}
+	if _, err = h.KeysHandler.CreateKey(ctx, &messagespb.CreateKeyRequest{
+		Name: "approved-key", Policy: pol, TemplateId: &tid, ScopeSpec: aeadScope(),
+	}); err != nil {
+		t.Fatalf("CreateKey under approved_generation: %v", err)
+	}
+	if err = retain("approved-key"); err != nil {
+		t.Errorf("TransformKey retaining material with an approved lineage: %v", err)
 	}
 }
 
