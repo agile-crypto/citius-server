@@ -20,18 +20,23 @@ const (
 
 // MatchProviders handles the MatchProviders RPC.
 //
-// It returns the instances that can hold a key of template_id (every
-// instance when it is empty) and meet every hard requirement, best first, in
-// the order CreateKey chooses: instances with a property the requirements
-// prefer, then the rest, each in registration order. So the first match is
-// the instance CreateKey would pick for the same template and requirements
-// when no instance is named. An instance that advertises the template but
-// misses a requirement is left out; compare with ListProviderInstances to
-// see which requirement it missed. No instance is disabled, so
-// include_disabled changes nothing.
+// It returns the instances that can hold a key of template_id and meet
+// every hard requirement, best first, in the order CreateKey chooses:
+// instances with a property the requirements prefer, then the rest, each in
+// registration order. So the first match is the instance CreateKey would
+// pick for the same template and requirements when no instance is named and
+// no crypto policy adds requirements: MatchProviders judges only the
+// requirements in the request, never a policy's provider_requirements. An
+// instance that advertises the template but misses a requirement is left
+// out; compare with ListProviderInstances to see which requirement it
+// missed. template_id is required, as the proto says. No instance is
+// disabled, so include_disabled changes nothing.
 func (h *ProviderHandler) MatchProviders(ctx context.Context, req *servicespb.MatchProvidersRequest) (*servicespb.MatchProvidersResponse, error) {
 	const op = providerHandlerOp + ".MatchProviders"
 
+	if req.GetTemplateId() == "" {
+		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeInvalidArgument, "template_id is required"))
+	}
 	required, err := core.ProviderRequirementsFromProto(ctx, req.GetRequirements())
 	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err, engerr.WithMessage("invalid requirements")))
@@ -43,10 +48,7 @@ func (h *ProviderHandler) MatchProviders(ctx context.Context, req *servicespb.Ma
 
 	var preferred, rest []*servicespb.MatchedProvider
 	for _, b := range reg.List(ctx) {
-		if b == nil || !provider.Meets(b, required) {
-			continue
-		}
-		if id := req.GetTemplateId(); id != "" && !advertises(b, id) {
+		if !provider.Meets(b, required) || !advertises(b, req.GetTemplateId()) {
 			continue
 		}
 		m := &servicespb.MatchedProvider{

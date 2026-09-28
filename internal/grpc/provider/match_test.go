@@ -98,7 +98,14 @@ func TestMatchProviders_ScoresAndImplementation(t *testing.T) {
 func TestMatchProviders_InvalidRequirements(t *testing.T) {
 	h, _ := newProviders(t)
 	_, err := h.MatchProviders(context.Background(), &servicespb.MatchProvidersRequest{
+		TemplateId:   "aes-256-gcm",
 		Requirements: &typespb.ProviderRequirements{Additional: map[string]string{"k": "v"}},
 	})
+	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestMatchProviders_TemplateRequired(t *testing.T) {
+	h, _ := newProviders(t)
+	_, err := h.MatchProviders(context.Background(), &servicespb.MatchProvidersRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
 }
