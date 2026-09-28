@@ -1,8 +1,6 @@
 package discogrpc
 
 import (
-	"context"
-
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/template"
@@ -25,8 +23,3 @@ type AlgorithmDiscoveryHandler struct {
 var _ servicespb.AlgorithmDiscoveryServiceServer = (*AlgorithmDiscoveryHandler)(nil)
 
 const algorithmDiscoveryHandlerOp = engerr.Op("grpc.(AlgorithmDiscoveryHandler)")
-
-// ListScopes handles the ListScopes RPC.
-func (h *AlgorithmDiscoveryHandler) ListScopes(ctx context.Context, req *servicespb.ListScopesRequest) (*servicespb.ListScopesResponse, error) {
-	return h.UnimplementedAlgorithmDiscoveryServiceServer.ListScopes(ctx, req)
-}
