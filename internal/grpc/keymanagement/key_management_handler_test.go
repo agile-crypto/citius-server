@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 // mockKeyOrchestrator stubs KeyOrchestrator for tests.
@@ -196,6 +197,21 @@ func TestKeyManagementHandler_CreateKey_UnenforceableProviderRequirements_Return
 		ProviderRequirements: &typespb.ProviderRequirements{Additional: map[string]string{"vendor": "acme"}},
 	})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+func TestKeyManagementHandler_CreateKey_UnconsumedFields_ReturnInvalidArgument(t *testing.T) {
+	h := wireKeys(t, &mockKeyOrchestrator{}) // CreateKey must not be reached
+
+	for name, req := range map[string]*messagespb.CreateKeyRequest{
+		"provider_configuration": {Name: "k", ProviderConfiguration: map[string]string{"slot": "1"}},
+		"activation_time":        {Name: "k", ActivationTime: timestamppb.Now()},
+		"expiration_time":        {Name: "k", ExpirationTime: timestamppb.Now()},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := h.CreateKey(context.Background(), req)
+			require.Equal(t, codes.InvalidArgument, status.Code(err))
+		})
+	}
 }
 
 func TestKeyManagementHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) {

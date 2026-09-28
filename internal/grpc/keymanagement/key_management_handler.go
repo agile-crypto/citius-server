@@ -55,6 +55,9 @@ func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.Cr
 			return nil, grpcstatus.ToStatusError(err)
 		}
 	}
+	if err := rejectUnconsumedCreateFields(ctx, createOp, req); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
 
 	keys, err := h.keys(ctx)
 	if err != nil {
@@ -97,6 +100,20 @@ func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.Cr
 		Success:     true,
 		KeyMetadata: mdProto,
 	}, nil
+}
+
+// rejectUnconsumedCreateFields refuses the CreateKey fields that nothing
+// consumes yet, rather than accepting and silently dropping them: no provider
+// reads provider_configuration, and the lifecycle does not schedule
+// activation or expiration.
+func rejectUnconsumedCreateFields(ctx context.Context, op engerr.Op, req *messagespb.CreateKeyRequest) error {
+	if len(req.GetProviderConfiguration()) > 0 {
+		return engerr.New(ctx, op, engerr.CodeInvalidArgument, "provider_configuration is not supported")
+	}
+	if req.ActivationTime != nil || req.ExpirationTime != nil {
+		return engerr.New(ctx, op, engerr.CodeInvalidArgument, "activation_time and expiration_time are not supported")
+	}
+	return nil
 }
 
 // ReadKey handles the ReadKey RPC. A zero version means "latest".
