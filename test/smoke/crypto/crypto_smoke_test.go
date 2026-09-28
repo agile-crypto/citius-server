@@ -54,8 +54,20 @@ func buildServer(t *testing.T) *server.TestableHandler {
 // Skips the test if fipsmodule.cnf is absent -- the FIPS module is an
 // optional, separately-installed artifact, not something every environment
 // running this suite is expected to have.
+//
+// OPENSSL_FIPS_CONFIG, the variable the server's --fips-config defaults
+// from, overrides all of this: its config is used as is. scripts/fips_setup.sh
+// writes one in a user directory, including on builds (RHEL) where
+// fipsinstall is disabled and there is no fipsmodule.cnf.
 func activatingFIPSConfig(t *testing.T) string {
 	t.Helper()
+
+	if path := os.Getenv("OPENSSL_FIPS_CONFIG"); path != "" {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("OPENSSL_FIPS_CONFIG=%s: %v", path, err)
+		}
+		return path
+	}
 
 	moduleConfig := ossl.DefaultFIPSModuleConfig()
 	if _, err := os.Stat(moduleConfig); err != nil {
