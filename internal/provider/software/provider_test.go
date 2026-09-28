@@ -3,6 +3,10 @@ package software_test
 import (
 	"context"
 	"crypto/sha512"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/asn1"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -114,10 +118,12 @@ func standardCatalogPath() string {
 }
 
 // assertAdvertisesGeneratedEncoding checks that the stored-payload encoding
-// p advertises for alg is the one GenerateKey emitted in genResp: a core
-// switching a key onto or off p acts on the advertisement.
+// p advertises for alg is the one GenerateKey emitted in genResp, and that
+// the key material really is in it: a core switching a key onto or off p
+// acts on the advertisement.
 func assertAdvertisesGeneratedEncoding(t *testing.T, p *software.Provider, alg *api.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {
 	t.Helper()
+	requireEncodedAs(t, genResp.GetKeyMaterialEncoding(), genResp.GetKeyMaterial())
 	stored := provider.TransferOf(p, alg)
 	want := []providerpb.PrivateKeyEncoding{genResp.GetKeyMaterialEncoding()}
 	if !slices.Equal(stored.Emit.StoredPayload, want) || !slices.Equal(stored.Accept.StoredPayload, want) {
@@ -360,5 +366,38 @@ func TestProvider_ExportPublicKey_returnsNotImplemented(t *testing.T) {
 	// TODO: Stateless provider doesn't return keys for now - ExportPublicKey is not supported
 	if !errors.IsNotImplemented(err) {
 		t.Errorf("expected CodeNotImplemented, got: %v", err)
+	}
+}
+
+// pkcs8 is the outer structure of a PKCS#8 PrivateKeyInfo (RFC 5208), enough
+// to tell PKCS#8 from other encodings for any key type.
+type pkcs8 struct {
+	Version    int
+	Algorithm  pkix.AlgorithmIdentifier
+	PrivateKey []byte
+}
+
+// requireEncodedAs fails unless key parses in encoding.
+func requireEncodedAs(t *testing.T, encoding providerpb.PrivateKeyEncoding, key []byte) {
+	t.Helper()
+	var err error
+	switch encoding {
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_SEC1:
+		_, err = x509.ParseECPrivateKey(key)
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_PKCS8:
+		var info pkcs8
+		var rest []byte
+		if rest, err = asn1.Unmarshal(key, &info); err == nil && len(rest) > 0 {
+			err = fmt.Errorf("%d trailing bytes", len(rest))
+		}
+	case providerpb.PrivateKeyEncoding_PRIVATE_KEY_ENCODING_RAW:
+		if n := len(key); n != 16 && n != 24 && n != 32 {
+			err = fmt.Errorf("%d bytes is no symmetric key size", n)
+		}
+	default:
+		err = fmt.Errorf("unexpected encoding %s", encoding)
+	}
+	if err != nil {
+		t.Errorf("key material is not %s: %v", encoding, err)
 	}
 }
