@@ -2,6 +2,7 @@ package server_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -204,6 +205,31 @@ func TestNewFactorySet_ValidatesForAllServices(t *testing.T) {
 	}
 	if len(reg.names) != 7 {
 		t.Errorf("registered %d services (%v), want 7", len(reg.names), reg.names)
+	}
+}
+
+// ServedServices is what the binary exposes: this pins the list, so a
+// service dropped from, or added to, the binary is a visible change.
+func TestServedServices(t *testing.T) {
+	ctx := context.Background()
+	f, err := server.WireFactorySet(ctx, server.Config{CatalogPath: catalogPath()})
+	if err != nil {
+		t.Fatalf("WireFactorySet: %v", err)
+	}
+	reg := &recordingRegistrar{}
+	if err := server.RegisterAll(ctx, reg, server.ServedServices(), f); err != nil {
+		t.Fatalf("RegisterAll: %v", err)
+	}
+	want := []string{
+		"caas.crypto.v1.AlgorithmDiscoveryService",
+		"caas.crypto.v1.CryptoPolicyService",
+		"caas.crypto.v1.CryptoService",
+		"caas.crypto.v1.KeyManagementService",
+		"caas.crypto.v1.ProviderService",
+	}
+	got := slices.Sorted(slices.Values(reg.names))
+	if !slices.Equal(got, want) {
+		t.Errorf("the binary serves %v, want %v", got, want)
 	}
 }
 

@@ -99,6 +99,21 @@ type Services struct {
 	Streaming        bool
 }
 
+// ServedServices is the set the server binary (internal/cmd/server/main)
+// exposes: key management, crypto, crypto policy, and the read-only
+// template and provider catalogues. KeyEstablishment and Streaming are left
+// out until they are ready to be served; enabling one is a change here, and
+// TestServedServices shows it.
+func ServedServices() Services {
+	return Services{
+		KeyManagement: true,
+		Crypto:        true,
+		CryptoPolicy:  true,
+		Discovery:     true,
+		Provider:      true,
+	}
+}
+
 // Validate checks the deployment before it accepts connections. It reports:
 //
 //   - no service enabled;

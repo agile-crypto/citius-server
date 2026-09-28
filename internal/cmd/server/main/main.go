@@ -97,15 +97,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("wiring failed: %v", err)
 	}
-	// set up the crypto, crypto-policy and key-management services, and the
-	// read-only template and provider catalogues
-	services := server.Services{
-		Crypto:        true,
-		CryptoPolicy:  true,
-		KeyManagement: true,
-		Discovery:     true,
-		Provider:      true,
-	}
+	services := server.ServedServices()
 
 	srv := grpc.NewServer(serverOpts...)
 	err = server.RegisterAll(ctx, srv, services, factorySet)
