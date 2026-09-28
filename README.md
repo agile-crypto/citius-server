@@ -20,7 +20,7 @@ The server exposes three gRPC services from the API spec:
 
 | Service | Supported operations |
 |---|---|
-| `KeyManagementService` | `CreateKey`, `ReadKey`, `TransformKey` |
+| `KeyManagementService` | `CreateKey`, `ReadKey`, `TransformKey`, `MigrateKey`, `ValidateKeyOperation` (migrate intent) |
 | `CryptoService` | `Sign`, `Verify`, `DigestSign`, `DigestVerify`, `Encrypt`, `Decrypt` |
 | `CryptoPolicyService` | `CreateCryptoPolicy`, `ReadCryptoPolicy`, `UpdateCryptoPolicy` |
 
