@@ -10,8 +10,10 @@ import (
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/service"
 	cryptohandler "github.com/agile-crypto/citius-server/internal/grpc/crypto"
+	discogrpc "github.com/agile-crypto/citius-server/internal/grpc/discovery"
 	keymgmthandler "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	policyhandler "github.com/agile-crypto/citius-server/internal/grpc/policy"
+	providergrpc "github.com/agile-crypto/citius-server/internal/grpc/provider"
 	"github.com/agile-crypto/citius-server/internal/storage"
 )
 
@@ -25,6 +27,10 @@ type TestableHandler struct {
 	CryptoHandler *cryptohandler.CryptoHandler
 	KeysHandler   *keymgmthandler.KeyManagementHandler
 	PolicyHandler *policyhandler.CryptoPolicyHandler
+	// DiscoveryHandler and ProviderHandler serve the same template catalogue
+	// and provider registry the other handlers use.
+	DiscoveryHandler *discogrpc.AlgorithmDiscoveryHandler
+	ProviderHandler  *providergrpc.ProviderHandler
 
 	store                storage.Storage
 	keyOrchestratorFn    service.KeyOrchestratorFactory
@@ -58,10 +64,20 @@ func NewTestableServer(ctx context.Context, cfg Config) (*TestableHandler, error
 	if err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}
+	discoveryHandler, err := discogrpc.New(ctx, fns.Templates)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
+	providerHandler, err := providergrpc.New(ctx, fns.Catalog, fns.Instances)
+	if err != nil {
+		return nil, engerr.Wrap(ctx, op, err)
+	}
 	return &TestableHandler{
 		CryptoHandler:        cryptoHandler,
 		KeysHandler:          keysHandler,
 		PolicyHandler:        policyHandler,
+		DiscoveryHandler:     discoveryHandler,
+		ProviderHandler:      providerHandler,
 		keyOrchestratorFn:    fns.Keys,
 		cryptoOrchestratorFn: fns.Crypto,
 		policyEngineFn:       fns.Policy,
