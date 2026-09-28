@@ -51,8 +51,3 @@ func (h *ProviderHandler) UpdateProviderInstance(ctx context.Context, req *servi
 func (h *ProviderHandler) DeleteProviderInstance(ctx context.Context, req *servicespb.DeleteProviderInstanceRequest) (*servicespb.DeleteProviderInstanceResponse, error) {
 	return h.UnimplementedProviderServiceServer.DeleteProviderInstance(ctx, req)
 }
-
-// MatchProviders handles the MatchProviders RPC.
-func (h *ProviderHandler) MatchProviders(ctx context.Context, req *servicespb.MatchProvidersRequest) (*servicespb.MatchProvidersResponse, error) {
-	return h.UnimplementedProviderServiceServer.MatchProviders(ctx, req)
-}
