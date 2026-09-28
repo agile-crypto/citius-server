@@ -4,6 +4,7 @@ import (
 	"context"
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/provider"
 )
 
@@ -24,7 +25,7 @@ type ProviderHandler struct {
 
 var _ servicespb.ProviderServiceServer = (*ProviderHandler)(nil)
 
-// const providerHandlerOp = engerr.Op("grpc.(ProviderHandler)")
+const providerHandlerOp = engerr.Op("grpc.(ProviderHandler)")
 
 // ListProviders handles the ListProviders RPC.
 func (h *ProviderHandler) ListProviders(ctx context.Context, req *servicespb.ListProvidersRequest) (*servicespb.ListProvidersResponse, error) {
@@ -39,16 +40,6 @@ func (h *ProviderHandler) GetProvider(ctx context.Context, req *servicespb.GetPr
 // RegisterProviderInstance handles the RegisterProviderInstance RPC.
 func (h *ProviderHandler) RegisterProviderInstance(ctx context.Context, req *servicespb.RegisterProviderInstanceRequest) (*servicespb.RegisterProviderInstanceResponse, error) {
 	return h.UnimplementedProviderServiceServer.RegisterProviderInstance(ctx, req)
-}
-
-// ListProviderInstances handles the ListProviderInstances RPC.
-func (h *ProviderHandler) ListProviderInstances(ctx context.Context, req *servicespb.ListProviderInstancesRequest) (*servicespb.ListProviderInstancesResponse, error) {
-	return h.UnimplementedProviderServiceServer.ListProviderInstances(ctx, req)
-}
-
-// GetProviderInstance handles the GetProviderInstance RPC.
-func (h *ProviderHandler) GetProviderInstance(ctx context.Context, req *servicespb.GetProviderInstanceRequest) (*servicespb.GetProviderInstanceResponse, error) {
-	return h.UnimplementedProviderServiceServer.GetProviderInstance(ctx, req)
 }
 
 // UpdateProviderInstance handles the UpdateProviderInstance RPC.
