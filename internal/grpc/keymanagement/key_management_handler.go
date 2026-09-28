@@ -240,9 +240,9 @@ func (h *KeyManagementHandler) MigrateKey(ctx context.Context, req *messagespb.M
 // Proto mapping (migrate intent):
 //
 //	messages.ValidateKeyOperationRequest.name                       => service.MigrateKeySpec.KeyName
-//	messages.ValidateMigrateIntent.target_instance_id               => service.MigrateKeySpec.TargetInstanceID (oneof)
-//	messages.ValidateMigrateIntent.target_provider_id               => service.MigrateKeySpec.TargetProviderID (oneof)
-//	messages.ValidateMigrateIntent.preferred_strategy (optional)    => service.MigrateKeySpec.Strategy
+//	messages.ValidateKeyOperationRequest.migrate.target_instance_id => service.MigrateKeySpec.TargetInstanceID (oneof)
+//	messages.ValidateKeyOperationRequest.migrate.target_provider_id => service.MigrateKeySpec.TargetProviderID (oneof)
+//	messages.ValidateKeyOperationRequest.migrate.preferred_strategy => service.MigrateKeySpec.Strategy (UNSPECIFIED assesses every strategy)
 func (h *KeyManagementHandler) ValidateKeyOperation(ctx context.Context, req *messagespb.ValidateKeyOperationRequest) (*messagespb.ValidateKeyOperationResponse, error) {
 	const op engerr.Op = keyManagementHandlerOp + ".ValidateKeyOperation"
 
@@ -275,6 +275,9 @@ func (h *KeyManagementHandler) ValidateKeyOperation(ctx context.Context, req *me
 	v, err := keys.ValidateMigration(ctx, spec)
 	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	if v == nil {
+		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeInternal, "no migration validation"))
 	}
 	return v.ToProto(), nil
 }

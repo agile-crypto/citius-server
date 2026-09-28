@@ -462,6 +462,23 @@ func TestKeyManagementHandler_ValidateKeyOperation_Errors(t *testing.T) {
 			wantCode: codes.Unimplemented,
 		},
 		{
+			name: "migrate intent without a target is refused by the orchestrator",
+			req:  &messagespb.ValidateKeyOperationRequest{Name: "key_123", Intent: &messagespb.ValidateKeyOperationRequest_Migrate{}},
+			validate: func(ctx context.Context, spec service.MigrateKeySpec) (*service.MigrationValidation, error) {
+				require.Equal(t, service.MigrateKeySpec{KeyName: "key_123"}, spec)
+				return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "exactly one target")
+			},
+			wantCode: codes.InvalidArgument,
+		},
+		{
+			name: "no validation is an internal error",
+			req:  &messagespb.ValidateKeyOperationRequest{Name: "key_123", Intent: migrate},
+			validate: func(context.Context, service.MigrateKeySpec) (*service.MigrationValidation, error) {
+				return nil, nil
+			},
+			wantCode: codes.Internal,
+		},
+		{
 			name: "orchestrator error is mapped",
 			req:  &messagespb.ValidateKeyOperationRequest{Name: "nope", Intent: migrate},
 			validate: func(ctx context.Context, _ service.MigrateKeySpec) (*service.MigrationValidation, error) {
