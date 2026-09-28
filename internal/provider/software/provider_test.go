@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
@@ -112,6 +113,19 @@ func standardCatalogPath() string {
 	return filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "proto", "standard_algorithms.json")
 }
 
+// assertAdvertisesGeneratedEncoding checks that the stored-payload encoding
+// p advertises for alg is the one GenerateKey emitted in genResp: a core
+// switching a key onto or off p acts on the advertisement.
+func assertAdvertisesGeneratedEncoding(t *testing.T, p *software.Provider, alg *api.AlgorithmDetails, genResp *providerpb.GenerateKeyResponse) {
+	t.Helper()
+	stored := provider.TransferOf(p, alg)
+	want := []providerpb.PrivateKeyEncoding{genResp.GetKeyMaterialEncoding()}
+	if !slices.Equal(stored.Emit.StoredPayload, want) || !slices.Equal(stored.Accept.StoredPayload, want) {
+		t.Errorf("stored payload: emits %v, accepts %v; GenerateKey emitted %v",
+			stored.Emit.StoredPayload, stored.Accept.StoredPayload, want)
+	}
+}
+
 // TestProvider_SupportedAlgorithms_everyEntryMatchesCatalogAndDispatches is
 // the regression guard for the SupportedAlgorithms/dispatch-switch
 // consistency bug: every template ID this provider advertises must (a)
@@ -156,6 +170,7 @@ func TestProvider_SupportedAlgorithms_everyEntryMatchesCatalogAndDispatches(t *t
 			if err != nil {
 				t.Fatalf("GenerateKey: %v", err)
 			}
+			assertAdvertisesGeneratedEncoding(t, p, alg, genResp)
 
 			switch a := alg.GetAlgorithm().(type) {
 			case *api.AlgorithmDetails_Ed25519:
