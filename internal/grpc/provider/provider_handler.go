@@ -27,16 +27,6 @@ var _ servicespb.ProviderServiceServer = (*ProviderHandler)(nil)
 
 const providerHandlerOp = engerr.Op("grpc.(ProviderHandler)")
 
-// ListProviders handles the ListProviders RPC.
-func (h *ProviderHandler) ListProviders(ctx context.Context, req *servicespb.ListProvidersRequest) (*servicespb.ListProvidersResponse, error) {
-	return h.UnimplementedProviderServiceServer.ListProviders(ctx, req)
-}
-
-// GetProvider handles the GetProvider RPC.
-func (h *ProviderHandler) GetProvider(ctx context.Context, req *servicespb.GetProviderRequest) (*servicespb.GetProviderResponse, error) {
-	return h.UnimplementedProviderServiceServer.GetProvider(ctx, req)
-}
-
 // RegisterProviderInstance handles the RegisterProviderInstance RPC.
 func (h *ProviderHandler) RegisterProviderInstance(ctx context.Context, req *servicespb.RegisterProviderInstanceRequest) (*servicespb.RegisterProviderInstanceResponse, error) {
 	return h.UnimplementedProviderServiceServer.RegisterProviderInstance(ctx, req)
