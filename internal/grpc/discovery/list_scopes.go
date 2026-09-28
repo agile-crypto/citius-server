@@ -18,8 +18,9 @@ import (
 // It returns, in the scope enum's order, each scope at least one registered
 // template offers, with the operations those templates allow under it. A
 // scope no template offers cannot be used to create a key, so it is left out.
-// A template scope this server cannot parse is skipped, as CreateKey's
-// selection would skip it.
+// A registered template whose scope this server cannot read is a fault of
+// the catalogue, not of the request: it fails CreateKey's selection too
+// (template.MatchesScope), so it is reported as Internal, not skipped.
 func (h *AlgorithmDiscoveryHandler) ListScopes(ctx context.Context, _ *servicespb.ListScopesRequest) (*servicespb.ListScopesResponse, error) {
 	const op = algorithmDiscoveryHandlerOp + ".ListScopes"
 	reg, err := h.templates(ctx)
@@ -27,7 +28,10 @@ func (h *AlgorithmDiscoveryHandler) ListScopes(ctx context.Context, _ *servicesp
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
 	}
 
-	offered := offeredScopes(ctx, reg.List(ctx))
+	offered, err := offeredScopes(ctx, reg.List(ctx))
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
 
 	resp := &servicespb.ListScopesResponse{Scopes: make([]*typespb.ScopeInfo, 0, len(offered))}
 	for _, s := range core.ListScopes() {
@@ -46,7 +50,7 @@ func (h *AlgorithmDiscoveryHandler) ListScopes(ctx context.Context, _ *servicesp
 
 // offeredScopes maps each scope the templates offer to the operations they
 // allow under it, each operation once.
-func offeredScopes(ctx context.Context, templates []*template.Template) map[core.Scope][]typespb.CryptoOperation {
+func offeredScopes(ctx context.Context, templates []*template.Template) (map[core.Scope][]typespb.CryptoOperation, error) {
 	offered := map[core.Scope][]typespb.CryptoOperation{}
 	for _, t := range templates {
 		if t == nil {
@@ -56,20 +60,39 @@ func offeredScopes(ctx context.Context, templates []*template.Template) map[core
 			if sc.GetScope() == nil {
 				continue
 			}
-			spec, err := core.ScopeSpecificationFromProto(ctx, sc.GetScope())
-			if err != nil || !spec.Scope.IsValid() {
-				continue
+			s, err := templateScope(ctx, t, sc.GetScope())
+			if err != nil {
+				return nil, err
 			}
-			ops := offered[spec.Scope]
+			ops := offered[s]
 			for _, o := range sc.GetOperations() {
 				if !slices.Contains(ops, o) {
 					ops = append(ops, o)
 				}
 			}
-			offered[spec.Scope] = ops
+			offered[s] = ops
 		}
 	}
-	return offered
+	return offered, nil
+}
+
+// templateScope reads the scope of one of t's scoped capabilities. A scope
+// that cannot be read, or is not one this server knows, is Internal: the
+// catalogue is at fault, not the request.
+func templateScope(ctx context.Context, t *template.Template, scope *typespb.ScopeSpecification) (core.Scope, error) {
+	const op = algorithmDiscoveryHandlerOp + ".templateScope"
+	spec, err := core.ScopeSpecificationFromProto(ctx, scope)
+	if err != nil {
+		unreadable := engerr.New(ctx, op, engerr.CodeInternal,
+			"template %s has a scope this server cannot read", t.TemplateID())
+		unreadable.Wrapped = err
+		return core.ScopeUnknown, unreadable
+	}
+	if !spec.Scope.IsValid() {
+		return core.ScopeUnknown, engerr.New(ctx, op, engerr.CodeInternal,
+			"template %s has an unknown scope", t.TemplateID())
+	}
+	return spec.Scope, nil
 }
 
 // scopeInfo describes scope s with the operations templates offer under it,

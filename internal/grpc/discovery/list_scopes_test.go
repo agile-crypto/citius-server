@@ -9,6 +9,8 @@ import (
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/template"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestListScopes_OnlyOfferedScopesWithTheirOperations(t *testing.T) {
@@ -33,4 +35,17 @@ func TestListScopes_OnlyOfferedScopesWithTheirOperations(t *testing.T) {
 	require.Equal(t, []typespb.CryptoOperation{
 		typespb.CryptoOperation_CRYPTO_OPERATION_ENCRYPT, typespb.CryptoOperation_CRYPTO_OPERATION_DECRYPT,
 	}, got["aead_standard"], "operations are merged across templates, once each")
+}
+
+// A template whose scope cannot be read is a catalogue fault: CreateKey's
+// selection fails on it too, so ListScopes reports it instead of hiding it.
+func TestListScopes_UnreadableTemplateScopeIsInternal(t *testing.T) {
+	h, reg := newDiscovery(t)
+	reg.list = append(reg.list, template.NewTemplate(&typespb.TemplateInfo{
+		TemplateId:         "unreadable",
+		ScopedCapabilities: []*typespb.ScopedCapabilities{{Scope: &typespb.ScopeSpecification{}}},
+	}))
+
+	_, err := h.ListScopes(context.Background(), &servicespb.ListScopesRequest{})
+	require.Equal(t, codes.Internal, status.Code(err), "got %v", err)
 }
