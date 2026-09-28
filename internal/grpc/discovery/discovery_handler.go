@@ -4,6 +4,7 @@ import (
 	"context"
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
+	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/template"
 )
 
@@ -23,12 +24,7 @@ type AlgorithmDiscoveryHandler struct {
 
 var _ servicespb.AlgorithmDiscoveryServiceServer = (*AlgorithmDiscoveryHandler)(nil)
 
-// const algorithmDiscoveryHandlerOp = engerr.Op("grpc.(AlgorithmDiscoveryHandler)")
-
-// ListTemplates handles the ListTemplates RPC.
-func (h *AlgorithmDiscoveryHandler) ListTemplates(ctx context.Context, req *servicespb.ListTemplatesRequest) (*servicespb.ListTemplatesResponse, error) {
-	return h.UnimplementedAlgorithmDiscoveryServiceServer.ListTemplates(ctx, req)
-}
+const algorithmDiscoveryHandlerOp = engerr.Op("grpc.(AlgorithmDiscoveryHandler)")
 
 // GetTemplate handles the GetTemplate RPC.
 func (h *AlgorithmDiscoveryHandler) GetTemplate(ctx context.Context, req *servicespb.GetTemplateRequest) (*servicespb.GetTemplateResponse, error) {
