@@ -23,6 +23,7 @@
 #   OPENSSL        openssl binary (default: openssl on PATH)
 #   FIPS_MODULE    path to fips.so (default: <modulesdir>/fips.so)
 set -euo pipefail
+umask 077
 
 dir="${1:-${XDG_CONFIG_HOME:-$HOME/.config}/citius/fips}"
 openssl_bin="${OPENSSL:-openssl}"
@@ -33,8 +34,21 @@ modules_dir="$("$openssl_bin" info -modulesdir)"
 module="${FIPS_MODULE:-$modules_dir/fips.so}"
 [[ -f "$module" ]] || { echo "fips_setup: no FIPS module at $module (install the OpenSSL FIPS provider, or set FIPS_MODULE)" >&2; exit 1; }
 
-mkdir -p "$dir"
-chmod 700 "$dir"
+# The paths are written into an OpenSSL config, which expands $VAR and
+# ends a value at whitespace or a comment: refuse any path it would misread.
+for path in "$dir" "$module"; do
+	if [[ "$path" =~ [[:space:]\$#\"\'\\] ]]; then
+		echo "fips_setup: path '$path' contains a character an OpenSSL config cannot hold (whitespace, \$, #, quote or backslash)" >&2
+		exit 1
+	fi
+done
+
+# Only a directory created here is made private: an existing one, which the
+# caller may share, keeps its mode. The files are private either way.
+if [[ ! -d "$dir" ]]; then
+	mkdir -p "$dir"
+	chmod 700 "$dir"
+fi
 activate="$dir/fips_activate.cnf"
 module_cnf="$dir/fipsmodule.cnf"
 
@@ -73,7 +87,10 @@ chmod 600 "$activate"
 probe="$(mktemp)"
 trap 'rm -f "$probe"' EXIT
 echo citius >"$probe"
-if ! OPENSSL_CONF="$activate" "$openssl_bin" list -providers 2>/dev/null | grep -q "^  fips"; then
+# Capture the listing first: grep -q exiting early under pipefail would
+# fail the pipeline with SIGPIPE even when the provider is listed.
+providers="$(OPENSSL_CONF="$activate" "$openssl_bin" list -providers 2>/dev/null || true)"
+if ! grep -q "^  fips" <<<"$providers"; then
 	echo "fips_setup: the fips provider did not activate with $activate" >&2
 	exit 1
 fi
