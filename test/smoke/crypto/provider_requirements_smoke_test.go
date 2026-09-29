@@ -100,8 +100,8 @@ func TestSmoke_CreateKey_providerRequirementsChooseTheProvider(t *testing.T) {
 	}
 }
 
-// TestSmoke_CreateKey_scopeFIPSApprovalSelectsAlgorithmsOnly records
-// decision DT-027: fips_approved in a scope selects a FIPS-approved
+// TestSmoke_CreateKey_scopeFIPSApprovalSelectsAlgorithmsOnly checks that
+// fips_approved in a scope selects a FIPS-approved
 // algorithm (ML-DSA, FIPS 204) and does not force a FIPS 140 certified
 // provider, so the pinned software provider serves it.
 func TestSmoke_CreateKey_scopeFIPSApprovalSelectsAlgorithmsOnly(t *testing.T) {
@@ -179,7 +179,7 @@ func TestSmoke_CreateKey_intentBasedProviderRequirements(t *testing.T) {
 }
 
 // TestSmoke_CreateKey_fipsInstance_scopeFIPSApprovalDoesNotChooseIt
-// records decision DT-027 with a FIPS instance registered: a scope's
+// checks the same with a FIPS instance registered: a scope's
 // fips_approved selects algorithms, so with no provider requirement the
 // first registered instance (software) serves the key; only a FIPS 140
 // provider requirement selects openssl-fips. Skips without a FIPS module.
@@ -220,7 +220,7 @@ func TestSmoke_CreateKey_fipsInstance_scopeFIPSApprovalDoesNotChooseIt(t *testin
 }
 
 // TestSmoke_PolicyProviderRequirements_governTheKeyLifecycle proves a
-// policy's provider_requirements rule (DT-029) applies to every key under
+// policy's provider_requirements rule applies to every key under
 // the policy, whenever a version is placed on a provider: a key on openssl
 // can no longer be transformed in place once the policy requires a
 // memory-safe provider, may migrate to software, and may not migrate back.
@@ -304,7 +304,7 @@ func catalogTemplateIDs(t *testing.T) []string {
 }
 
 // TestSmoke_CreateKey_wholeCatalogPolicy_selectsServableTemplates proves
-// intent-based creation under a policy allowing the whole catalog (DT-026):
+// intent-based creation under a policy allowing the whole catalog:
 // templates listed before a servable one but implemented by no provider
 // (hybrids) or not by the pinned provider are skipped, not selected and
 // then refused. The expected templates are the first servable ones in

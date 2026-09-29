@@ -383,7 +383,7 @@ func TestSmoke_CreateKey_providerID_pinned_honoured(t *testing.T) {
 // wire_internal_test.go's direct-Backend-call FIPS test don't individually
 // cover, since neither goes through CreateKey -> Match with a real
 // multi-provider registry. Only the provider requirement forces a FIPS
-// provider; the scope's fips_approved selects algorithms (decision DT-027).
+// provider; the scope's fips_approved selects algorithms.
 func TestSmoke_CreateKey_fipsRequired_selectsFIPSInstance(t *testing.T) {
 	ctx := context.Background()
 	fipsCfgPath := activatingFIPSConfig(t)
