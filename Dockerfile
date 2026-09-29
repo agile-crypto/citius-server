@@ -27,9 +27,26 @@ RUN CGO_ENABLED=1 go build -trimpath -o /out/caas-server ./internal/cmd/server/m
 
 FROM debian:trixie-slim
 WORKDIR /app
+# openssl-provider-fips is the upstream FIPS provider (fips.so) built by
+# Debian; openssl is the CLI fips_setup.sh needs for `openssl fipsinstall`
+# and its self-check.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends libssl3 ca-certificates \
+ && apt-get install -y --no-install-recommends libssl3 openssl openssl-provider-fips ca-certificates \
  && rm -rf /var/lib/apt/lists/*
+
+# Both OpenSSL instances are on by default: "openssl" (the default provider)
+# and "openssl-fips" (a separate library context restricted to the FIPS
+# provider). fips_setup.sh runs fipsinstall against this image's fips.so,
+# writes the activation config, and fails the build unless fips=yes fetches
+# SHA-256 and refuses MD5. The config holds no secret, so it is made
+# readable for a non-root user. To run without the FIPS instance, start the
+# container with OPENSSL_FIPS_CONFIG= (empty).
+COPY scripts/fips_setup.sh /app/scripts/fips_setup.sh
+RUN /app/scripts/fips_setup.sh /etc/citius/fips \
+ && chmod 755 /etc/citius/fips \
+ && chmod 644 /etc/citius/fips/*.cnf
+ENV OPENSSL_FIPS_CONFIG=/etc/citius/fips/fips_activate.cnf
+
 COPY --from=build /out/caas-server /app/caas-server
 COPY --from=build /src/proto/standard_algorithms.json /app/proto/standard_algorithms.json
 EXPOSE 50051

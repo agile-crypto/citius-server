@@ -64,7 +64,26 @@ The server binary accepts:
 -tls-cert         TLS certificate (PEM); required when AUTH_ENABLED=true
 -tls-key          TLS private key (PEM); required when AUTH_ENABLED=true
 -grpc-reflection  register the gRPC reflection service (default off)
+-fips-config      OpenSSL config activating the FIPS provider; registers the
+                  openssl-fips instance (default $OPENSSL_FIPS_CONFIG)
 ```
+
+### Container image
+
+```sh
+make docker-build                      # or CONTAINER_ENGINE=podman make docker-build
+docker run --rm -p 50051:50051 -e AUTH_ENABLED=false citius-server:local
+```
+
+The image registers both OpenSSL instances by default: `openssl` (the default
+provider) and `openssl-fips` (its own library context, restricted to the FIPS
+provider). It installs Debian's `openssl-provider-fips`, runs
+`scripts/fips_setup.sh` during the build, and sets `OPENSSL_FIPS_CONFIG`; the
+build fails if the FIPS provider does not activate and restrict. A request
+picks one by naming it (`provider_id`) or by a requirement such as
+`fips_140_certified`. Start with `-e OPENSSL_FIPS_CONFIG=` to leave the FIPS
+instance out. Debian builds `fips.so` from source, so it is the FIPS provider
+code, not a CMVP-validated binary.
 
 ## Talking to the server
 
