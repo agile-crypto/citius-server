@@ -72,8 +72,14 @@ The server binary accepts:
 
 ```sh
 make docker-build                      # or CONTAINER_ENGINE=podman make docker-build
-docker run --rm -p 50051:50051 -e AUTH_ENABLED=false citius-server:local
+docker run --rm -p 50051:50051 -e AUTH_ENABLED=false \
+  --read-only --cap-drop=ALL --security-opt no-new-privileges citius-server:local
 ```
+
+The container runs as the unprivileged user `citius` (UID/GID 10001), which
+owns no files; the binary, catalog and FIPS config are root-owned and
+read-only to it. The server writes nothing to disk, so it runs with a
+read-only root filesystem and no capabilities, as above.
 
 The image registers both OpenSSL instances by default: `openssl` (the default
 provider) and `openssl-fips` (its own library context, restricted to the FIPS

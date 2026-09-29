@@ -41,14 +41,32 @@ RUN apt-get update \
 # SHA-256 and refuses MD5. The config holds no secret, so it is made
 # readable for a non-root user. To run without the FIPS instance, start the
 # container with OPENSSL_FIPS_CONFIG= (empty).
+# fips_setup.sh creates its directories under umask 077, so every level is
+# opened up to read-only for others here.
 COPY scripts/fips_setup.sh /app/scripts/fips_setup.sh
 RUN /app/scripts/fips_setup.sh /etc/citius/fips \
- && chmod 755 /etc/citius/fips \
+ && chmod 755 /etc/citius /etc/citius/fips \
  && chmod 644 /etc/citius/fips/*.cnf
 ENV OPENSSL_FIPS_CONFIG=/etc/citius/fips/fips_activate.cnf
 
 COPY --from=build /out/caas-server /app/caas-server
 COPY --from=build /src/proto/standard_algorithms.json /app/proto/standard_algorithms.json
+
+# Run unprivileged. The server writes nothing to disk (storage is in
+# memory), so the user owns no files: the binary, catalog and FIPS config
+# stay root-owned and read-only to it, and a compromised process cannot
+# change them. The UID is numeric so Kubernetes' runAsNonRoot can verify it.
+# The port is above 1024, so no capability is needed to bind it.
+RUN groupadd --system --gid 10001 citius \
+ && useradd --system --uid 10001 --gid citius --no-create-home \
+      --home-dir /nonexistent --shell /usr/sbin/nologin citius
+USER 10001:10001
+
+# The server only logs, and carries on without openssl-fips, when it cannot
+# load the FIPS config; fail the build instead if the runtime user cannot
+# read it.
+RUN test -r "$OPENSSL_FIPS_CONFIG" && test -r /etc/citius/fips/fipsmodule.cnf
+
 EXPOSE 50051
 ENTRYPOINT ["/app/caas-server"]
 CMD ["-addr", ":50051", "-catalog", "/app/proto/standard_algorithms.json"]
