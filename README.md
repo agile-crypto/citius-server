@@ -16,13 +16,15 @@ sites.
 
 ## What works today
 
-The server exposes three gRPC services from the API spec:
+The server exposes five gRPC services from the API spec:
 
 | Service | Supported operations |
 |---|---|
-| `KeyManagementService` | `CreateKey`, `ReadKey`, `TransformKey`, `MigrateKey`, `ValidateKeyOperation` (migrate intent) |
+| `KeyManagementService` | `CreateKey`, `ReadKey`, `ListKeys`, `TransformKey`, `MigrateKey`, `ValidateKeyOperation` (migrate intent) |
 | `CryptoService` | `Sign`, `Verify`, `DigestSign`, `DigestVerify`, `Encrypt`, `Decrypt` |
 | `CryptoPolicyService` | `CreateCryptoPolicy`, `ReadCryptoPolicy`, `UpdateCryptoPolicy` |
+| `AlgorithmDiscoveryService` | `ListTemplates`, `GetTemplate`, `ListScopes` |
+| `ProviderService` | `ListProviders`, `GetProvider`, `ListProviderInstances`, `GetProviderInstance`, `MatchProviders` (read-only; instance registration is not implemented) |
 
 - **Algorithms:** ECDSA (P-256/P-384/P-521), RSA-PSS and RSA-PKCS#1v1.5
   (2048/3072/4096), Ed25519 (pure and prehashed), and ML-DSA-44/65/87
@@ -115,8 +117,7 @@ This implementation is actively evolving toward broader coverage of the API
 spec. Planned work, roughly in scope order:
 
 - **Functions:** expose MAC, key agreement, encapsulation/decapsulation, key
-  wrapping/derivation, digest/XOF, random generation, rotation, migration,
-  and the discovery service over gRPC.
+  wrapping/derivation, digest/XOF, random generation and rotation over gRPC.
 - **Algorithms:** expand coverage within each primitive.
 - **Provider backends:** additional backends and capabilities — PKCS#11,
   KMS, JCA.
