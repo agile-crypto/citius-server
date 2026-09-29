@@ -2,6 +2,7 @@ package providergrpc_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -108,4 +109,46 @@ func TestMatchProviders_TemplateRequired(t *testing.T) {
 	h, _ := newProviders(t)
 	_, err := h.MatchProviders(context.Background(), &servicespb.MatchProvidersRequest{})
 	require.Equal(t, codes.InvalidArgument, status.Code(err))
+}
+
+// MatchProviders is core's judgement, not a copy of it: for every
+// combination of template, hard requirement and preference, its matches are
+// exactly Rank's eligible candidates in Rank's order, and when there is a
+// match the first is Registry.Match's pick.
+func TestMatchProviders_IsCoresRank(t *testing.T) {
+	h, reg := newProviders(t)
+	ctx := context.Background()
+
+	for _, tmpl := range []string{"aes-256-gcm", "ml-dsa-65", "rot13"} {
+		for _, fips := range []bool{false, true} {
+			for _, prefer := range []bool{false, true} {
+				reqProto := &typespb.ProviderRequirements{
+					Fips_140Certified:         proto.Bool(fips),
+					PreferHardwareAccelerated: proto.Bool(prefer),
+				}
+				resp, err := h.MatchProviders(ctx, &servicespb.MatchProvidersRequest{TemplateId: tmpl, Requirements: reqProto})
+				require.NoError(t, err)
+
+				impl, err := core.ProviderRequirementsFromProto(ctx, reqProto)
+				require.NoError(t, err)
+				req := provider.Requirements{TemplateID: tmpl, Implementation: impl}
+				want := []string{}
+				for _, c := range provider.Rank(reg.List(ctx), req) {
+					if c.Eligible() {
+						want = append(want, c.Backend.Name())
+					}
+				}
+				name := fmt.Sprintf("%s fips=%v prefer=%v", tmpl, fips, prefer)
+				require.Equal(t, want, matchIDs(resp), name)
+
+				picked, err := reg.Match(ctx, req)
+				if len(want) == 0 {
+					require.Error(t, err, name)
+					continue
+				}
+				require.NoError(t, err, name)
+				require.Equal(t, picked.Name(), want[0], name)
+			}
+		}
+	}
 }
