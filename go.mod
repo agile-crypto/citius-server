@@ -116,3 +116,5 @@ require (
 replace github.com/agile-crypto/vault-storage => ./vault-storage
 
 replace github.com/agile-crypto/citius-api-go/gen/go => ./gen/go/api
+
+replace github.com/agile-crypto/citius-core => ../citius-core
