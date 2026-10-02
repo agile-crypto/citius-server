@@ -26,12 +26,13 @@ import (
 // Only signFn, verifyFn, encryptFn, decryptFn, digestSignFn, and
 // digestVerifyFn are wired; all other methods panic.
 type mockCryptoOps struct {
-	signFn         func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
-	verifyFn       func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
-	encryptFn      func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
-	decryptFn      func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
-	digestSignFn   func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error)
-	digestVerifyFn func(ctx context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error)
+	signFn            func(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error)
+	verifyFn          func(ctx context.Context, req crypto.VerifyRequest) (crypto.VerifyResult, error)
+	encryptFn         func(ctx context.Context, req crypto.EncryptRequest) (crypto.EncryptResult, error)
+	decryptFn         func(ctx context.Context, req crypto.DecryptRequest) (crypto.DecryptResult, error)
+	digestSignFn      func(ctx context.Context, req crypto.DigestSignRequest) (crypto.SignResult, error)
+	digestVerifyFn    func(ctx context.Context, req crypto.DigestVerifyRequest) (crypto.VerifyResult, error)
+	verifyPublicKeyFn func(ctx context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error)
 }
 
 func (m *mockCryptoOps) Sign(ctx context.Context, req crypto.SignRequest) (crypto.SignResult, error) {
@@ -93,6 +94,13 @@ func (m *mockCryptoOps) Digest(_ context.Context, _ crypto.DigestRequest) (crypt
 }
 func (m *mockCryptoOps) GenerateRandom(_ context.Context, _ int) ([]byte, error) {
 	panic("mockCryptoOps.GenerateRandom: not implemented")
+}
+
+func (m *mockCryptoOps) VerifyWithPublicKey(ctx context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+	if m.verifyPublicKeyFn != nil {
+		return m.verifyPublicKeyFn(ctx, req)
+	}
+	panic("mockCryptoOps.VerifyWithPublicKey: not implemented")
 }
 
 // wireCrypto builds the handler under test over a fixed orchestrator.
