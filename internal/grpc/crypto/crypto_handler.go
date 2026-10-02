@@ -6,6 +6,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/service"
@@ -23,8 +24,9 @@ import (
 // when the deployment runs without authorization — which is why this package
 // does not import internal/auth.
 type CryptoHandler struct {
-	crypto       service.CryptoOrchestratorFactory
-	authorizeKey grpcstatus.AuthorizeKeyName
+	crypto          service.CryptoOrchestratorFactory
+	authorizeKey    grpcstatus.AuthorizeKeyName
+	authorizePolicy grpcstatus.AuthorizePolicyName
 	servicespb.UnimplementedCryptoServiceServer
 }
 
@@ -183,6 +185,56 @@ func (h *CryptoHandler) Verify(ctx context.Context, req *messagespb.VerifyReques
 	}, nil
 }
 
+// VerifyWithPublicKey handles the VerifyWithPublicKey RPC: a stateless
+// verification against a caller-supplied public key. No stored key is
+// involved, so the caller is authorized against the policy it names rather
+// than a key. An invalid signature returns Valid=false with a nil error.
+//
+//	messages.VerifyWithPublicKeyRequest.scope_params => crypto.VerifyWithPublicKeyRequest.{NoContext,DomainContext,VendorContext}
+//	messages.VerifyWithPublicKeyRequest.provider_id  => crypto.VerifyWithPublicKeyRequest.ProviderID
+func (h *CryptoHandler) VerifyWithPublicKey(ctx context.Context, req *messagespb.VerifyWithPublicKeyRequest) (*messagespb.VerifyWithPublicKeyResponse, error) {
+	const verifyPublicKeyOp engerr.Op = cryptoHandlerOp + ".VerifyWithPublicKey"
+
+	if err := h.authorizePolicy(ctx, verifyPublicKeyOp, req.GetPolicyName()); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
+
+	providerReqs, err := core.ProviderRequirementsFromProto(ctx, req.GetProviderRequirements())
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, verifyPublicKeyOp, err, engerr.WithMessage("invalid provider_requirements")))
+	}
+
+	ops, err := h.crypto(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, verifyPublicKeyOp, err))
+	}
+
+	verifyReq := crypto.VerifyWithPublicKeyRequest{
+		PublicKey:             req.GetPublicKey(),
+		PublicKeyFormat:       req.GetPublicKeyFormat(),
+		Payload:               req.GetInput(),
+		Signature:             req.GetSignature(),
+		TemplateID:            req.GetTemplateId(),
+		PolicyName:            req.GetPolicyName(),
+		ProviderID:            req.GetProviderId(),
+		ProviderConfiguration: req.GetProviderConfiguration(),
+		ProviderRequirements:  providerReqs,
+		UserContext:           req.GetUserContext(),
+	}
+	extractVerifyWithPublicKeyScopeParams(req.GetScopeParams(), &verifyReq)
+
+	result, err := ops.VerifyWithPublicKey(ctx, verifyReq)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, verifyPublicKeyOp, err))
+	}
+
+	return &messagespb.VerifyWithPublicKeyResponse{
+		Valid:      result.Valid,
+		TemplateId: result.TemplateID,
+		ProviderId: result.ProviderID,
+	}, nil
+}
+
 // DigestSign handles the DigestSign RPC — signing a pre-computed digest
 // rather than hashing the message here.
 func (h *CryptoHandler) DigestSign(ctx context.Context, req *messagespb.DigestSignRequest) (*messagespb.DigestSignResponse, error) {
@@ -320,6 +372,22 @@ func extractVerifyScopeParams(sp any, req *crypto.VerifyRequest) {
 		req.VendorContext = v.VendorContext
 	default:
 		// nil or unrecognised variant.
+	}
+}
+
+// extractVerifyWithPublicKeyScopeParams maps the proto scope_params oneof for
+// VerifyWithPublicKeyRequest. Same pattern as extractVerifyScopeParams but uses
+// VerifyWithPublicKeyRequest_* wrapper types.
+func extractVerifyWithPublicKeyScopeParams(sp any, req *crypto.VerifyWithPublicKeyRequest) {
+	switch v := sp.(type) {
+	case *messagespb.VerifyWithPublicKeyRequest_NoContext:
+		req.NoContext = v.NoContext
+	case *messagespb.VerifyWithPublicKeyRequest_DomainContext:
+		req.DomainContext = v.DomainContext
+	case *messagespb.VerifyWithPublicKeyRequest_VendorContext:
+		req.VendorContext = v.VendorContext
+	default:
+		// nil or unrecognised variant — downstream validation will report the issue.
 	}
 }
 

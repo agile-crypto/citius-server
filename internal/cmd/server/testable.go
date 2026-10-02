@@ -52,7 +52,7 @@ func NewTestableServer(ctx context.Context, cfg Config) (*TestableHandler, error
 	if err != nil {
 		return nil, err
 	}
-	cryptoHandler, err := cryptohandler.New(ctx, fns.Crypto, fns.AuthorizeKey)
+	cryptoHandler, err := cryptohandler.New(ctx, fns.Crypto, fns.AuthorizeKey, fns.AuthorizePolicy)
 	if err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}

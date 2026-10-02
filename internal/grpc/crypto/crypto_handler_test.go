@@ -9,6 +9,7 @@ import (
 	"context"
 	"testing"
 
+	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/provider"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
@@ -18,6 +19,7 @@ import (
 	"github.com/agile-crypto/citius-core/key"
 	"github.com/agile-crypto/citius-core/service"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
+	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -103,8 +105,18 @@ func (m *mockCryptoOps) VerifyWithPublicKey(ctx context.Context, req crypto.Veri
 	panic("mockCryptoOps.VerifyWithPublicKey: not implemented")
 }
 
-// wireCrypto builds the handler under test over a fixed orchestrator.
+// wireCrypto builds the handler under test over a fixed orchestrator, with
+// key and policy authorization always allowing.
 func wireCrypto(t *testing.T, ops service.CryptoOrchestrator) *cryptogrpc.CryptoHandler {
+	t.Helper()
+	return wireCryptoWithPolicyAuth(t, ops, func(_ context.Context, _ engerr.Op, _ string) error {
+		return nil
+	})
+}
+
+// wireCryptoWithPolicyAuth is wireCrypto with the given policy authorization
+// check.
+func wireCryptoWithPolicyAuth(t *testing.T, ops service.CryptoOrchestrator, authorizePolicy grpcstatus.AuthorizePolicyName) *cryptogrpc.CryptoHandler {
 	t.Helper()
 	newCrypto := service.CryptoOrchestratorFactory(func(_ context.Context) (service.CryptoOrchestrator, error) {
 		return ops, nil
@@ -112,7 +124,7 @@ func wireCrypto(t *testing.T, ops service.CryptoOrchestrator) *cryptogrpc.Crypto
 	authFn := func(ctx context.Context, op engerr.Op, name string) error {
 		return nil
 	}
-	h, err := cryptogrpc.New(context.Background(), newCrypto, authFn)
+	h, err := cryptogrpc.New(context.Background(), newCrypto, authFn, authorizePolicy)
 	if err != nil {
 		t.Fatalf("cryptogrpc.New: %v", err)
 	}
@@ -838,5 +850,295 @@ func TestCryptoHandler_DigestVerify_OrchestratorError_MapsToStatus(t *testing.T)
 	st, _ := status.FromError(err)
 	if st.Code() != codes.Unimplemented {
 		t.Errorf("expected Unimplemented, got %s", st.Code())
+	}
+}
+
+// ============================================================================
+// VerifyWithPublicKey
+// ============================================================================
+
+// verifyWithPublicKeyRequest returns a complete, valid request with NoContext
+// scope; tests override what they exercise.
+func verifyWithPublicKeyRequest() *messagespb.VerifyWithPublicKeyRequest {
+	return &messagespb.VerifyWithPublicKeyRequest{
+		PublicKey:       []byte("public-key"),
+		PublicKeyFormat: typespb.KeyFormat_KEY_FORMAT_SPKI,
+		Input:           []byte("payload"),
+		Signature:       []byte("sig"),
+		ScopeParams: &messagespb.VerifyWithPublicKeyRequest_NoContext{
+			NoContext: &typespb.NoParams{},
+		},
+		TemplateId: "ecdsa-p256-sha256-der",
+		PolicyName: "verify-policy",
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_Valid(t *testing.T) {
+	ctx := context.Background()
+	fips := true
+	providerID := "software"
+	cr := &mockCryptoOps{
+		verifyPublicKeyFn: func(_ context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+			if string(req.PublicKey) != "public-key" {
+				t.Errorf("PublicKey: got %q", req.PublicKey)
+			}
+			if req.PublicKeyFormat != typespb.KeyFormat_KEY_FORMAT_SPKI {
+				t.Errorf("PublicKeyFormat: got %s", req.PublicKeyFormat)
+			}
+			if string(req.Payload) != "payload" {
+				t.Errorf("Payload: expected input, got %q", req.Payload)
+			}
+			if string(req.Signature) != "sig" {
+				t.Errorf("Signature: got %q", req.Signature)
+			}
+			if req.NoContext == nil {
+				t.Error("expected NoContext to be set")
+			}
+			if req.TemplateID != "ecdsa-p256-sha256-der" {
+				t.Errorf("TemplateID: got %q", req.TemplateID)
+			}
+			if req.PolicyName != "verify-policy" {
+				t.Errorf("PolicyName: got %q", req.PolicyName)
+			}
+			if req.ProviderID != providerID {
+				t.Errorf("ProviderID: got %q want %q", req.ProviderID, providerID)
+			}
+			if req.ProviderConfiguration["mode"] != "fast" {
+				t.Errorf("ProviderConfiguration: got %v", req.ProviderConfiguration)
+			}
+			if !req.ProviderRequirements.FIPS140Certified {
+				t.Error("ProviderRequirements: expected FIPS140Certified from provider_requirements")
+			}
+			if req.UserContext["tenant"] != "acme" {
+				t.Errorf("UserContext: got %v", req.UserContext)
+			}
+			return crypto.VerifyWithPublicKeyResult{Valid: true, TemplateID: req.TemplateID, ProviderID: providerID}, nil
+		},
+	}
+	h := wireCrypto(t, cr)
+
+	req := verifyWithPublicKeyRequest()
+	req.ProviderId = &providerID
+	req.ProviderConfiguration = map[string]string{"mode": "fast"}
+	req.ProviderRequirements = &typespb.ProviderRequirements{Fips_140Certified: &fips}
+	req.UserContext = map[string]string{"tenant": "acme"}
+
+	resp, err := h.VerifyWithPublicKey(ctx, req)
+	if err != nil {
+		t.Fatalf("VerifyWithPublicKey handler: %v", err)
+	}
+	if !resp.GetValid() {
+		t.Error("VerifyWithPublicKey response: expected valid=true")
+	}
+	if resp.GetTemplateId() != "ecdsa-p256-sha256-der" {
+		t.Errorf("TemplateId: got %q", resp.GetTemplateId())
+	}
+	if resp.GetProviderId() != providerID {
+		t.Errorf("ProviderId: got %q want %q", resp.GetProviderId(), providerID)
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_NoOptionalFields_PassesZeroValues(t *testing.T) {
+	ctx := context.Background()
+	cr := &mockCryptoOps{
+		verifyPublicKeyFn: func(_ context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+			if req.ProviderID != "" {
+				t.Errorf("ProviderID: expected empty without provider_id, got %q", req.ProviderID)
+			}
+			if !req.ProviderRequirements.IsZero() {
+				t.Errorf("ProviderRequirements: expected zero without provider_requirements, got %+v", req.ProviderRequirements)
+			}
+			return crypto.VerifyWithPublicKeyResult{Valid: true}, nil
+		},
+	}
+	h := wireCrypto(t, cr)
+
+	if _, err := h.VerifyWithPublicKey(ctx, verifyWithPublicKeyRequest()); err != nil {
+		t.Fatalf("VerifyWithPublicKey handler: %v", err)
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_ScopeParams_Mapped(t *testing.T) {
+	tests := []struct {
+		name  string
+		scope any
+		check func(t *testing.T, sf crypto.SignatureScopeFields)
+	}{
+		{
+			name:  "no context",
+			scope: &messagespb.VerifyWithPublicKeyRequest_NoContext{NoContext: &typespb.NoParams{}},
+			check: func(t *testing.T, sf crypto.SignatureScopeFields) {
+				if sf.NoContext == nil || sf.DomainContext != nil || sf.VendorContext != nil {
+					t.Errorf("expected only NoContext, got %+v", sf)
+				}
+			},
+		},
+		{
+			name: "domain context",
+			scope: &messagespb.VerifyWithPublicKeyRequest_DomainContext{
+				DomainContext: &typespb.SignatureDomainContext{Context: []byte("ctx")},
+			},
+			check: func(t *testing.T, sf crypto.SignatureScopeFields) {
+				if sf.DomainContext == nil || string(sf.DomainContext.GetContext()) != "ctx" {
+					t.Errorf("expected DomainContext with context %q, got %+v", "ctx", sf)
+				}
+			},
+		},
+		{
+			name: "vendor context",
+			scope: &messagespb.VerifyWithPublicKeyRequest_VendorContext{
+				VendorContext: &typespb.VendorSignatureContext{},
+			},
+			check: func(t *testing.T, sf crypto.SignatureScopeFields) {
+				if sf.VendorContext == nil {
+					t.Errorf("expected VendorContext, got %+v", sf)
+				}
+			},
+		},
+		{
+			name:  "none",
+			scope: nil,
+			check: func(t *testing.T, sf crypto.SignatureScopeFields) {
+				if sf != (crypto.SignatureScopeFields{}) {
+					t.Errorf("expected no scope field, got %+v", sf)
+				}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cr := &mockCryptoOps{
+				verifyPublicKeyFn: func(_ context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+					tt.check(t, req.SignatureScopeFields)
+					return crypto.VerifyWithPublicKeyResult{Valid: true}, nil
+				},
+			}
+			h := wireCrypto(t, cr)
+
+			req := verifyWithPublicKeyRequest()
+			switch sp := tt.scope.(type) {
+			case *messagespb.VerifyWithPublicKeyRequest_NoContext:
+				req.ScopeParams = sp
+			case *messagespb.VerifyWithPublicKeyRequest_DomainContext:
+				req.ScopeParams = sp
+			case *messagespb.VerifyWithPublicKeyRequest_VendorContext:
+				req.ScopeParams = sp
+			default:
+				req.ScopeParams = nil
+			}
+			if _, err := h.VerifyWithPublicKey(context.Background(), req); err != nil {
+				t.Fatalf("VerifyWithPublicKey handler: %v", err)
+			}
+		})
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_InvalidSig_ReturnsValidFalse(t *testing.T) {
+	cr := &mockCryptoOps{
+		verifyPublicKeyFn: func(_ context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+			return crypto.VerifyWithPublicKeyResult{Valid: false, TemplateID: req.TemplateID, ProviderID: "software"}, nil // invalid sig — not an error
+		},
+	}
+	h := wireCrypto(t, cr)
+
+	resp, err := h.VerifyWithPublicKey(context.Background(), verifyWithPublicKeyRequest())
+	if err != nil {
+		t.Fatalf("VerifyWithPublicKey handler should not error for invalid sig: %v", err)
+	}
+	if resp.GetValid() {
+		t.Error("VerifyWithPublicKey response: expected valid=false")
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_OrchestratorError_MapsToStatus(t *testing.T) {
+	tests := []struct {
+		name string
+		code engerr.Code
+		want codes.Code
+	}{
+		{"unsupported public key format", engerr.CodeInvalidArgument, codes.InvalidArgument},
+		{"template not allowed by policy", engerr.CodePolicyViolation, codes.PermissionDenied},
+		{"no matching provider", engerr.CodeProviderNotFound, codes.NotFound},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cr := &mockCryptoOps{
+				verifyPublicKeyFn: func(ctx context.Context, _ crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+					return crypto.VerifyWithPublicKeyResult{}, engerr.New(ctx, "test", tt.code, tt.name)
+				},
+			}
+			h := wireCrypto(t, cr)
+
+			_, err := h.VerifyWithPublicKey(context.Background(), verifyWithPublicKeyRequest())
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			st, _ := status.FromError(err)
+			if st.Code() != tt.want {
+				t.Errorf("expected %s, got %s", tt.want, st.Code())
+			}
+		})
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_PolicyNotAuthorized_PermissionDenied(t *testing.T) {
+	cr := &mockCryptoOps{} // VerifyWithPublicKey panics if reached
+	var authorized string
+	h := wireCryptoWithPolicyAuth(t, cr, func(ctx context.Context, op engerr.Op, name string) error {
+		authorized = name
+		return engerr.New(ctx, op, engerr.CodePolicyViolation, "caller may not use policy "+name)
+	})
+
+	_, err := h.VerifyWithPublicKey(context.Background(), verifyWithPublicKeyRequest())
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if authorized != "verify-policy" {
+		t.Errorf("policy authorization: got name %q want %q", authorized, "verify-policy")
+	}
+	st, _ := status.FromError(err)
+	if st.Code() != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %s", st.Code())
+	}
+}
+
+func TestCryptoHandler_VerifyWithPublicKey_InvalidProviderRequirements_InvalidArgument(t *testing.T) {
+	tests := []struct {
+		name string
+		reqs *typespb.ProviderRequirements
+	}{
+		{"additional requirement", &typespb.ProviderRequirements{Additional: map[string]string{"k": "v"}}},
+		{"unknown FIPS level", &typespb.ProviderRequirements{MinFipsLevel: typespb.Fips140Level(core.MaxFIPS140Level + 1)}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cr := &mockCryptoOps{} // VerifyWithPublicKey panics if reached
+			h := wireCrypto(t, cr)
+
+			req := verifyWithPublicKeyRequest()
+			req.ProviderRequirements = tt.reqs
+			_, err := h.VerifyWithPublicKey(context.Background(), req)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			st, _ := status.FromError(err)
+			if st.Code() != codes.InvalidArgument {
+				t.Errorf("expected InvalidArgument, got %s", st.Code())
+			}
+		})
+	}
+}
+
+func TestNew_NilPolicyAuthorization_ReturnsError(t *testing.T) {
+	newCrypto := service.CryptoOrchestratorFactory(func(_ context.Context) (service.CryptoOrchestrator, error) {
+		return &mockCryptoOps{}, nil
+	})
+	allow := func(_ context.Context, _ engerr.Op, _ string) error { return nil }
+	_, err := cryptogrpc.New(context.Background(), newCrypto, allow, nil)
+	if err == nil {
+		t.Fatal("expected error for nil policy authorization check")
+	}
+	if !engerr.IsInvalidArgument(err) {
+		t.Errorf("expected CodeInvalidArgument, got: %v", err)
 	}
 }

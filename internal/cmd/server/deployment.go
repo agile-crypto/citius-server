@@ -153,6 +153,7 @@ func (s Services) Validate(f FactorySet) error {
 		reqs = append(reqs,
 			requirement{"Crypto", "crypto orchestrator factory", f.Crypto != nil},
 			requirement{"Crypto", "key authorization check", f.AuthorizeKey != nil},
+			requirement{"Crypto", "policy authorization check", f.AuthorizePolicy != nil},
 		)
 	}
 	if s.CryptoPolicy {
@@ -240,7 +241,7 @@ func BuildHandlers(ctx context.Context, s Services, f FactorySet) (*Handlers, er
 		handlers.KeyManagement = h
 	}
 	if s.Crypto {
-		h, err := cryptogrpc.New(ctx, f.Crypto, f.AuthorizeKey)
+		h, err := cryptogrpc.New(ctx, f.Crypto, f.AuthorizeKey, f.AuthorizePolicy)
 		if err != nil {
 			return nil, engerr.Wrap(ctx, registerOp, err)
 		}
