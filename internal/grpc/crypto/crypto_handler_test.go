@@ -7,6 +7,7 @@ package cryptogrpc_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	core "github.com/agile-crypto/citius-core"
@@ -877,45 +878,6 @@ func TestCryptoHandler_VerifyWithPublicKey_Valid(t *testing.T) {
 	ctx := context.Background()
 	fips := true
 	providerID := "software"
-	cr := &mockCryptoOps{
-		verifyPublicKeyFn: func(_ context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
-			if string(req.PublicKey) != "public-key" {
-				t.Errorf("PublicKey: got %q", req.PublicKey)
-			}
-			if req.PublicKeyFormat != typespb.KeyFormat_KEY_FORMAT_SPKI {
-				t.Errorf("PublicKeyFormat: got %s", req.PublicKeyFormat)
-			}
-			if string(req.Payload) != "payload" {
-				t.Errorf("Payload: expected input, got %q", req.Payload)
-			}
-			if string(req.Signature) != "sig" {
-				t.Errorf("Signature: got %q", req.Signature)
-			}
-			if req.NoContext == nil {
-				t.Error("expected NoContext to be set")
-			}
-			if req.TemplateID != "ecdsa-p256-sha256-der" {
-				t.Errorf("TemplateID: got %q", req.TemplateID)
-			}
-			if req.PolicyName != "verify-policy" {
-				t.Errorf("PolicyName: got %q", req.PolicyName)
-			}
-			if req.ProviderID != providerID {
-				t.Errorf("ProviderID: got %q want %q", req.ProviderID, providerID)
-			}
-			if req.ProviderConfiguration["mode"] != "fast" {
-				t.Errorf("ProviderConfiguration: got %v", req.ProviderConfiguration)
-			}
-			if !req.ProviderRequirements.FIPS140Certified {
-				t.Error("ProviderRequirements: expected FIPS140Certified from provider_requirements")
-			}
-			if req.UserContext["tenant"] != "acme" {
-				t.Errorf("UserContext: got %v", req.UserContext)
-			}
-			return crypto.VerifyWithPublicKeyResult{Valid: true, TemplateID: req.TemplateID, ProviderID: providerID}, nil
-		},
-	}
-	h := wireCrypto(t, cr)
 
 	req := verifyWithPublicKeyRequest()
 	req.ProviderId = &providerID
@@ -923,9 +885,39 @@ func TestCryptoHandler_VerifyWithPublicKey_Valid(t *testing.T) {
 	req.ProviderRequirements = &typespb.ProviderRequirements{Fips_140Certified: &fips}
 	req.UserContext = map[string]string{"tenant": "acme"}
 
+	// Every proto field maps to its core counterpart; the scope message is
+	// passed through as-is.
+	want := crypto.VerifyWithPublicKeyRequest{
+		PublicKey:       []byte("public-key"),
+		PublicKeyFormat: typespb.KeyFormat_KEY_FORMAT_SPKI,
+		Payload:         []byte("payload"),
+		Signature:       []byte("sig"),
+		SignatureScopeFields: crypto.SignatureScopeFields{
+			NoContext: req.GetNoContext(),
+		},
+		TemplateID:            "ecdsa-p256-sha256-der",
+		PolicyName:            "verify-policy",
+		ProviderID:            providerID,
+		ProviderConfiguration: map[string]string{"mode": "fast"},
+		ProviderRequirements:  core.ProviderRequirements{FIPS140Certified: true},
+		UserContext:           map[string]string{"tenant": "acme"},
+	}
+
+	var got crypto.VerifyWithPublicKeyRequest
+	cr := &mockCryptoOps{
+		verifyPublicKeyFn: func(_ context.Context, req crypto.VerifyWithPublicKeyRequest) (crypto.VerifyWithPublicKeyResult, error) {
+			got = req
+			return crypto.VerifyWithPublicKeyResult{Valid: true, TemplateID: req.TemplateID, ProviderID: providerID}, nil
+		},
+	}
+	h := wireCrypto(t, cr)
+
 	resp, err := h.VerifyWithPublicKey(ctx, req)
 	if err != nil {
 		t.Fatalf("VerifyWithPublicKey handler: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("orchestrator request:\n got  %+v\n want %+v", got, want)
 	}
 	if !resp.GetValid() {
 		t.Error("VerifyWithPublicKey response: expected valid=true")
