@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;types";
 
 import "api/types/implementation.proto";
+import "buf/validate/validate.proto";
 
 // ============================================================================
 // Provider Type Classification
@@ -46,24 +49,24 @@ enum ProviderType {
 // - Clean CBOM generation for compliance reporting
 message ProviderInfo {
   // Unique identifier for this provider (e.g., "go-crypto", "openssl3-fips", "pkcs11")
-  string provider_id = 1;
+  string provider_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 128}];
   
   // Human-readable name (e.g., "Go Cryptography (stdlib + x/crypto)")
-  string display_name = 2;
+  string display_name = 2 [(buf.validate.field).string.max_len = 256];
   
   // Description of the provider
   string description = 3;
   
   // General capabilities as key-value pairs (for flexibility)
   // Examples: {"key_storage": "software", "max_key_size": "4096"}
-  map<string, string> capabilities = 5;
+  map<string, string> capabilities = 4;
   
   // Configuration schema for this provider
   // Describes what configuration parameters can be passed to the provider
-  map<string, ConfigurationParameter> configuration_schema = 6;
+  map<string, ConfigurationParameter> configuration_schema = 5;
   
   // ========================================
-  // Implementation Properties (NEW)
+  // Implementation Properties
   // ========================================
   
   // Provider-wide default implementation properties.
@@ -75,7 +78,7 @@ message ProviderInfo {
   //     constant_time: true
   //     side_channel_hardened: true
   //   }
-  ImplementationProperties default_implementation = 10;
+  ImplementationProperties default_implementation = 6;
   
   // Per-template support declarations with optional property overrides.
   // Each entry declares that this provider supports a specific template.
@@ -86,23 +89,28 @@ message ProviderInfo {
   // If a template's implementation field is omitted or partial,
   // it inherits from default_implementation.
   //
-  // Example:
+  // Example (entries are enabled unless disabled is set):
   //   template_support: [
-  //     { template_id: "aes-256-gcm-96-128", enabled: true },
+  //     { template_id: "aes-256-gcm-96-128" },
+  //     { template_id: "3des-cbc", disabled: true },
   //     { template_id: "ml-kem-768", implementation: { fips_140: { certified: false } } }
   //   ]
-  repeated ProviderTemplateSupport template_support = 11;
+  repeated ProviderTemplateSupport template_support = 7;
 
   // Provider type classification.
   // Used for migration strategy selection and provider-type filtering.
   // Example: An HSM provider sets PROVIDER_TYPE_HSM; the migration logic
   // uses this to recommend WRAPPED_TRANSFER for HSM→HSM migrations.
-  ProviderType provider_type = 12;
+  ProviderType provider_type = 8;
 }
 
 // ConfigurationParameter describes a configuration option for a provider.
+// Used as map values in ProviderInfo.configuration_schema.
 message ConfigurationParameter {
-  // Parameter name (e.g., "pkcs11_library_path")
+  // Parameter name (e.g., "pkcs11_library_path").
+  // MUST equal the map key under which this entry is stored in
+  // configuration_schema; the duplication makes the message self-describing
+  // when passed around outside the map.
   string name = 1;
   
   // Parameter type (e.g., "string", "int", "bool")

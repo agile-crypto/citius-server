@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;types";
 
 import "google/protobuf/timestamp.proto";
+import "buf/validate/validate.proto";
 
 // ============================================================================
 // Implementation Properties - Provider-specific characteristics
@@ -132,8 +135,8 @@ message AuditReport {
   // Name of the auditing firm (e.g., "Trail of Bits", "NCC Group")
   string auditor = 1;
   
-  // Date of the audit report (ISO 8601 format)
-  string report_date = 2;
+  // Date of the audit report
+  google.protobuf.Timestamp report_date = 2;
   
   // Reference identifier for the report
   string report_id = 3;
@@ -161,7 +164,7 @@ message ProviderTemplateSupport {
   // REQUIRED: Must match a registered TemplateInfo.template_id
   // Examples: "aes-256-gcm-96-128", "ed25519-pure", "ml-kem-768"
   // Validation should reject unknown template IDs
-  string template_id = 1;
+  string template_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 128}];
   
   // Implementation properties for this specific template.
   // If omitted or partially specified, inherits from provider's default_implementation.
@@ -172,10 +175,11 @@ message ProviderTemplateSupport {
   // e.g., "Hardware acceleration requires AVX2 CPU support"
   string notes = 3;
   
-  // Whether this template is enabled for this provider.
+  // Whether this template is disabled for this provider.
   // Allows temporarily disabling support without removing the entry.
-  // Default: true (if not specified, template is enabled)
-  bool enabled = 4;
+  // Named "disabled" (not "enabled") so the proto3 default (false) matches
+  // the intended default: an entry without this field is ENABLED.
+  bool disabled = 4;
 }
 
 // ============================================================================
@@ -274,11 +278,11 @@ message ProviderRequirements {
 // See: docs/PROVIDER_CAPABILITIES_DESIGN.md for full design rationale
 message ProviderInstance {
   // Unique identifier for this instance (e.g., "hsm-payments-slot5")
-  string instance_id = 1;
+  string instance_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 128}];
   
   // References ProviderInfo.provider_id (e.g., "pkcs11")
   // The ProviderInfo defines capabilities and configuration_schema
-  string provider_id = 2;
+  string provider_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 128}];
   
   // Human-readable name (e.g., "Payments HSM - Slot 5")
   string display_name = 3;
@@ -298,9 +302,11 @@ message ProviderInstance {
   //   }
   map<string, string> configuration = 5;
   
-  // Whether this instance is active and available for use.
+  // Whether this instance is disabled (not available for use).
   // Disabled instances are not selected during auto-selection.
-  bool enabled = 6;
+  // Named "disabled" (not "enabled") so the proto3 default (false) matches
+  // the intended default: a newly registered instance is ENABLED.
+  bool disabled = 6;
   
   // Optional: Override default_implementation from ProviderInfo.
   // Useful when this specific instance has different properties than the default.

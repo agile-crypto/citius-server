@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;services";
 
 import "google/api/annotations.proto";
 import "api/types/common.proto";

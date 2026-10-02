@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;services";
 
 import "google/api/annotations.proto";
 import "api/types/providers.proto";
@@ -186,7 +188,9 @@ message GetProviderInstanceResponse {
 }
 
 message UpdateProviderInstanceRequest {
-  // The instance with updated fields
+  // The instance to store. FULL-REPLACEMENT semantics: the stored instance
+  // is replaced entirely by this value (no field masking / partial update).
+  // Read-modify-write: fetch via GetProviderInstance, modify, then update.
   ProviderInstance instance = 1;
 }
 
@@ -216,8 +220,10 @@ message MatchProvidersRequest {
   // Optional: Implementation requirements to filter by
   ProviderRequirements requirements = 2;
   
-  // Optional: Only return enabled instances (default: true)
-  bool enabled_only = 3;
+  // Optional: Also include disabled instances in matching.
+  // Named so the proto3 default (false) matches the intended default:
+  // by default only enabled instances are matched.
+  bool include_disabled = 3;
 }
 
 message MatchProvidersResponse {

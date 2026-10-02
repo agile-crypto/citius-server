@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;types";
 
 import "buf/validate/validate.proto";
 import "google/protobuf/struct.proto";
@@ -571,12 +573,9 @@ message Ed25519Params {
 message Ed448Params {
   // Ed448 variant. Default: PURE.
   // PKCS#11: CK_EDDSA_PARAMS.phFlag (CK_FALSE=Pure, CK_TRUE=Prehash)
+  // Per RFC 8032 §5.2, Ed448 always accepts a context (default empty);
+  // provide it at operation time via SignatureDomainContext.
   Ed448Variant variant = 1;
-
-  // Context string (0-255 bytes).
-  // PKCS#11: CK_EDDSA_PARAMS.pContextData, ulContextDataLen
-  // Ed448 always supports context; use empty bytes for "pure" mode.
-  bytes context = 2 [(buf.validate.field).bytes.max_len = 255];
 }
 
 
@@ -1513,6 +1512,13 @@ message Gost3410Params {
 // PKCS#11 Key Type: CKK_HOTP
 // PKCS#11 Reference Struct: CK_OTP_PARAMS, CK_OTP_PARAM
 // Standards: RFC 4226
+//
+// SCOPE STATUS: HOTP/TOTP templates are currently CATALOG-ONLY. There is no
+// OtpScope in ScopeSpecification and no OTP operations in CryptoOperation,
+// so these templates cannot be selected through scope-based discovery or
+// executed through the service RPCs. OTP generation/verification is treated
+// as an authentication concern pending a design decision on whether it
+// belongs in this cryptographic API (tracked in the audit as H-TPL-1).
 message HotpParams {
   // Hash algorithm for HMAC.
   // PKCS#11: Part of key attributes (typically SHA-1 per RFC 4226)
@@ -1534,6 +1540,13 @@ message HotpParams {
 // PKCS#11: Uses CKM_HOTP with time-based counter (CK_OTP_TIME param)
 // PKCS#11 Reference Struct: CK_OTP_PARAMS with CK_OTP_TIME parameter
 // Standards: RFC 6238
+//
+// SCOPE STATUS: HOTP/TOTP templates are currently CATALOG-ONLY. There is no
+// OtpScope in ScopeSpecification and no OTP operations in CryptoOperation,
+// so these templates cannot be selected through scope-based discovery or
+// executed through the service RPCs. OTP generation/verification is treated
+// as an authentication concern pending a design decision on whether it
+// belongs in this cryptographic API (tracked in the audit as H-TPL-1).
 message TotpParams {
   // Hash algorithm for HMAC.
   // Standard uses SHA-1 (100), SHA-256 (1), and SHA-512 (3) are supported (RFC 6238 §1.2).

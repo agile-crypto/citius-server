@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;services";
 
 import "google/api/annotations.proto";
 import "api/messages/encryption.proto";
@@ -122,6 +124,17 @@ service CryptoService {
   rpc SeedRandom(SeedRandomRequest) returns (SeedRandomResponse) {
     option (google.api.http) = {
       post: "/v1/random/seed"
+      body: "*"
+    };
+  }
+
+  // ============== Stateless Signature Verification =================
+
+  // Stateless signature verification using a public key (no key management required).
+  // The public key is provided in the request, and the signature is verified against the provided data.
+  rpc VerifyWithPublicKey(VerifyWithPublicKeyRequest) returns (VerifyWithPublicKeyResponse) {
+    option (google.api.http) = {
+      post: "/v1/verify/publickey"
       body: "*"
     };
   }

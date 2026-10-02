@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;messages";
 
 import "api/types/common.proto";
 import "api/messages/metadata.proto";
@@ -26,21 +28,21 @@ message DigestInitRequest {
   // the scope specification and the policy.
   optional string template_id = 2;
   
-  // Unique identifier for this streaming operation
-  string operation_id = 3;
-  
   // Optional: Policy name for additional validation and enforcement.
   // If provided, validates whether this operation and selected template are allowed.
-  string policy_name = 4;
+  string policy_name = 3;
   
   // Optional: User-provided context for audit trail enrichment.
-  map<string, string> user_context = 5;
+  map<string, string> user_context = 15;
 }
 
 message DigestInitResponse {
   bool success = 1;
   // The template that was selected for this operation
   string selected_template_id = 2;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 3 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 // DigestRequest performs a single-shot digest operation.
@@ -59,14 +61,14 @@ message DigestRequest {
   optional string template_id = 2;
   
   // The data to hash
-  bytes data = 4;
+  bytes data = 3;
   
   // Optional: Policy name for additional validation and enforcement.
   // If provided, validates whether this operation and selected template are allowed.
-  string policy_name = 5;
+  string policy_name = 4;
   
   // Optional: User-provided context for audit trail enrichment.
-  map<string, string> user_context = 6;
+  map<string, string> user_context = 15;
 }
 
 message DigestResponse {
@@ -75,7 +77,7 @@ message DigestResponse {
 }
 
 message DigestUpdateRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes data_chunk = 2;
 }
 
@@ -84,8 +86,8 @@ message DigestUpdateResponse {
 }
 
 message DigestKeyRequest {
-  string operation_id = 1;
-  string key_name = 2;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string key_name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message DigestKeyResponse {
@@ -93,7 +95,7 @@ message DigestKeyResponse {
 }
 
 message DigestFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message DigestFinalResponse {
@@ -128,13 +130,14 @@ message XofRequest {
 
   // Required: the desired output length in bytes.
   // XOFs produce variable-length output; this field specifies how many bytes to generate.
-  uint32 output_length_bytes = 4;
+  // Bounded to 1 MiB per request to prevent resource-exhaustion abuse.
+  uint32 output_length_bytes = 4 [(buf.validate.field).uint32 = {gte: 1, lte: 1048576}];
 
   // Optional: Policy name for additional validation and enforcement.
   string policy_name = 5;
   
   // Optional: User-provided context for audit trail enrichment.
-  map<string, string> user_context = 6;
+  map<string, string> user_context = 15;
 }
 
 message XofResponse {
@@ -156,30 +159,31 @@ message XofInitRequest {
   // the scope specification and the policy.
   optional string template_id = 2;
 
-  // Unique identifier for this streaming operation
-  string operation_id = 3;
-
   // Required: the desired output length in bytes.
-  uint32 output_length_bytes = 4;
+  // Bounded to 1 MiB per request to prevent resource-exhaustion abuse.
+  uint32 output_length_bytes = 3 [(buf.validate.field).uint32 = {gte: 1, lte: 1048576}];
 
   // Optional: Policy name for additional validation and enforcement.
-  string policy_name = 5;
+  string policy_name = 4;
   
   // Optional: User-provided context for audit trail enrichment.
-  map<string, string> user_context = 6;
+  map<string, string> user_context = 15;
 }
 
 message XofInitResponse {
   bool success = 1;
   // The template that was selected for this operation
   string selected_template_id = 2;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 3 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 // XofUpdateRequest feeds a data chunk into a streaming XOF operation.
 // Dedicated type (not reusing DigestUpdateRequest) to allow independent
 // evolution of XOF and digest streaming interfaces.
 message XofUpdateRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes data_chunk = 2;
 }
 
@@ -190,7 +194,7 @@ message XofUpdateResponse {
 // XofFinalRequest completes a streaming XOF operation.
 // Data chunks are fed via XofUpdateRequest.
 message XofFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message XofFinalResponse {

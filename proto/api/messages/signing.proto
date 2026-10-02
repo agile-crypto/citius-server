@@ -1,12 +1,16 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;messages";
 
 import "api/messages/metadata.proto";
 import "api/types/algorithm_params.proto";
 import "api/types/common.proto";
 import "api/types/operation_params.proto";
+import "api/types/implementation.proto";
+import "api/types/templates.proto";
 import "buf/validate/validate.proto";
 
 // ============================================================================
@@ -14,7 +18,7 @@ import "buf/validate/validate.proto";
 // ============================================================================
 
 message SignRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes input = 2;
   
   // Scope-based context parameters for domain separation.
@@ -36,7 +40,7 @@ message SignResponse {
 }
 
 message VerifyRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes input = 2;
   bytes signature = 3;
   // Operation metadata from sign response.
@@ -61,7 +65,7 @@ message VerifyResponse {
 }
 
 message DigestSignRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes digest = 2;
   
   // Scope-based context (same as SignRequest).
@@ -72,28 +76,23 @@ message DigestSignRequest {
     VendorSignatureContext vendor_context = 5;     // Vendor/custom scope
   }
   
-  // Hash algorithm used to compute the digest - REQUIRED.
-  // Declares which hash algorithm was used to produce the digest bytes.
+  // Hash algorithm that produced the digest - REQUIRED.
   //
-  // Security purpose:
-  //   1. Digest size validation (prevents policy bypass - SHA-1 digest can't claim to be SHA-256)
-  //   2. Policy enforcement (reject weak hash algorithms like SHA-1, MD5)
-  //   3. Audit trail (returned in OperationMetadata.used_hash_algorithm)
-  //
-  // The service validates that len(digest) matches the output size of this algorithm.
-  // Example: SHA-256 → 32 bytes, SHA-384 → 48 bytes, SHA-512 → 64 bytes
+  // The key version accepts only the hashes in its scope spec's
+  // accepted_digest_hashes (see ReadKey; the first entry is the preferred
+  // hash). Any other hash is rejected with INVALID_ARGUMENT. The service also
+  // checks that len(digest) matches this hash's output size, and records the
+  // hash in the response's OperationMetadata.digest_hash, which DigestVerify
+  // uses.
   //
   // PKCS#11 Reference: CKM_ECDSA (prehashed) vs CKM_ECDSA_SHA256 (hash-then-sign)
-  HashAlgorithm hash_algorithm = 6;
-  
-  // Optional: OID of the hash algorithm for extensibility.
-  // Use when hash_algorithm is HASH_ALGORITHM_OTHER or for explicit OID-based validation.
-  // Example: "2.16.840.1.101.3.4.2.1" for SHA-256, "2.16.840.1.101.3.4.2.8" for SHA3-256
-  //
-  // When both are specified, service validates they match.
-  // When only OID is specified with HASH_ALGORITHM_OTHER, service uses OID for validation.
-  string hash_algorithm_oid = 7;
-  
+  HashAlgorithm hash_algorithm = 6 [(buf.validate.field).enum = {defined_only: true, not_in: [0, 200]}];
+
+  // Removed: the hash OID (only meaningful for HASH_ALGORITHM_OTHER, which no
+  // key accepts).
+  reserved 7;
+  reserved "hash_algorithm_oid";
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
@@ -104,12 +103,18 @@ message DigestSignResponse {
 }
 
 message DigestVerifyRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes digest = 2;
   bytes signature = 3;
-  // Operation metadata from digest sign response.
-  // Contains key_version to ensure correct key is used for verification.
-  OperationMetadata metadata = 4;
+  // Operation metadata from the DigestSign response. Required: key_version
+  // selects the key version, and digest_hash is the hash that produced the
+  // digest. There is no separate hash argument, so the verifier cannot
+  // disagree with what was signed.
+  OperationMetadata metadata = 4 [(buf.validate.field).required = true];
+
+  // Removed: the digest hash now comes from metadata.digest_hash.
+  reserved 8, 9;
+  reserved "hash_algorithm", "hash_algorithm_oid";
   
   // Must match scope used during signing.
   oneof scope_params {
@@ -119,21 +124,6 @@ message DigestVerifyRequest {
     VendorSignatureContext vendor_context = 7;     // Vendor/custom scope
   }
 
-  // Hash algorithm used to compute the digest - REQUIRED.
-  // Must match the hash_algorithm from the corresponding DigestSignRequest.
-  //
-  // Security purpose:
-  //   1. Digest size validation (SHA-1 digest can't claim to be SHA-256)
-  //   2. Policy enforcement (reject verification with weak hash algorithms)
-  //   3. Audit trail (record which hash was claimed during verification)
-  //
-  // The service validates that len(digest) matches the output size of this algorithm.
-  HashAlgorithm hash_algorithm = 8;
-
-  // Optional: OID of the hash algorithm for extensibility.
-  // Same semantics as DigestSignRequest.hash_algorithm_oid.
-  string hash_algorithm_oid = 9;
-  
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
@@ -145,15 +135,13 @@ message DigestVerifyResponse {
 
 // Multi-part signing
 message SignInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Scope-based context for domain separation.
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_context = 3;                      // Classical signatures
-    SignatureDomainContext domain_context = 4;     // Context-bearing signatures
-    VendorSignatureContext vendor_context = 5;     // Vendor/custom scope
+    NoParams no_context = 2;                      // Classical signatures
+    SignatureDomainContext domain_context = 3;     // Context-bearing signatures
+    VendorSignatureContext vendor_context = 4;     // Vendor/custom scope
   }
   
   // Optional: User-provided context for audit trail enrichment.
@@ -162,10 +150,13 @@ message SignInitRequest {
 
 message SignInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message SignUpdateRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes data_chunk = 2;
 }
 
@@ -174,7 +165,7 @@ message SignUpdateResponse {
 }
 
 message SignFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message SignFinalResponse {
@@ -183,27 +174,33 @@ message SignFinalResponse {
 }
 
 message VerifyInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Must match scope used during signing.
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_context = 3;                      // Classical signatures
-    SignatureDomainContext domain_context = 4;     // Context-bearing signatures
-    VendorSignatureContext vendor_context = 5;     // Vendor/custom scope
+    NoParams no_context = 2;                      // Classical signatures
+    SignatureDomainContext domain_context = 3;     // Context-bearing signatures
+    VendorSignatureContext vendor_context = 4;     // Vendor/custom scope
   }
-  
+
+  // Operation metadata from the corresponding sign response.
+  // Contains key_version so verification uses the same key version that
+  // produced the signature (critical after key rotation).
+  OperationMetadata metadata = 5;
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
 
 message VerifyInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message VerifyUpdateRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes data_chunk = 2;
 }
 
@@ -212,7 +209,7 @@ message VerifyUpdateResponse {
 }
 
 message VerifyFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes signature = 2;
 }
 
@@ -223,15 +220,13 @@ message VerifyFinalResponse {
 
 // Message-based signing
 message SignMessageInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Scope-based context for domain separation.
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_context = 3;                      // Classical signatures
-    SignatureDomainContext domain_context = 4;     // Context-bearing signatures
-    VendorSignatureContext vendor_context = 5;     // Vendor/custom scope
+    NoParams no_context = 2;                      // Classical signatures
+    SignatureDomainContext domain_context = 3;     // Context-bearing signatures
+    VendorSignatureContext vendor_context = 4;     // Vendor/custom scope
   }
   
   // Optional: User-provided context for audit trail enrichment.
@@ -240,12 +235,22 @@ message SignMessageInitRequest {
 
 message SignMessageInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message SignMessageRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes message = 2;
-  
+
+  // Identifies the message session established by SignMessageInit.
+  // The session provides the key state and scope parameters (including
+  // any SignatureDomainContext); each call signs one independent message.
+  // PKCS#11 analogy: C_SignMessage operates on the session prepared
+  // by C_MessageSignInit.
+  string operation_id = 3 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
@@ -256,7 +261,7 @@ message SignMessageResponse {
 }
 
 message SignMessageBeginRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message SignMessageBeginResponse {
@@ -264,33 +269,43 @@ message SignMessageBeginResponse {
 }
 
 message SignMessageNextRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes message_chunk = 2;
+  // Marks the final chunk of the current message (PKCS#11: the signature is
+  // returned by the last C_SignMessageNext call). When true, the response
+  // carries the signature and metadata for this message. The session stays
+  // open for further messages.
+  bool end_of_message = 3;
 }
 
 message SignMessageNextResponse {
   bool success = 1;
+  // Set only on the end_of_message call: signature over the whole message.
+  bytes signature = 2;
+  // Set only on the end_of_message call: metadata (key_version, encoding).
+  OperationMetadata metadata = 3;
 }
 
+// SignMessageFinal ends the message-based SESSION (PKCS#11
+// C_MessageSignFinal). It carries no signature: per-message signatures are
+// returned by the end_of_message SignMessageNext call (or single-shot
+// SignMessage).
 message SignMessageFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message SignMessageFinalResponse {
-  bytes signature = 1;
-  OperationMetadata metadata = 2;
+  bool success = 1;
 }
 
 message VerifyMessageInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Must match scope used during signing.
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_context = 3;                      // Classical signatures
-    SignatureDomainContext domain_context = 4;     // Context-bearing signatures
-    VendorSignatureContext vendor_context = 5;     // Vendor/custom scope
+    NoParams no_context = 2;                      // Classical signatures
+    SignatureDomainContext domain_context = 3;     // Context-bearing signatures
+    VendorSignatureContext vendor_context = 4;     // Vendor/custom scope
   }
   
   // Optional: User-provided context for audit trail enrichment.
@@ -299,13 +314,26 @@ message VerifyMessageInitRequest {
 
 message VerifyMessageInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message VerifyMessageRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes message = 2;
   bytes signature = 3;
-  
+
+  // Operation metadata from the corresponding sign response.
+  // Contains key_version so verification uses the same key version that
+  // produced the signature (critical after key rotation).
+  OperationMetadata metadata = 4;
+
+  // Identifies the message session established by VerifyMessageInit.
+  // The session provides the key state and scope parameters; each call
+  // verifies one independent message.
+  string operation_id = 5 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
@@ -316,7 +344,7 @@ message VerifyMessageResponse {
 }
 
 message VerifyMessageBeginRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message VerifyMessageBeginResponse {
@@ -324,20 +352,71 @@ message VerifyMessageBeginResponse {
 }
 
 message VerifyMessageNextRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes message_chunk = 2;
+  // Marks the final chunk of the current message (PKCS#11: the signature is
+  // supplied to the last C_VerifyMessageNext call). When true, signature
+  // must be set and the response carries the verification result. The
+  // session stays open for further messages.
+  bool end_of_message = 3;
+  // Signature to verify — set only on the end_of_message call.
+  bytes signature = 4;
 }
 
 message VerifyMessageNextResponse {
   bool success = 1;
+  // Set only on the end_of_message call: result of signature verification.
+  bool valid = 2;
+  // Set only on the end_of_message call: metadata (key_version, encoding).
+  OperationMetadata metadata = 3;
 }
 
+// VerifyMessageFinal ends the message-based SESSION (PKCS#11
+// C_MessageVerifyFinal). Per-message results are returned by the
+// end_of_message VerifyMessageNext call (or single-shot VerifyMessage).
 message VerifyMessageFinalRequest {
-  string operation_id = 1;
-  bytes signature = 2;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message VerifyMessageFinalResponse {
-  bool valid = 1;
-  OperationMetadata metadata = 2;
+  bool success = 1;
+}
+
+// ============================================================================
+// Stateless Verification Request/Response
+// ============================================================================
+
+message VerifyWithPublicKeyRequest {
+    bytes public_key = 1;
+    KeyFormat public_key_format = 2;
+    bytes input = 3;
+    bytes signature = 4;
+    
+    // Additional operation parameters used to compute the signature
+    oneof scope_params {
+        option (buf.validate.oneof).required = true;
+        NoParams no_context = 5;                      // Classical signatures
+        SignatureDomainContext domain_context = 6;     // Context-bearing signatures
+        VendorSignatureContext vendor_context = 7;     // Vendor/custom scope
+    }
+
+    // Template of the algorithm used to sign the input
+    oneof algorithm {
+        option (buf.validate.oneof).required = true;
+        string template_id = 8; // Explicit known template
+        AlgorithmDetails algorithm_params = 9; // Incomplete algorithm params, remaining inferred from the key
+    } 
+    string policy_name = 10; // Name of the policy authorizing the operation, required.
+    optional string provider_id = 11; // Optional provider ID to use for verification. If not provided, the system will select a provider.
+    map<string, string> provider_configuration = 12; // Optional provider configuration for the provider selected for verification. If not provided, the system will use the default configuration for the provider.
+    optional ProviderRequirements provider_requirements = 13; // Optional provider requirements for the provider selected for verification. If not provided, the system will use the default requirements for the provider.
+
+    // Optional: User-provided context for audit trail enrichment.
+    map<string, string> user_context = 14;
+}
+
+message VerifyWithPublicKeyResponse {
+    bool valid = 1;
+    string template_id = 2;
+    string provider_id = 3;
 }

@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;messages";
 
 import "google/protobuf/timestamp.proto";
 import "api/types/common.proto";
@@ -84,7 +86,7 @@ import "buf/validate/validate.proto";
 //
 message CreateKeyRequest {
   // Unique name to identify this key
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Name of the policy to bind this key to, for security governance
   string policy = 2;
   // Optional: provider ID in which the key must be created. If not set, the provider is 
@@ -124,6 +126,13 @@ message CreateKeyRequest {
   //
   // If provider_id is also specified, that provider must meet these requirements.
   ProviderRequirements provider_requirements = 7;
+
+  // Optional cryptoperiod bounds (NIST SP 800-57 Part 1 §5.3).
+  // If unset, defaults come from the governing policy (which SHOULD define
+  // a maximum cryptoperiod). See KeyMetadata.activation_time/expiration_time
+  // for enforcement semantics.
+  optional google.protobuf.Timestamp activation_time = 8;
+  optional google.protobuf.Timestamp expiration_time = 9;
 }
 
 message CreateKeyResponse {
@@ -148,7 +157,7 @@ message CreateKeyResponse {
 
 
 message KeyMetadata {
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   uint32 version = 2;
   string key_id = 3; // Unique identifier for the key 
   string template_id = 4;
@@ -171,10 +180,27 @@ message KeyMetadata {
   KeyLifecycleState lifecycle_state = 14;
   optional bytes public_key_bytes = 15; // Public-key material for asymmetric keys
   optional KeyFormat public_key_format = 16; // Format of public key material (e.g., RAW, PKCS8, JWK)
+
+  // Cryptoperiod (NIST SP 800-57 Part 1 §5.3): the time span during which
+  // the key is authorized for use.
+  //
+  // Start of the key's originator-usage period. If unset, the key is usable
+  // from creation. Keys before activation are in PRE_ACTIVE state.
+  optional google.protobuf.Timestamp activation_time = 17;
+  // End of the key's usage period. After expiration, protect operations
+  // (encrypt, sign, wrap) MUST fail with CRYPTO_ERROR_KEY_EXPIRED; process
+  // operations (decrypt, verify, unwrap) remain available per policy.
+  // If unset, the key does not expire automatically (NOT RECOMMENDED —
+  // policies SHOULD enforce a maximum cryptoperiod).
+  optional google.protobuf.Timestamp expiration_time = 18;
+
+  // How the key material came into existence (generated, imported, derived,
+  // unwrapped). Immutable; set by the server at creation time.
+  KeyOrigin origin = 19;
 }
 
 message ReadKeyRequest {
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   optional uint32 version = 2; // Optional: specific version to read (default = latest)
 }
 
@@ -200,8 +226,21 @@ message ListKeysResponse {
   string next_page_token = 2;
 }
 
+// DeleteKeyRequest - Destroy a key's material (NIST SP 800-57 §8.3)
+//
+// Destruction semantics:
+//   - Key material is ZEROIZED in the provider; this is irreversible.
+//   - By default the key transitions to DESTROYED (or DESTROYED_COMPROMISED
+//     if it was COMPROMISED) and its METADATA IS RETAINED for audit.
+//   - Set remove_metadata=true to also remove the key record entirely
+//     (permitted only where audit/retention policy allows).
 message DeleteKeyRequest {
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
+  // If true, remove the key record (metadata) in addition to zeroizing
+  // material. Default false: retain metadata in DESTROYED state for audit
+  // per NIST SP 800-57 §8.3.
+  bool remove_metadata = 2;
 }
 
 message DeleteKeyResponse {
@@ -209,8 +248,58 @@ message DeleteKeyResponse {
   string message = 2; // Status message (e.g., soft-delete confirmation, remaining reference warnings)
 }
 
+// RotateKeyRequest - Generate a new version of the key
+//
+// Rotation semantics:
+//   - A new key version is generated with the SAME template and policy.
+//   - Previous versions remain available for process operations (decrypt,
+//     verify, unwrap) — see ReadKeyRequest.version — but new protect
+//     operations use the latest version.
+//   - To change algorithm during renewal, use TransformKey; to change
+//     provider, use MigrateKey.
 message RotateKeyRequest {
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
+  // Reason for rotation, recorded in the audit trail
+  // (e.g., "scheduled", "suspected-compromise", "personnel-change").
+  string reason = 2 [(buf.validate.field).string.max_len = 1024];
+}
+
+// UpdateKeyStateRequest - Explicit, auditable key lifecycle state transition
+//
+// NIST SP 800-57 Part 1 §7 requires explicit, auditable transitions between
+// key states. This RPC covers transitions not implied by other operations:
+//   PRE_ACTIVE  → ACTIVE        (activate)
+//   ACTIVE      → SUSPENDED     (temporarily disable)
+//   SUSPENDED   → ACTIVE        (reactivate)
+//   ACTIVE      → DEACTIVATED   (retire from protect operations)
+//   any         → COMPROMISED   (mark exposure; process ops per policy only)
+//
+// Destruction transitions (→ DESTROYED / DESTROYED_COMPROMISED) go through
+// DeleteKey, which performs material zeroization.
+//
+// The server MUST validate the transition against the SP 800-57 / KMIP state
+// machine and reject invalid transitions with
+// CRYPTO_ERROR_INVALID_KEY_STATE_TRANSITION (e.g., COMPROMISED → ACTIVE,
+// DESTROYED → anything).
+message UpdateKeyStateRequest {
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
+  // Target lifecycle state. Required, must be a concrete state.
+  KeyLifecycleState target_state = 2 [(buf.validate.field).enum = {
+    defined_only: true,
+    not_in: [0]
+  }];
+
+  // Reason for the transition, recorded in the audit trail.
+  // REQUIRED for transitions to COMPROMISED (breach documentation).
+  string reason = 3 [(buf.validate.field).string.max_len = 1024];
+}
+
+message UpdateKeyStateResponse {
+  bool success = 1;
+  string message = 2;
+  KeyMetadata key_metadata = 3;
 }
 
 message RotateKeyResponse {
@@ -238,7 +327,7 @@ message RotateKeyResponse {
 // - PKCS8: Standard PKCS#8 format for asymmetric keys
 // - JWK: JSON Web Key format
 message ExportKeyRequest {
-  string name = 1;                // Name of key to export (key's policy governs export)
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];                // Name of key to export (key's policy governs export)
   KeyFormat format = 2;           // Export format
   string wrapping_key_name = 3;   // Required if format=KEY_FORMAT_WRAPPED: KEK to wrap with
 }
@@ -247,6 +336,13 @@ message ExportKeyResponse {
   bytes key_material = 1;       // Exported key (raw or wrapped based on format)
   KeyFormat format = 2;         // Format of exported key material
   KeyMetadata key_metadata = 3; // Metadata of exported key
+
+  // Key check value for integrity verification of the exported material
+  // (e.g., ANSI X9.24 KCV: leading bytes of encrypting a zero block, or an
+  // HMAC/hash over the canonical key encoding — algorithm-dependent, and
+  // documented by the provider). Allows the receiver to detect corruption
+  // in transit or at rest before using the key. Optional but RECOMMENDED.
+  bytes key_check_value = 4;
 }
 
 // ImportKeyRequest - Import key material into the service
@@ -259,7 +355,7 @@ message ExportKeyResponse {
 // - Key attestation verification
 // - Restrictions on imported key usage
 message ImportKeyRequest {
-  string name = 1;              // Name for the imported key
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];              // Name for the imported key
   string policy_name = 2;       // Policy to associate with imported key
   bytes key_material = 3;       // Key material to import (raw or wrapped)
   KeyFormat format = 4;         // Import format
@@ -267,7 +363,14 @@ message ImportKeyRequest {
   string provider_id = 6;       // Optional: target provider for the key
   map<string, string> provider_configuration = 7;
   string template_id = 8;       // Template ID for the imported key (required)
-  
+
+  // Optional: attestation over the imported key material (BYOK).
+  // Provider/vendor-specific evidence that the key was generated in a trusted
+  // environment (e.g., HSM attestation blob, signed key provenance statement).
+  // The governing policy may REQUIRE attestation for import; the server
+  // verifies it before accepting the key. Imported keys are recorded with
+  // KeyMetadata.origin = KEY_ORIGIN_IMPORTED regardless.
+  bytes key_attestation = 9;
 }
 
 message ImportKeyResponse {
@@ -341,18 +444,18 @@ message ImportKeyResponse {
 //   → Transform keeping existing key bytes
 message TransformKeyRequest {
   // Name of the key to be transformed
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Whether to retain the existing key bytes (true) or regenerate (false)
   bool retain_key_bytes = 2;
   // Scope specification for template selection. The scope specification describes the 
   // scope (ie. cryptographic intent) and properties that the template must satisfy.
   // If a template is explicitly provided, the scope specification must at least 
   // include the scope to be associated with the key.
-  ScopeSpecification scope_spec = 5;
+  ScopeSpecification scope_spec = 3;
   // Optional: explicit template ID. If set, it must match the scope specification
   // and be allowed by the policy. If not set, the template is determined based on
   // the scope specification and the policy.
-  optional string template_id = 6;
+  optional string template_id = 4;
 }
 
 message TransformKeyResponse {
@@ -373,8 +476,8 @@ message TransformKeyResponse {
 //   - Compliance and security requirements
 // This operation typically requires elevated privileges or admin approval.
 message UpdateKeyPolicyRequest {
-  string name = 1;
-  string new_policy = 2;  // Policy name to assign to this key
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string new_policy = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];  // Policy name to assign to this key
 }
 
 message UpdateKeyPolicyResponse {
@@ -507,7 +610,7 @@ enum MigrationStrategy {
 //   }
 message MigrateKeyRequest {
   // Name of the key to migrate
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   
   // Target provider specification (exactly one required)
   oneof target {
@@ -618,7 +721,7 @@ message MigrationResult {
 // - Build UIs with disabled/enabled options
 message ValidateKeyOperationRequest {
   // Key to validate operations for
-  string name = 1;
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   
   // What the user wants to achieve
   oneof intent {
@@ -657,6 +760,13 @@ message ValidateMigrateIntent {
 }
 
 // ValidateKeyOperationResponse - Feasibility report
+//
+// INTENT-DEPENDENT FIELDS: `options` and `recommended_strategy` are
+// MigrationStrategy-typed and are populated for MIGRATE intents. For
+// TRANSFORM intents, feasibility is reported via StrategyOption.feasible /
+// infeasibility_reason with strategy = MIGRATION_STRATEGY_UNSPECIFIED
+// (e.g., "retain_key_bytes not possible: key size changes"), and
+// recommended_strategy remains UNSPECIFIED.
 message ValidateKeyOperationResponse {
   // Current key state (for user's information)
   KeyState current_state = 1;

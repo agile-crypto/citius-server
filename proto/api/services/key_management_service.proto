@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/services;services";
 
 import "google/api/annotations.proto";
 import "api/messages/key_management.proto";
@@ -72,6 +74,16 @@ service KeyManagementService {
   rpc TransformKey(TransformKeyRequest) returns (TransformKeyResponse) {
     option (google.api.http) = {
       post: "/v1/keys/{name}/transform"
+      body: "*"
+    };
+  }
+
+  // UpdateKeyState performs an explicit, auditable lifecycle state transition
+  // (activate, suspend, reactivate, deactivate, mark compromised) per
+  // NIST SP 800-57 Part 1 §7. Destruction goes through DeleteKey.
+  rpc UpdateKeyState(UpdateKeyStateRequest) returns (UpdateKeyStateResponse) {
+    option (google.api.http) = {
+      post: "/v1/keys/{name}/state"
       body: "*"
     };
   }

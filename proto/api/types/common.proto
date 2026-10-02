@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/types;types";
 
 import "buf/validate/validate.proto";
+import "api/types/algorithm_params.proto";
 
 // ============================================================================
 // Per-Primitive Scope Enums - Define Operational Interface
@@ -73,7 +76,7 @@ enum KdfScope {
   KDF_SCOPE_AGREEMENT = 3;          // peer_public_key → shared secret (ECDH, X25519/X448, X942, X3DH)
   KDF_SCOPE_COUNTER = 4;            // label + context + counter_format → key (SP800-108)
   KDF_SCOPE_TLS = 5;                // cipher_suite + seed → key material (TLS PRF, TLS 1.2)
-  KDF_SCOPE_GOST = 6;               // ukm → key (GOST R 34.11)
+  KDF_SCOPE_GOST = 6;               // ukm → key (VKO GOST R 34.10, RFC 4357/7836)
   KDF_SCOPE_VENDOR = 7;             // custom parameters → key (vendor-specific)
 }
 
@@ -187,6 +190,19 @@ enum KeyLifecycleState {
   KEY_LIFECYCLE_STATE_DESTROYED_COMPROMISED = 7; // Compromised key destroyed; metadata retained for breach audit (NIST SP 800-57 -7.3)
 }
 
+// KeyOrigin records how a key's material came into existence.
+// PKCS#11 analogy: CKA_LOCAL (TRUE for locally generated keys) combined with
+// the creating mechanism. Origin is immutable for the life of the key and is
+// essential for audit: imported (BYOK) material has a different trust story
+// than provider-generated material.
+enum KeyOrigin {
+  KEY_ORIGIN_UNSPECIFIED = 0;
+  KEY_ORIGIN_GENERATED = 1;  // Generated inside the provider (CKA_LOCAL=TRUE)
+  KEY_ORIGIN_IMPORTED = 2;   // Imported via ImportKey (BYOK)
+  KEY_ORIGIN_DERIVED = 3;    // Produced by DeriveKey/KeyAgreement/Encapsulate
+  KEY_ORIGIN_UNWRAPPED = 4;  // Produced by UnwrapKey
+}
+
 // ============================================================================
 // Universal Security Properties - Shared by All Primitives
 // ============================================================================
@@ -269,10 +285,37 @@ message SignatureScopeSpec {
   // Deterministic: Same input always produces same signature.
   // Relevant for: Reproducibility, testing, side-channel resistance.
   optional bool deterministic = 4;
-  
+
+  // Digest hashes accepted by a PREHASHED or PREHASHED_WITH_CONTEXT scope, in
+  // order of preference: the first entry is the preferred hash.
+  //   Template: hashes the template can sign without weakening its advertised
+  //             security. Required (non-empty) on every prehashed scope; the
+  //             catalog validator and the service's catalog loader enforce it.
+  //   Request:  a requirement. The selected template must accept every entry.
+  //             Empty means no requirement.
+  //   Key:      hashes this key version accepts. Always non-empty for a
+  //             prehashed version: CreateKey and TransformKey store the
+  //             request's list, or the template's list when it is empty.
+  // Applications hash with accepted_digest_hashes[0] of the key's scope spec
+  // (ReadKey), so the hash can change without code changes.
+  // Must be empty for STANDARD and WITH_CONTEXT scopes.
+  repeated HashAlgorithm accepted_digest_hashes = 5 [(buf.validate.field).repeated = {
+    unique: true,
+    items: { enum: { defined_only: true, not_in: [0, 200] } }
+  }];
+
   // Extensibility: Additional properties not covered by typed fields.
   // Use for vendor-specific, compliance, or future requirements.
   map<string, string> additional_properties = 15;
+
+  // Digest hashes only apply to scopes whose input is a digest.
+  // CEL note: 3 and 4 are the wire values of SIGNATURE_SCOPE_PREHASHED and
+  // SIGNATURE_SCOPE_PREHASHED_WITH_CONTEXT.
+  option (buf.validate.message).cel = {
+    id: "accepted_digest_hashes_prehashed_only"
+    message: "accepted_digest_hashes is only allowed on prehashed signature scopes"
+    expression: "this.accepted_digest_hashes.size() == 0 || this.scope == 3 || this.scope == 4"
+  };
 }
 
 // AeadScopeSpec specifies AEAD scope with typed properties.
@@ -746,6 +789,7 @@ enum CryptoErrorCode {
   CRYPTO_ERROR_KEY_VERSION_MISMATCH = 3;        // Requested key_version does not exist
   CRYPTO_ERROR_KEY_NOT_EXPORTABLE = 4;          // Key is marked non-exportable
   CRYPTO_ERROR_KEY_OPERATION_NOT_ALLOWED = 5;   // Key's allowed_operations does not include the requested op
+  CRYPTO_ERROR_INVALID_KEY_STATE_TRANSITION = 6; // Requested lifecycle transition violates the SP 800-57/KMIP state machine
 
   // Template errors (10–19)
   CRYPTO_ERROR_TEMPLATE_NOT_FOUND = 10;         // No template with the given template_id
@@ -762,6 +806,7 @@ enum CryptoErrorCode {
   // Policy errors (30–39)
   CRYPTO_ERROR_POLICY_NOT_FOUND = 30;           // No policy with the given name
   CRYPTO_ERROR_POLICY_VIOLATION = 31;           // Operation rejected by policy evaluation
+  CRYPTO_ERROR_POLICY_VERSION_CONFLICT = 32;    // expected_version does not match stored policy version
 
   // Operation errors (40–49)
   CRYPTO_ERROR_INVALID_OPERATION_STATE = 40;    // Multi-part operation in wrong state (e.g., Update before Init)
@@ -816,6 +861,7 @@ enum CryptoOperation {
   CRYPTO_OPERATION_EXPORT_KEY = 7;
   CRYPTO_OPERATION_UPDATE_KEY_POLICY = 8;
   CRYPTO_OPERATION_MIGRATE_KEY = 9;              // Migrate key to another provider
+  CRYPTO_OPERATION_UPDATE_KEY_STATE = 12;        // Explicit lifecycle state transition (NIST SP 800-57 §7)
 
   // ========================================================================
   // Encryption/Decryption Operations (PKCS#11: C_Encrypt*, C_Decrypt*)
@@ -838,9 +884,6 @@ enum CryptoOperation {
   CRYPTO_OPERATION_DIGEST_SIGN = 22;
   CRYPTO_OPERATION_DIGEST_VERIFY = 23;
   
-  // 24, 25: SIGN_RECOVER / VERIFY_RECOVER (RSA message recovery,
-  // PKCS#11 C_SignRecoverInit / C_VerifyRecoverInit) removed as out of scope.
-
   // ========================================================================
   // Key Wrapping Operations (PKCS#11: C_WrapKey, C_UnwrapKey)
   // ========================================================================
@@ -890,7 +933,7 @@ enum CryptoOperation {
 
   // ========================================================================
   // Range Convention:
-  //   1–12:   Key Lifecycle (1–10 core)
+  //   1–9, 12–19: Key Lifecycle
   //   10–11:  Encryption/Decryption
   //   20–25:  Signing/Verification
   //   30–39:  Key Wrapping

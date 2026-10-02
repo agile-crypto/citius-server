@@ -1,7 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0
+
 syntax = "proto3";
 
 package caas.crypto.v1;
-option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;api";
+option go_package = "github.com/agile-crypto/citius-api-go/gen/go/messages;messages";
 
 import "api/messages/metadata.proto";
 import "api/types/operation_params.proto";
@@ -12,7 +14,7 @@ import "buf/validate/validate.proto";
 // ============================================================================
 
 message EncryptRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes plaintext = 2;
   
   // Scope-based operation parameters.
@@ -38,11 +40,13 @@ message EncryptResponse {
 }
 
 message DecryptRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes ciphertext = 2;
-  // Operation metadata from encryption response.
-  // Contains key_version, template_id, algorithm_parameters, provider, and timestamp.
-  // The algorithm_parameters field within metadata includes IV/nonce needed for decryption.
+  // Operation metadata from the encryption response.
+  // Contains key_version and provider_output; the provider_output's typed
+  // algorithm output (e.g., aead_output.nonce) carries the IV/nonce needed
+  // for decryption. Template/provider identity is deliberately NOT carried
+  // here (see the threat model in metadata.proto).
   OperationMetadata metadata = 3;
   
   // Scope-based operation parameters (must match encryption).
@@ -66,17 +70,15 @@ message DecryptResponse {
 
 // Multi-part encryption
 message EncryptInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Scope-based operation parameters.
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_params = 3;                        // Simple symmetric
-    AeadEncryptParams aead_params = 4;             // AEAD scope
-    XtsEncryptParams xts_params = 5;               // Storage encryption scope
-    AsymmetricEncryptParams asymmetric_params = 6; // Asymmetric encryption scope
-    VendorEncryptionParams vendor_params = 7;      // Vendor/custom scope
+    NoParams no_params = 2;                        // Simple symmetric
+    AeadEncryptParams aead_params = 3;             // AEAD scope
+    XtsEncryptParams xts_params = 4;               // Storage encryption scope
+    AsymmetricEncryptParams asymmetric_params = 5; // Asymmetric encryption scope
+    VendorEncryptionParams vendor_params = 6;      // Vendor/custom scope
   }
   
   // Optional: User-provided context for audit trail enrichment.
@@ -85,10 +87,13 @@ message EncryptInitRequest {
 
 message EncryptInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message EncryptUpdateRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes plaintext_chunk = 2;
 }
 
@@ -97,7 +102,7 @@ message EncryptUpdateResponse {
 }
 
 message EncryptFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message EncryptFinalResponse {
@@ -106,29 +111,37 @@ message EncryptFinalResponse {
 }
 
 message DecryptInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Scope-based operation parameters (must match encryption).
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_params = 3;                        // Simple symmetric
-    AeadEncryptParams aead_params = 4;             // AEAD scope
-    XtsEncryptParams xts_params = 5;               // Storage encryption scope
-    AsymmetricEncryptParams asymmetric_params = 6; // Asymmetric encryption scope
-    VendorEncryptionParams vendor_params = 7;      // Vendor/custom scope
+    NoParams no_params = 2;                        // Simple symmetric
+    AeadEncryptParams aead_params = 3;             // AEAD scope
+    XtsEncryptParams xts_params = 4;               // Storage encryption scope
+    AsymmetricEncryptParams asymmetric_params = 5; // Asymmetric encryption scope
+    VendorEncryptionParams vendor_params = 6;      // Vendor/custom scope
   }
-  
+
+  // Operation metadata from the encryption that produced the ciphertext
+  // (EncryptFinalResponse.metadata or EncryptResponse.metadata).
+  // Contains key_version and provider_output with the system-generated
+  // IV/nonce required to initialize decryption. Without this, the server
+  // cannot recover the IV/nonce used during multi-part encryption.
+  OperationMetadata metadata = 7;
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
 
 message DecryptInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message DecryptUpdateRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes ciphertext_chunk = 2;
 }
 
@@ -137,7 +150,7 @@ message DecryptUpdateResponse {
 }
 
 message DecryptFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message DecryptFinalResponse {
@@ -147,17 +160,15 @@ message DecryptFinalResponse {
 
 // Message-based AEAD
 message EncryptMessageInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Scope-based operation parameters.
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_params = 3;
-    AeadEncryptParams aead_params = 4;
-    XtsEncryptParams xts_params = 5;
-    AsymmetricEncryptParams asymmetric_params = 6;
-    VendorEncryptionParams vendor_params = 7;
+    NoParams no_params = 2;
+    AeadEncryptParams aead_params = 3;
+    XtsEncryptParams xts_params = 4;
+    AsymmetricEncryptParams asymmetric_params = 5;
+    VendorEncryptionParams vendor_params = 6;
   }
   
   // Optional: User-provided context for audit trail enrichment.
@@ -166,13 +177,23 @@ message EncryptMessageInitRequest {
 
 message EncryptMessageInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message EncryptMessageRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes associated_data = 2;
   bytes plaintext = 3;
-  
+
+  // Identifies the message session established by EncryptMessageInit.
+  // The session provides the key state and scope parameters; each call
+  // encrypts one independent message with its own system-generated nonce.
+  // PKCS#11 analogy: C_EncryptMessage operates on the session prepared
+  // by C_MessageEncryptInit.
+  string operation_id = 4 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
@@ -183,7 +204,7 @@ message EncryptMessageResponse {
 }
 
 message EncryptMessageBeginRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes associated_data = 2;
 }
 
@@ -195,35 +216,44 @@ message EncryptMessageBeginResponse {
 }
 
 message EncryptMessageNextRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes plaintext_chunk = 2;
+  // Marks the final chunk of the current message (PKCS#11 CKF_END_OF_MESSAGE).
+  // When true, the response's ciphertext_chunk carries the remaining
+  // ciphertext plus the authentication tag, completing the message started
+  // by EncryptMessageBegin. The session stays open for further messages.
+  bool end_of_message = 3;
 }
 
 message EncryptMessageNextResponse {
+  // Ciphertext for this chunk. On the end_of_message call this includes the
+  // remaining ciphertext and the authentication tag (standard AEAD
+  // convention: Ciphertext || Tag).
   bytes ciphertext_chunk = 1;
 }
 
+// EncryptMessageFinal ends the message-based SESSION (PKCS#11
+// C_MessageEncryptFinal). It carries no ciphertext: per-message output is
+// completed by the end_of_message EncryptMessageNext call (or single-shot
+// EncryptMessage), and per-message metadata comes from EncryptMessageBegin.
 message EncryptMessageFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message EncryptMessageFinalResponse {
-  bytes ciphertext_final = 1;
-  OperationMetadata metadata = 2;
+  bool success = 1;
 }
 
 message DecryptMessageInitRequest {
-  string key_name = 1;
-  string operation_id = 2;
-
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   // Scope-based operation parameters (must match encryption).
   oneof scope_params {
     option (buf.validate.oneof).required = true;
-    NoParams no_params = 3;
-    AeadEncryptParams aead_params = 4;
-    XtsEncryptParams xts_params = 5;
-    AsymmetricEncryptParams asymmetric_params = 6;
-    VendorEncryptionParams vendor_params = 7;
+    NoParams no_params = 2;
+    AeadEncryptParams aead_params = 3;
+    XtsEncryptParams xts_params = 4;
+    AsymmetricEncryptParams asymmetric_params = 5;
+    VendorEncryptionParams vendor_params = 6;
   }
   
   // Optional: User-provided context for audit trail enrichment.
@@ -232,13 +262,26 @@ message DecryptMessageInitRequest {
 
 message DecryptMessageInitResponse {
   bool success = 1;
+  // Server-generated unique identifier for this streaming session.
+  // Pass this operation_id to all subsequent calls of the session.
+  string operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message DecryptMessageRequest {
-  string key_name = 1;
+  string key_name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes associated_data = 2;
   bytes ciphertext = 3;
-  
+
+  // Per-message metadata from the corresponding EncryptMessageResponse.
+  // Contains key_version and provider_output with the system-generated
+  // IV/nonce required to decrypt this message.
+  OperationMetadata metadata = 4;
+
+  // Identifies the message session established by DecryptMessageInit.
+  // The session provides the key state and scope parameters; each call
+  // decrypts one independent message.
+  string operation_id = 5 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+
   // Optional: User-provided context for audit trail enrichment.
   map<string, string> user_context = 15;
 }
@@ -249,8 +292,13 @@ message DecryptMessageResponse {
 }
 
 message DecryptMessageBeginRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes associated_data = 2;
+  // Per-message metadata from the corresponding EncryptMessageBeginResponse.
+  // Contains the system-generated IV/nonce for THIS message within the session.
+  // In message-based AEAD (PKCS#11 CK_GCM_MESSAGE_PARAMS / CK_CCM_MESSAGE_PARAMS),
+  // each message has its own nonce; the session alone cannot supply it.
+  OperationMetadata partial_metadata = 3;
 }
 
 message DecryptMessageBeginResponse {
@@ -258,34 +306,43 @@ message DecryptMessageBeginResponse {
 }
 
 message DecryptMessageNextRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes ciphertext_chunk = 2;
+  // Marks the final chunk of the current message (PKCS#11 CKF_END_OF_MESSAGE).
+  // The final chunk includes the authentication tag; the server verifies it
+  // before returning the last plaintext. The session stays open for further
+  // messages.
+  bool end_of_message = 3;
 }
 
 message DecryptMessageNextResponse {
+  // Plaintext for this chunk.
+  //
+  // IND-CCA2 SECURITY NOTE: On the end_of_message call, authentication
+  // failure MUST be reported as a gRPC error
+  // (CRYPTO_ERROR_AUTHENTICATION_FAILED) — never as plaintext plus a flag.
+  // Plaintext chunks released by earlier Next calls are necessarily
+  // unauthenticated; callers MUST buffer and MUST NOT act on them until the
+  // end_of_message response confirms tag verification.
   bytes plaintext_chunk = 1;
 }
 
+// DecryptMessageFinal ends the message-based SESSION (PKCS#11
+// C_MessageDecryptFinal). It carries no plaintext: per-message output and
+// tag verification are completed by the end_of_message DecryptMessageNext
+// call (or single-shot DecryptMessage).
 message DecryptMessageFinalRequest {
-  string operation_id = 1;
+  string operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
 }
 
 message DecryptMessageFinalResponse {
-  // Final plaintext chunk and authentication tag verification.
-  //
-  // IND-CCA2 SECURITY NOTE: Authentication failure MUST be reported as a
-  // gRPC error (CRYPTO_ERROR_AUTHENTICATION_FAILED), never as a boolean flag
-  // alongside plaintext. Returning plaintext with verified=false would violate
-  // IND-CCA2 security — an attacker could observe partial decryption results.
-  // If this response is returned, authentication has already succeeded.
-  bytes plaintext_final = 1;
-  OperationMetadata metadata = 2;
+  bool success = 1;
 }
 
 // Dual-function operations
 message DigestEncryptUpdateRequest {
-  string digest_operation_id = 1;
-  string encrypt_operation_id = 2;
+  string digest_operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string encrypt_operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes plaintext_chunk = 3;
 }
 
@@ -294,8 +351,8 @@ message DigestEncryptUpdateResponse {
 }
 
 message DecryptDigestUpdateRequest {
-  string decrypt_operation_id = 1;
-  string digest_operation_id = 2;
+  string decrypt_operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string digest_operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes ciphertext_chunk = 3;
 }
 
@@ -304,8 +361,8 @@ message DecryptDigestUpdateResponse {
 }
 
 message SignEncryptUpdateRequest {
-  string sign_operation_id = 1;
-  string encrypt_operation_id = 2;
+  string sign_operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string encrypt_operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes plaintext_chunk = 3;
 }
 
@@ -314,8 +371,8 @@ message SignEncryptUpdateResponse {
 }
 
 message DecryptVerifyUpdateRequest {
-  string decrypt_operation_id = 1;
-  string verify_operation_id = 2;
+  string decrypt_operation_id = 1 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
+  string verify_operation_id = 2 [(buf.validate.field).string = {min_len: 1, max_len: 256}];
   bytes ciphertext_chunk = 3;
 }
 
