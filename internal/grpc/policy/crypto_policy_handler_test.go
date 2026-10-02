@@ -7,6 +7,7 @@ package policygrpc_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
@@ -15,21 +16,24 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
+	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 	policygrpc "github.com/agile-crypto/citius-server/internal/grpc/policy"
+	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-// mockPolicyManager stubs policy.Manager. Only the three CRUD methods exercised
-// by CreateCryptoPolicy/ReadCryptoPolicy/UpdateCryptoPolicy are wired;
-// DeletePolicy and ListPolicies panic to catch accidental calls.
+// mockPolicyManager stubs policy.Engine. Only the three CRUD methods exercised
+// by CreateCryptoPolicy/ReadCryptoPolicy/UpdateCryptoPolicy and AllowedTemplates
+// (ListAllowedAlgorithms) are wired; the others panic to catch accidental calls.
 type mockPolicyManager struct {
-	createFn func(ctx context.Context, p *policy.Policy) (*policy.Policy, error)
-	getFn    func(ctx context.Context, name string) (*policy.Policy, error)
-	updateFn func(ctx context.Context, p *policy.Policy, expectedVersion int64) (*policy.Policy, error)
+	createFn           func(ctx context.Context, p *policy.Policy) (*policy.Policy, error)
+	getFn              func(ctx context.Context, name string) (*policy.Policy, error)
+	updateFn           func(ctx context.Context, p *policy.Policy, expectedVersion int64) (*policy.Policy, error)
+	allowedTemplatesFn func(ctx context.Context, policyName string, scopeSpec *core.ScopeSpecification) ([]string, error)
 }
 
 func (m *mockPolicyManager) CreatePolicy(ctx context.Context, p *policy.Policy) (*policy.Policy, error) {
@@ -62,14 +66,18 @@ func (m *mockPolicyManager) ValidateOperation(_ context.Context, _ string, _ cor
 func (m *mockPolicyManager) ValidateKeyCreation(_ context.Context, _ string, _ *core.KeyCreationSpec) error {
 	panic("mockPolicyManager.ValidateKeyCreation: not implemented")
 }
-func (m *mockPolicyManager) AllowedTemplates(_ context.Context, _ string, _ *core.ScopeSpecification) ([]string, error) {
+func (m *mockPolicyManager) AllowedTemplates(ctx context.Context, policyName string, scopeSpec *core.ScopeSpecification) ([]string, error) {
+	if m.allowedTemplatesFn != nil {
+		return m.allowedTemplatesFn(ctx, policyName, scopeSpec)
+	}
 	panic("mockPolicyManager.AllowedTemplates: not implemented")
 }
 func (m *mockPolicyManager) ProviderRequirements(_ context.Context, _ string) (core.ProviderRequirements, error) {
 	panic("mockPolicyManager.ProviderRequirements: not implemented")
 }
 
-// wirePolicy builds the handler under test over a fixed policy engine.
+// wirePolicy builds the handler under test over a fixed policy engine, with
+// policy authorization always allowing.
 func wirePolicy(t *testing.T, engine policy.Engine) *policygrpc.CryptoPolicyHandler {
 	t.Helper()
 	newPolicy := policy.EngineFactory(func(_ context.Context) (policy.Engine, error) {
@@ -78,7 +86,14 @@ func wirePolicy(t *testing.T, engine policy.Engine) *policygrpc.CryptoPolicyHand
 	authFn := func(ctx context.Context, op engerr.Op, name string) error {
 		return nil
 	}
-	h, err := policygrpc.New(context.Background(), newPolicy, authFn)
+	return wirePolicyFactory(t, newPolicy, authFn)
+}
+
+// wirePolicyFactory builds the handler under test from newPolicy and the
+// given policy authorization check.
+func wirePolicyFactory(t *testing.T, newPolicy policy.EngineFactory, authorizePolicy grpcstatus.AuthorizePolicyName) *policygrpc.CryptoPolicyHandler {
+	t.Helper()
+	h, err := policygrpc.New(context.Background(), newPolicy, authorizePolicy)
 	if err != nil {
 		t.Fatalf("policygrpc.New: %v", err)
 	}
@@ -316,5 +331,214 @@ func TestCryptoPolicyHandler_UpdateCryptoPolicy_EmptyName_ReturnsInvalidArgument
 	_, err := h.UpdateCryptoPolicy(ctx, &messagespb.UpdateCryptoPolicyRequest{Name: ""})
 	if status.Code(err) != codes.InvalidArgument {
 		t.Errorf("expected InvalidArgument, got %v", status.Code(err))
+	}
+}
+
+// ============================================================================
+// ListAllowedAlgorithms
+// ============================================================================
+
+// signatureFilter is a ListAllowedAlgorithms filter on the standard signature
+// scope.
+func signatureFilter() *typespb.ScopeSpecification {
+	return &typespb.ScopeSpecification{
+		ScopeSpec: &typespb.ScopeSpecification_Signature{
+			Signature: &typespb.SignatureScopeSpec{Scope: typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD},
+		},
+	}
+}
+
+// failOnEngine is a policy engine factory that fails the test if the handler
+// reaches the engine.
+func failOnEngine(t *testing.T) policy.EngineFactory {
+	return func(_ context.Context) (policy.Engine, error) {
+		t.Error("policy engine factory must not be called")
+		return &mockPolicyManager{}, nil
+	}
+}
+
+func allowAllPolicies(_ context.Context, _ engerr.Op, _ string) error { return nil }
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_WithFilters_Success(t *testing.T) {
+	ctx := context.Background()
+	allowed := []string{"ecdsa-p256-sha256-der", "ml-dsa-65"}
+	pm := &mockPolicyManager{
+		allowedTemplatesFn: func(_ context.Context, policyName string, scopeSpec *core.ScopeSpecification) ([]string, error) {
+			if policyName != "tenant-a/strict" {
+				t.Errorf("policy name: got %q want tenant-a/strict", policyName)
+			}
+			if scopeSpec == nil {
+				t.Fatal("expected the filters to be converted to a scope specification")
+			}
+			if scopeSpec.Scope != core.ScopeSignatureStandard {
+				t.Errorf("scope: got %q want %q", scopeSpec.Scope, core.ScopeSignatureStandard)
+			}
+			return allowed, nil
+		},
+	}
+	h := wirePolicy(t, pm)
+
+	resp, err := h.ListAllowedAlgorithms(ctx, &messagespb.ListAllowedAlgorithmsRequest{
+		PolicyName: "tenant-a/strict",
+		Filters:    signatureFilter(),
+	})
+	if err != nil {
+		t.Fatalf("ListAllowedAlgorithms: %v", err)
+	}
+	if resp.GetPolicyName() != "tenant-a/strict" {
+		t.Errorf("policy_name: got %q", resp.GetPolicyName())
+	}
+	if resp.GetPolicyVersion() != -1 {
+		t.Errorf("policy_version: got %d want -1 (not supported yet)", resp.GetPolicyVersion())
+	}
+	if !slices.Equal(resp.GetAllowedTemplates(), allowed) {
+		t.Errorf("allowed_templates: got %v want %v", resp.GetAllowedTemplates(), allowed)
+	}
+	if len(resp.GetLegacyTemplates()) != 0 {
+		t.Errorf("legacy_templates: expected none, got %v", resp.GetLegacyTemplates())
+	}
+}
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_NoFilters_PassesNilScope(t *testing.T) {
+	ctx := context.Background()
+	allowed := []string{"ml-dsa-65"}
+	pm := &mockPolicyManager{
+		allowedTemplatesFn: func(_ context.Context, _ string, scopeSpec *core.ScopeSpecification) ([]string, error) {
+			if scopeSpec != nil {
+				t.Errorf("expected nil scope specification without filters, got %+v", scopeSpec)
+			}
+			return allowed, nil
+		},
+	}
+	h := wirePolicy(t, pm)
+
+	resp, err := h.ListAllowedAlgorithms(ctx, &messagespb.ListAllowedAlgorithmsRequest{PolicyName: "tenant-a/strict"})
+	if err != nil {
+		t.Fatalf("ListAllowedAlgorithms: %v", err)
+	}
+	if !slices.Equal(resp.GetAllowedTemplates(), allowed) {
+		t.Errorf("allowed_templates: got %v want %v", resp.GetAllowedTemplates(), allowed)
+	}
+}
+
+// A policy without an allowed-templates section allows nothing (deny by
+// default): an empty list, not an error.
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_NothingAllowed_ReturnsEmptyList(t *testing.T) {
+	ctx := context.Background()
+	pm := &mockPolicyManager{
+		allowedTemplatesFn: func(_ context.Context, _ string, _ *core.ScopeSpecification) ([]string, error) {
+			return []string{}, nil
+		},
+	}
+	h := wirePolicy(t, pm)
+
+	resp, err := h.ListAllowedAlgorithms(ctx, &messagespb.ListAllowedAlgorithmsRequest{PolicyName: "deny-all"})
+	if err != nil {
+		t.Fatalf("ListAllowedAlgorithms: %v", err)
+	}
+	if len(resp.GetAllowedTemplates()) != 0 {
+		t.Errorf("allowed_templates: expected none, got %v", resp.GetAllowedTemplates())
+	}
+	if resp.GetPolicyName() != "deny-all" {
+		t.Errorf("policy_name: got %q", resp.GetPolicyName())
+	}
+}
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_EmptyPolicyName_ReturnsInvalidArgument(t *testing.T) {
+	authorize := func(_ context.Context, _ engerr.Op, _ string) error {
+		t.Error("policy authorization must not be called for an empty name")
+		return nil
+	}
+	h := wirePolicyFactory(t, failOnEngine(t), authorize)
+
+	_, err := h.ListAllowedAlgorithms(context.Background(), &messagespb.ListAllowedAlgorithmsRequest{
+		PolicyName: "",
+		Filters:    signatureFilter(),
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", status.Code(err))
+	}
+}
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_NotAuthorized_ReturnsPermissionDenied(t *testing.T) {
+	var authorized string
+	authorize := func(ctx context.Context, op engerr.Op, name string) error {
+		authorized = name
+		return engerr.New(ctx, op, engerr.CodePolicyViolation, "caller may not read policy "+name)
+	}
+	h := wirePolicyFactory(t, failOnEngine(t), authorize)
+
+	_, err := h.ListAllowedAlgorithms(context.Background(), &messagespb.ListAllowedAlgorithmsRequest{PolicyName: "tenant-a/strict"})
+	if status.Code(err) != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", status.Code(err))
+	}
+	if authorized != "tenant-a/strict" {
+		t.Errorf("policy authorization: got name %q want tenant-a/strict", authorized)
+	}
+}
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_InvalidFilters_ReturnsInvalidArgument(t *testing.T) {
+	tests := []struct {
+		name    string
+		filters *typespb.ScopeSpecification
+	}{
+		{"no scope family set", &typespb.ScopeSpecification{}},
+		{"unrecognized scope", &typespb.ScopeSpecification{
+			ScopeSpec: &typespb.ScopeSpecification_Signature{
+				Signature: &typespb.SignatureScopeSpec{Scope: typespb.SignatureScope_SIGNATURE_SCOPE_UNSPECIFIED},
+			},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pm := &mockPolicyManager{} // AllowedTemplates panics if reached
+			h := wirePolicy(t, pm)
+
+			_, err := h.ListAllowedAlgorithms(context.Background(), &messagespb.ListAllowedAlgorithmsRequest{
+				PolicyName: "tenant-a/strict",
+				Filters:    tt.filters,
+			})
+			if status.Code(err) != codes.InvalidArgument {
+				t.Errorf("expected InvalidArgument, got %v", status.Code(err))
+			}
+		})
+	}
+}
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_EngineError_MapsToStatus(t *testing.T) {
+	tests := []struct {
+		name string
+		code engerr.Code
+		want codes.Code
+	}{
+		{"policy not found", engerr.CodePolicyNotFound, codes.NotFound},
+		{"malformed policy document", engerr.CodeInternal, codes.Internal},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pm := &mockPolicyManager{
+				allowedTemplatesFn: func(ctx context.Context, _ string, _ *core.ScopeSpecification) ([]string, error) {
+					return nil, engerr.New(ctx, "test", tt.code, tt.name)
+				},
+			}
+			h := wirePolicy(t, pm)
+
+			_, err := h.ListAllowedAlgorithms(context.Background(), &messagespb.ListAllowedAlgorithmsRequest{PolicyName: "tenant-a/strict"})
+			if status.Code(err) != tt.want {
+				t.Errorf("expected %v, got %v", tt.want, status.Code(err))
+			}
+		})
+	}
+}
+
+func TestCryptoPolicyHandler_ListAllowedAlgorithms_EngineFactoryError_MapsToStatus(t *testing.T) {
+	newPolicy := policy.EngineFactory(func(ctx context.Context) (policy.Engine, error) {
+		return nil, engerr.New(ctx, "test", engerr.CodeInternal, "policy store unavailable")
+	})
+	h := wirePolicyFactory(t, newPolicy, allowAllPolicies)
+
+	_, err := h.ListAllowedAlgorithms(context.Background(), &messagespb.ListAllowedAlgorithmsRequest{PolicyName: "tenant-a/strict"})
+	if status.Code(err) != codes.Internal {
+		t.Errorf("expected Internal, got %v", status.Code(err))
 	}
 }

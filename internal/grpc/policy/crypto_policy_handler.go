@@ -5,6 +5,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
+	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
@@ -173,4 +174,42 @@ func (h *CryptoPolicyHandler) EvaluatePolicy(ctx context.Context, req *messagesp
 // in the response, not as an RPC error.
 func (h *CryptoPolicyHandler) BatchEvaluatePolicy(ctx context.Context, req *messagespb.BatchEvaluatePolicyRequest) (*messagespb.BatchEvaluatePolicyResponse, error) {
 	return h.UnimplementedCryptoPolicyServiceServer.BatchEvaluatePolicy(ctx, req)
+}
+
+// ListAllowedAlgorithms handles the ListAllowedAlgorithms RPC — returns the
+// set of algorithm templates that are allowed by the given policy.
+func (h *CryptoPolicyHandler) ListAllowedAlgorithms(ctx context.Context, req *messagespb.ListAllowedAlgorithmsRequest) (*messagespb.ListAllowedAlgorithmsResponse, error) {
+	const op engerr.Op = cryptoPolicyHandlerOp + ".ListAllowedAlgorithms"
+
+	policyName := req.GetPolicyName()
+	if policyName == "" {
+		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeInvalidArgument, "name is required"))
+	}
+	if err := h.authorizePolicy(ctx, op, policyName); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
+
+	engine, err := h.policy(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+
+	var scopeSpec *core.ScopeSpecification
+	if req.Filters != nil {
+		scopeSpec, err = core.ScopeSpecificationFromProto(ctx, req.Filters)
+		if err != nil {
+			return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+		}
+	}
+	allowedTemplates, err := engine.AllowedTemplates(ctx, policyName, scopeSpec)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+
+	return &messagespb.ListAllowedAlgorithmsResponse{
+		PolicyName:       policyName,
+		PolicyVersion:    -1, // Not supported yet
+		AllowedTemplates: allowedTemplates,
+	}, nil
+
 }
