@@ -14,6 +14,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.31.0
 	github.com/hashicorp/vault/sdk v0.25.1
 	github.com/stretchr/testify v1.12.1
+	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
@@ -40,7 +41,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
 )
 
 require (
@@ -114,3 +114,5 @@ require (
 // vault-storage is a local-only L2 adapter module (item 4.5) -- it is never
 // published, and is expected to always be co-located with citius-server.
 replace github.com/agile-crypto/vault-storage => ./vault-storage
+
+replace github.com/agile-crypto/citius-api-go/gen/go => ./gen/go/api
