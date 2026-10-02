@@ -207,10 +207,11 @@ API_REPO_URL := git@github.ibm.com:citius/api.git
 PROTO_PACKAGES := messages,services,types
 PROTO_FOLDER := proto
 TMP_DIR_PROTO := tmp_proto
+BRANCH := dev/policy-content-listing
 
+API_MODULE := github.com/agile-crypto/citius-api-go
 proto-update-api: ## Update the API proto definitions to match the latest version of the API specification (as defined by the main branch of the API repo)
-	@bash scripts/update_api_proto.sh "$(API_REPO_URL)" "$(MODULE)" "$(PROTO_PACKAGES)" "$(PROTO_FOLDER)" "$(TMP_DIR_PROTO)"
-
+	@bash scripts/update_api_proto.sh "$(API_REPO_URL)" "$(BRANCH)" "$(API_MODULE)" "$(PROTO_PACKAGES)" "$(PROTO_FOLDER)" "$(TMP_DIR_PROTO)"
 # ---------------------------------------------------------------------------
 # Go generate
 # ---------------------------------------------------------------------------

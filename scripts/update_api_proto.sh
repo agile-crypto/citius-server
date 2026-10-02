@@ -2,8 +2,9 @@
 set -euo pipefail
 
 usage() {
-    echo "Usage: $0 <repo_url> <go_module> <proto_packages> <proto_folder> <tmp_dir>" >&2
+    echo "Usage: $0 <repo_url> <branch> <go_module> <proto_packages> <proto_folder> <tmp_dir>" >&2
     echo "  repo_url       Git URL of the API repo  (e.g. git@github.ibm.com:org/api.git)" >&2
+    echo "  branch         Git branch                (e.g. main)" >&2
     echo "  go_module      Go module name            (e.g. github.com/agile-crypto/citius-server)" >&2
     echo "  proto_packages Comma-separated packages  (e.g. messages,services,types)" >&2
     echo "  proto_folder   Folder containing proto files (e.g. proto)" >&2
@@ -11,13 +12,14 @@ usage() {
     exit 1
 }
 
-[[ $# -eq 5 ]] || usage
+[[ $# -eq 6 ]] || usage
 
 REPO_URL="$1"
-GO_MODULE="$2"
-PROTO_PACKAGES="$3"
-PROTO_FOLDER="$4"
-TMP_DIR="$5"
+BRANCH="$2"
+GO_MODULE="$3"
+PROTO_PACKAGES="$4"
+PROTO_FOLDER="$5"
+TMP_DIR="$6"
 
 # Detect python command
 if command -v python3 &>/dev/null; then
@@ -38,8 +40,7 @@ if ! mkdir "$TMP_DIR"; then
 fi
 
 # Step 1 — pull and rewrite proto/api
-
-if ! $SCRIPT --keep-state --branch main \
+if ! $SCRIPT --keep-state --branch "$BRANCH" \
         --go-module "$GO_MODULE" \
         --proto-packages "$PROTO_PACKAGES" \
         --tmp-dir "$TMP_DIR" \

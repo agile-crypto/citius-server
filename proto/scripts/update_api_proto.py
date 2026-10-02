@@ -14,7 +14,7 @@ The script performs the following steps in order:
      NB: Update the list PROTO_PACKAGES_API in this script if the structure of the fetched proto changes (e.g. new subfolders are added).
   4. Remove every existing go_package option from proto/api/**/*.proto
   5. For each direct subfolder F of proto/api:
-       a. Add  option go_package = "github.com/agile-crypto/citius-server/gen/go/api/F;api";
+       a. Add  option go_package = "github.com/agile-crypto/citius-server/gen/go/api/F;F";
           to every .proto file inside that subfolder.
        b. For every *other* subfolder S of proto/api, rewrite import paths
           inside proto/api/F/**  of the form
@@ -116,7 +116,7 @@ PROTO_SUBFOLDERS_SERVER = ['api', 'server']
 DEFAULT_PROTO_PACKAGES_API = ['messages', 'services', 'types']
 
 DEFAULT_GO_MODULE = 'github.com/agile-crypto/citius-server'
-GO_PKG_API_ROOT_RELATIVE = 'gen/go/api'
+GO_PKG_API_ROOT_RELATIVE = 'gen/go'
 DEFAULT_GO_PKG_API_ROOT = f'{DEFAULT_GO_MODULE}/{GO_PKG_API_ROOT_RELATIVE}'
 
 REMOVE_GO_PKG_SCRIPT = SCRIPT_DIR / 'remove_go_package.py'
@@ -293,7 +293,7 @@ def step_add_go_packages_and_fix_imports(proto_packages: list[str], go_package_a
             die(f'Expected subfolder not found: {pkg_dir}')
 
         # 5a — add go_package
-        go_pkg = f'{go_package_api_root}/{pkg};api'
+        go_pkg = f'{go_package_api_root}/{pkg};{pkg}'
         logger.debug(f'\n  [{pkg}] Adding go_package = "{go_pkg}" ...')
 
         cmd = [sys.executable, str(ADD_GO_PKG_SCRIPT), go_pkg, '-r', str(pkg_dir)]
