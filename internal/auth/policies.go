@@ -89,13 +89,14 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodExportKey:            keysRead,
 
 		// CryptoPolicyService — crypto-policy lifecycle.
-		MethodCreateCryptoPolicy:  policyWrite,
-		MethodReadCryptoPolicy:    policyRead,
-		MethodDeleteCryptoPolicy:  policyWrite,
-		MethodUpdateCryptoPolicy:  policyWrite,
-		MethodListCryptoPolicies:  policyRead,
-		MethodEvaluatePolicy:      policyRead,
-		MethodBatchEvaluatePolicy: policyRead,
+		MethodCreateCryptoPolicy:    policyWrite,
+		MethodReadCryptoPolicy:      policyRead,
+		MethodDeleteCryptoPolicy:    policyWrite,
+		MethodUpdateCryptoPolicy:    policyWrite,
+		MethodListCryptoPolicies:    policyRead,
+		MethodEvaluatePolicy:        policyRead,
+		MethodBatchEvaluatePolicy:   policyRead,
+		MethodListAllowedAlgorithms: policyRead,
 
 		// Encrypt operations.
 		MethodEncrypt:             cryptoEncrypt,
@@ -161,6 +162,10 @@ func policyRegistry() map[string][]PolicyFunc {
 		MethodSeedRandom:          cryptoMisc,
 		MethodGenerateMAC:         cryptoMisc,
 		MethodVerifyMAC:           cryptoMisc,
+
+		// Public-key-only cryptography (signature verification, encryption with public key, etc.) that does not require a managed key.
+		MethodVerifyWithPublicKey: cryptoMisc,
+
 		// Stubs: no handler yet (UnimplementedServer); revisit permission once implemented.
 		MethodGenerateMACInit:   cryptoMisc,
 		MethodGenerateMACUpdate: cryptoMisc,

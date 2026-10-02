@@ -85,6 +85,7 @@ func citiusOperations() []admin.Operation {
 		op(policy, "ListCryptoPolicies", permPolicyRead, "List crypto policies"),
 		op(policy, "EvaluatePolicy", permPolicyRead, "Evaluate crypto policy"),
 		op(policy, "BatchEvaluatePolicy", permPolicyRead, "Evaluate crypto policy (batch)"),
+		op(policy, "ListAllowedAlgorithms", permPolicyRead, "List allowed algorithms for a crypto policy"),
 
 		// ---- CryptoService -----------------------------------------------
 		op(crypto, "Encrypt", permCryptoEncrypt, "Encrypt (one-shot)"),
@@ -99,6 +100,7 @@ func citiusOperations() []admin.Operation {
 		op(crypto, "SeedRandom", permCryptoMisc, "Seed random"),
 		op(crypto, "GenerateMAC", permCryptoMisc, "Generate MAC"),
 		op(crypto, "VerifyMAC", permCryptoMisc, "Verify MAC"),
+		op(crypto, "VerifyWithPublicKey", permCryptoMisc, "Verify with public key (no managed key)"),
 
 		// ---- StreamingCryptoService --------------------------------------
 		op(streaming, "EncryptInit", permCryptoEncrypt, "Encrypt (multi-part init)"),

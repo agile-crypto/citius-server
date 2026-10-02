@@ -30,30 +30,32 @@ const (
 
 // CryptoPolicyService — crypto-policy lifecycle.
 const (
-	MethodCreateCryptoPolicy  = methodPrefix + "CryptoPolicyService/CreateCryptoPolicy"
-	MethodReadCryptoPolicy    = methodPrefix + "CryptoPolicyService/ReadCryptoPolicy"
-	MethodDeleteCryptoPolicy  = methodPrefix + "CryptoPolicyService/DeleteCryptoPolicy"
-	MethodUpdateCryptoPolicy  = methodPrefix + "CryptoPolicyService/UpdateCryptoPolicy"
-	MethodListCryptoPolicies  = methodPrefix + "CryptoPolicyService/ListCryptoPolicies"
-	MethodEvaluatePolicy      = methodPrefix + "CryptoPolicyService/EvaluatePolicy"
-	MethodBatchEvaluatePolicy = methodPrefix + "CryptoPolicyService/BatchEvaluatePolicy"
+	MethodCreateCryptoPolicy    = methodPrefix + "CryptoPolicyService/CreateCryptoPolicy"
+	MethodReadCryptoPolicy      = methodPrefix + "CryptoPolicyService/ReadCryptoPolicy"
+	MethodDeleteCryptoPolicy    = methodPrefix + "CryptoPolicyService/DeleteCryptoPolicy"
+	MethodUpdateCryptoPolicy    = methodPrefix + "CryptoPolicyService/UpdateCryptoPolicy"
+	MethodListCryptoPolicies    = methodPrefix + "CryptoPolicyService/ListCryptoPolicies"
+	MethodEvaluatePolicy        = methodPrefix + "CryptoPolicyService/EvaluatePolicy"
+	MethodBatchEvaluatePolicy   = methodPrefix + "CryptoPolicyService/BatchEvaluatePolicy"
+	MethodListAllowedAlgorithms = methodPrefix + "CryptoPolicyService/ListAllowedAlgorithms"
 )
 
 // CryptoService — encrypt / decrypt / sign / verify (one-shot only).
 
 const (
-	MethodEncrypt        = methodPrefix + "CryptoService/Encrypt"
-	MethodDecrypt        = methodPrefix + "CryptoService/Decrypt"
-	MethodSign           = methodPrefix + "CryptoService/Sign"
-	MethodVerify         = methodPrefix + "CryptoService/Verify"
-	MethodDigest         = methodPrefix + "CryptoService/Digest"
-	MethodXof            = methodPrefix + "CryptoService/Xof"
-	MethodDigestSign     = methodPrefix + "CryptoService/DigestSign"
-	MethodDigestVerify   = methodPrefix + "CryptoService/DigestVerify"
-	MethodGenerateRandom = methodPrefix + "CryptoService/GenerateRandom"
-	MethodSeedRandom     = methodPrefix + "CryptoService/SeedRandom"
-	MethodGenerateMAC    = methodPrefix + "CryptoService/GenerateMAC"
-	MethodVerifyMAC      = methodPrefix + "CryptoService/VerifyMAC"
+	MethodEncrypt             = methodPrefix + "CryptoService/Encrypt"
+	MethodDecrypt             = methodPrefix + "CryptoService/Decrypt"
+	MethodSign                = methodPrefix + "CryptoService/Sign"
+	MethodVerify              = methodPrefix + "CryptoService/Verify"
+	MethodDigest              = methodPrefix + "CryptoService/Digest"
+	MethodXof                 = methodPrefix + "CryptoService/Xof"
+	MethodDigestSign          = methodPrefix + "CryptoService/DigestSign"
+	MethodDigestVerify        = methodPrefix + "CryptoService/DigestVerify"
+	MethodGenerateRandom      = methodPrefix + "CryptoService/GenerateRandom"
+	MethodSeedRandom          = methodPrefix + "CryptoService/SeedRandom"
+	MethodGenerateMAC         = methodPrefix + "CryptoService/GenerateMAC"
+	MethodVerifyMAC           = methodPrefix + "CryptoService/VerifyMAC"
+	MethodVerifyWithPublicKey = methodPrefix + "CryptoService/VerifyWithPublicKey"
 )
 
 // StreamingCryptoService — streaming encrypt / decrypt / sign / verify.
