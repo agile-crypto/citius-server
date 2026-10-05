@@ -160,7 +160,28 @@ func checkFormat(ctx context.Context, op engerr.Op, format string) error {
 
 // ListCryptoPolicies handles the ListCryptoPolicies RPC.
 func (h *CryptoPolicyHandler) ListCryptoPolicies(ctx context.Context, req *messagespb.ListCryptoPoliciesRequest) (*messagespb.ListCryptoPoliciesResponse, error) {
-	return h.UnimplementedCryptoPolicyServiceServer.ListCryptoPolicies(ctx, req)
+	const op engerr.Op = cryptoPolicyHandlerOp + ".ListAllowedAlgorithms"
+
+	engine, err := h.policy(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	policies, err := engine.ListPolicies(ctx)
+	if err != nil {
+		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
+	}
+	summaries := make([]*messagespb.PolicySummary, 0, len(policies))
+	for _, p := range policies {
+		summaries = append(summaries, &messagespb.PolicySummary{
+			Name: p.Name(),
+			// TODO: complete policy summary
+		})
+	}
+
+	return &messagespb.ListCryptoPoliciesResponse{
+		Policies:      summaries,
+		NextPageToken: "", // Explicit: no pagination
+	}, nil
 }
 
 // EvaluatePolicy handles the EvaluatePolicy RPC: a dry-run of the policy rules
