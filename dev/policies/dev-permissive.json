@@ -1,0 +1,21 @@
+{
+  "version": "1",
+  "allowed_templates": [
+    "ed25519",
+    "ecdsa-p256-sha256-der",
+    "ecdsa-p384-sha384-der",
+    "rsa-pss-sha256-mgf1-32-3072",
+    "ml-dsa-65",
+    "hmac-sha256-256",
+    "aes-256-gcm-128-96",
+    "aes-256-kw",
+    "hkdf-sha256"
+  ],
+  "allowed_operations": {
+    "key_operations": [
+      "create_key", "read_key", "delete_key",
+      "sign", "verify", "encrypt", "decrypt",
+      "wrap", "unwrap", "derive_key", "rotate_key"
+    ]
+  }
+}

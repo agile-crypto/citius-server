@@ -3,5 +3,4 @@ go 1.26.0
 use (
 	.
 	./vault-storage
-	../citius-core // (temporary) local citius-core until VerifyWithPublicKey is released
 )

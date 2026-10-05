@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "allowed_operations": {
+    "key_operations": ["verify"]
+  }
+}
