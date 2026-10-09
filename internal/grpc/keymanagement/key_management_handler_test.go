@@ -141,6 +141,10 @@ func TestKeyManagementHandler_CreateKey_Success(t *testing.T) {
 				TemplateID: "ecdsa-p256-sha256-der",
 				Provider:   "software",
 				ScopeSpec:  &core.ScopeSpecification{Scope: core.ScopeSignatureStandard},
+				SecurityGuarantees: &typespb.SecurityGuarantees{
+					AdditionalProperties: map[string]string{"claim": "authenticity"},
+				},
+				ImplementationProperties: &typespb.ImplementationProperties{ImplementationLanguage: "go"},
 			}, nil
 		},
 	}
@@ -168,6 +172,12 @@ func TestKeyManagementHandler_CreateKey_Success(t *testing.T) {
 		t.Error("expected Success: true in CreateKeyResponse")
 	}
 	require.Equal(t, typespb.SignatureScope_SIGNATURE_SCOPE_STANDARD, resp.GetKeyMetadata().GetScopeSpec().GetSignature().GetScope())
+	require.Equal(t, "created version 1 with template ecdsa-p256-sha256-der on software", resp.GetMessage())
+	require.Equal(t, "authenticity", resp.GetSecurityGuarantees().GetAdditionalProperties()["claim"])
+	require.Equal(t, "go", resp.GetImplementationProperties().GetImplementationLanguage())
+	require.Equal(t, "go", resp.GetKeyMetadata().GetImplementationProperties().GetImplementationLanguage())
+	require.NotSame(t, resp.GetImplementationProperties(), resp.GetKeyMetadata().GetImplementationProperties(),
+		"the response's two copies must not alias")
 }
 
 func TestKeyManagementHandler_CreateKey_MapsProviderRequirements(t *testing.T) {
@@ -317,6 +327,7 @@ func TestKeyManagementHandler_TransformKey_Success(t *testing.T) {
 	require.Equal(t, "key_123", md.KeyId)
 	require.Equal(t, "software", md.Provider)
 	require.Equal(t, uint32(1), md.Version)
+	require.Equal(t, "transformed to version 1 with template ecdsa-p256-sha256-der on software", resp.GetMessage())
 }
 
 func TestKeyManagementHandler_TransformKey_WithErrors(t *testing.T) {

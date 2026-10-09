@@ -2,6 +2,7 @@ package keygrpc
 
 import (
 	"context"
+	"fmt"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
@@ -9,6 +10,7 @@ import (
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/service"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 // KeyManagementHandler serves services.KeyManagementService — the key lifecycle.
@@ -96,9 +98,15 @@ func (h *KeyManagementHandler) CreateKey(ctx context.Context, req *messagespb.Cr
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, createOp, err))
 	}
 
+	// The template's guarantees for the key's scope, and the creating
+	// provider's implementation (the same as the key metadata's, which the
+	// response repeats at top level for the audit trail).
 	return &messagespb.CreateKeyResponse{
-		Success:     true,
-		KeyMetadata: mdProto,
+		Success:                  true,
+		Message:                  fmt.Sprintf("created version %d with template %s on %s", md.Version, md.TemplateID, md.Provider),
+		KeyMetadata:              mdProto,
+		SecurityGuarantees:       md.SecurityGuarantees,
+		ImplementationProperties: proto.CloneOf(mdProto.GetImplementationProperties()),
 	}, nil
 }
 
@@ -199,6 +207,7 @@ func (h *KeyManagementHandler) TransformKey(ctx context.Context, req *messagespb
 
 	return &messagespb.TransformKeyResponse{
 		Success:     true,
+		Message:     fmt.Sprintf("transformed to version %d with template %s on %s", md.Version, md.TemplateID, md.Provider),
 		KeyMetadata: mdProto,
 	}, nil
 }

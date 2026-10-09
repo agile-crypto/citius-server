@@ -138,6 +138,12 @@ func TestDigestSign_DigestVerify_roundtrip(t *testing.T) {
 	if !verifyResult.Valid {
 		t.Error("expected valid=true for a correctly round-tripped digest signature")
 	}
+	if verifyResult.KeyVersion != signResult.KeyVersion || verifyResult.KeyVersion == 0 {
+		t.Errorf("KeyVersion: got %d want the version used (%d)", verifyResult.KeyVersion, signResult.KeyVersion)
+	}
+	if verifyResult.DigestHash != signResult.DigestHash {
+		t.Errorf("DigestHash: got %s want the hash checked (%s)", verifyResult.DigestHash, signResult.DigestHash)
+	}
 }
 
 func TestDigestVerify_tamperedDigest_returnsFalse(t *testing.T) {

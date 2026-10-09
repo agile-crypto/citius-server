@@ -2,6 +2,7 @@ package cryptogrpc
 
 import (
 	"context"
+	"maps"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
@@ -61,6 +62,7 @@ func (h *CryptoHandler) Encrypt(ctx context.Context, req *messagespb.EncryptRequ
 		Metadata: &messagespb.OperationMetadata{
 			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
+			UserContext:    maps.Clone(req.GetUserContext()),
 		},
 	}, nil
 }
@@ -95,7 +97,9 @@ func (h *CryptoHandler) Decrypt(ctx context.Context, req *messagespb.DecryptRequ
 	return &messagespb.DecryptResponse{
 		Plaintext: result.Plaintext,
 		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
+			UserContext:    maps.Clone(req.GetUserContext()),
 		},
 	}, nil
 }
@@ -126,13 +130,15 @@ func (h *CryptoHandler) Sign(ctx context.Context, req *messagespb.SignRequest) (
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, signOp, err))
 	}
 
-	// Wrap ProviderOutput into OperationMetadata.
+	// Wrap ProviderOutput into OperationMetadata. api_version stays empty,
+	// which OperationMetadata defines as the initial version this server
+	// implements.
 	return &messagespb.SignResponse{
 		Signature: result.Signature,
 		Metadata: &messagespb.OperationMetadata{
 			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
-			//TODO: Add user context and API version
+			UserContext:    maps.Clone(req.GetUserContext()),
 		},
 	}, nil
 }
@@ -170,7 +176,9 @@ func (h *CryptoHandler) Verify(ctx context.Context, req *messagespb.VerifyReques
 	return &messagespb.VerifyResponse{
 		Valid: result.Valid,
 		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
+			UserContext:    maps.Clone(req.GetUserContext()),
 		},
 	}, nil
 }
@@ -207,6 +215,7 @@ func (h *CryptoHandler) DigestSign(ctx context.Context, req *messagespb.DigestSi
 			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
 			DigestHash:     result.DigestHash,
+			UserContext:    maps.Clone(req.GetUserContext()),
 		},
 	}, nil
 }
@@ -245,7 +254,10 @@ func (h *CryptoHandler) DigestVerify(ctx context.Context, req *messagespb.Digest
 	return &messagespb.DigestVerifyResponse{
 		Valid: result.Valid,
 		Metadata: &messagespb.OperationMetadata{
+			KeyVersion:     result.KeyVersion,
 			ProviderOutput: result.Output,
+			DigestHash:     result.DigestHash,
+			UserContext:    maps.Clone(req.GetUserContext()),
 		},
 	}, nil
 }

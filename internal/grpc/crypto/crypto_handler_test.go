@@ -135,12 +135,14 @@ func TestCryptoHandler_Sign_Success(t *testing.T) {
 	}
 	h := wireCrypto(t, cr)
 
+	userContext := map[string]string{"request_id": "abc-123"}
 	resp, err := h.Sign(ctx, &messagespb.SignRequest{
 		KeyName: "key_123",
 		Input:   []byte("hello"),
 		ScopeParams: &messagespb.SignRequest_NoContext{
 			NoContext: &typespb.NoParams{},
 		},
+		UserContext: userContext,
 	})
 	if err != nil {
 		t.Fatalf("Sign handler: %v", err)
@@ -154,6 +156,13 @@ func TestCryptoHandler_Sign_Success(t *testing.T) {
 	if resp.GetMetadata().GetProviderOutput() == nil {
 		t.Error("Sign response: Metadata.ProviderOutput must not be nil")
 	}
+	if got := resp.GetMetadata().GetUserContext(); got["request_id"] != "abc-123" || len(got) != 1 {
+		t.Errorf("Sign response: user_context = %v, want the request's %v", got, userContext)
+	}
+	userContext["request_id"] = "changed"
+	if resp.GetMetadata().GetUserContext()["request_id"] != "abc-123" {
+		t.Error("Sign response: user_context aliases the request's map")
+	}
 }
 
 func TestCryptoHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
@@ -163,11 +172,13 @@ func TestCryptoHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 			if req.NoContext == nil {
 				t.Error("expected NoContext to be set for ECDSA verify")
 			}
-			return crypto.VerifyResult{Valid: false}, nil // invalid sig — not an error
+			return crypto.VerifyResult{Valid: false, KeyVersion: 4}, nil // invalid sig — not an error
 		},
 	}
 	h := wireCrypto(t, cr)
 
+	// No metadata: the orchestrator verifies against the current version,
+	// and the response says which one that was.
 	resp, err := h.Verify(ctx, &messagespb.VerifyRequest{
 		KeyName:   "key_123",
 		Input:     []byte("hello"),
@@ -181,6 +192,9 @@ func TestCryptoHandler_Verify_InvalidSig_ReturnsValidFalse(t *testing.T) {
 	}
 	if resp.GetValid() {
 		t.Error("Verify response: expected valid=false")
+	}
+	if got := resp.GetMetadata().GetKeyVersion(); got != 4 {
+		t.Errorf("Verify response: Metadata.KeyVersion = %d, want the version used (4)", got)
 	}
 }
 
@@ -381,6 +395,7 @@ func TestCryptoHandler_Decrypt_Success(t *testing.T) {
 			}
 			return crypto.DecryptResult{
 				Plaintext:    []byte("hello"),
+				KeyVersion:   3,
 				Algorithm:    "aes-256-gcm-128-96",
 				ProviderName: "software",
 				Output:       providerOutput,
@@ -411,6 +426,9 @@ func TestCryptoHandler_Decrypt_Success(t *testing.T) {
 	}
 	if resp.GetMetadata().GetProviderOutput() == nil {
 		t.Error("Decrypt response: Metadata.ProviderOutput must not be nil")
+	}
+	if got := resp.GetMetadata().GetKeyVersion(); got != 3 {
+		t.Errorf("Decrypt response: Metadata.KeyVersion = %d, want the version used (3)", got)
 	}
 }
 
@@ -724,7 +742,7 @@ func TestCryptoHandler_DigestVerify_Valid(t *testing.T) {
 			if req.DigestHash != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
 				t.Errorf("expected DigestHash SHA256 from metadata.digest_hash, got %s", req.DigestHash)
 			}
-			return crypto.VerifyResult{Valid: true, Output: providerOutput}, nil
+			return crypto.VerifyResult{Valid: true, KeyVersion: 2, Output: providerOutput, DigestHash: req.DigestHash}, nil
 		},
 	}
 	h := wireCrypto(t, cr)
@@ -750,6 +768,12 @@ func TestCryptoHandler_DigestVerify_Valid(t *testing.T) {
 	}
 	if resp.GetMetadata().GetProviderOutput() == nil {
 		t.Error("DigestVerify response: Metadata.ProviderOutput must not be nil")
+	}
+	if got := resp.GetMetadata().GetKeyVersion(); got != 2 {
+		t.Errorf("DigestVerify response: Metadata.KeyVersion = %d, want the version used (2)", got)
+	}
+	if got := resp.GetMetadata().GetDigestHash(); got != typespb.HashAlgorithm_HASH_ALGORITHM_SHA256 {
+		t.Errorf("DigestVerify response: Metadata.DigestHash = %s, want the hash checked (SHA256)", got)
 	}
 }
 

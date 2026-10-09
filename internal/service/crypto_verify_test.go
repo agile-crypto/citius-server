@@ -105,6 +105,9 @@ func TestVerify_MLDSA_validSignature_returnsTrue(t *testing.T) {
 	if verifyResult.ProviderName == "" {
 		t.Error("ProviderName must be populated in VerifyResult")
 	}
+	if verifyResult.KeyVersion != signResult.KeyVersion {
+		t.Errorf("KeyVersion: got %d want the version requested (%d)", verifyResult.KeyVersion, signResult.KeyVersion)
+	}
 }
 
 func TestVerify_MLDSA_validSignature_noKeyVersion_returnsTrue(t *testing.T) {
@@ -141,6 +144,10 @@ func TestVerify_MLDSA_validSignature_noKeyVersion_returnsTrue(t *testing.T) {
 	}
 	if verifyResult.ProviderName == "" {
 		t.Error("ProviderName must be populated in VerifyResult")
+	}
+	// No version requested: the current one is used, and reported.
+	if verifyResult.KeyVersion != signResult.KeyVersion || verifyResult.KeyVersion == 0 {
+		t.Errorf("KeyVersion: got %d want the current version (%d)", verifyResult.KeyVersion, signResult.KeyVersion)
 	}
 }
 

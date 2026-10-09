@@ -146,6 +146,9 @@ func TestEncryptDecrypt_AESGCM_roundTrip(t *testing.T) {
 	if decResult.Algorithm != "aes-256-gcm-128-96" {
 		t.Errorf("Algorithm = %q, want %q", decResult.Algorithm, "aes-256-gcm-128-96")
 	}
+	if decResult.KeyVersion != encResult.KeyVersion || decResult.KeyVersion == 0 {
+		t.Errorf("KeyVersion = %d, want the version used (%d)", decResult.KeyVersion, encResult.KeyVersion)
+	}
 }
 
 func TestEncryptDecrypt_AESGCM_withAAD_roundTrip(t *testing.T) {
