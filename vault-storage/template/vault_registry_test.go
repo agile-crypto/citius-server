@@ -253,7 +253,7 @@ func TestVaultRegistry_Select_requireQuantumSafe(t *testing.T) {
 	got, err := r.Select(ctx, &core.ScopeSpecification{
 		Scope: core.ScopeSignatureStandard,
 		SecurityProps: &core.SecurityProperties{
-			QuantumSafe: true,
+			QuantumSafe: boolPtr(true),
 		},
 	}, coretemplate.AllTemplates())
 	if err != nil {
@@ -270,7 +270,7 @@ func TestVaultRegistry_Select_requireFIPSApproved(t *testing.T) {
 	got, err := r.Select(ctx, &core.ScopeSpecification{
 		Scope: core.ScopeSignatureStandard,
 		SecurityProps: &core.SecurityProperties{
-			FipsApproved: true,
+			FipsApproved: boolPtr(true),
 		},
 	}, coretemplate.AllTemplates())
 	if err != nil {
@@ -313,8 +313,8 @@ func TestVaultRegistry_Select_securityFilter_noMatch(t *testing.T) {
 	_, err := r.Select(ctx, &core.ScopeSpecification{
 		Scope: core.ScopeSignatureStandard,
 		SecurityProps: &core.SecurityProperties{
-			QuantumSafe:  true,
-			FipsApproved: true,
+			QuantumSafe:  boolPtr(true),
+			FipsApproved: boolPtr(true),
 		},
 	}, coretemplate.AllTemplates())
 	if err == nil {

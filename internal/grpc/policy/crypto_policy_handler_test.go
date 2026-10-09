@@ -8,8 +8,11 @@ package policygrpc_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	storepb "github.com/agile-crypto/citius-core/store"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	core "github.com/agile-crypto/citius-core"
@@ -26,7 +29,7 @@ import (
 type mockPolicyManager struct {
 	createFn func(ctx context.Context, p *policy.Policy) (*policy.Policy, error)
 	getFn    func(ctx context.Context, name string) (*policy.Policy, error)
-	updateFn func(ctx context.Context, p *policy.Policy) error
+	updateFn func(ctx context.Context, p *policy.Policy, expectedVersion int64) (*policy.Policy, error)
 }
 
 func (m *mockPolicyManager) CreatePolicy(ctx context.Context, p *policy.Policy) (*policy.Policy, error) {
@@ -41,9 +44,9 @@ func (m *mockPolicyManager) GetPolicy(ctx context.Context, name string) (*policy
 	}
 	panic("mockPolicyManager.GetPolicy: not implemented")
 }
-func (m *mockPolicyManager) UpdatePolicy(ctx context.Context, p *policy.Policy) error {
+func (m *mockPolicyManager) UpdatePolicy(ctx context.Context, p *policy.Policy, expectedVersion int64) (*policy.Policy, error) {
 	if m.updateFn != nil {
-		return m.updateFn(ctx, p)
+		return m.updateFn(ctx, p, expectedVersion)
 	}
 	panic("mockPolicyManager.UpdatePolicy: not implemented")
 }
@@ -96,6 +99,7 @@ func TestCryptoPolicyHandler_CreateCryptoPolicy_Success(t *testing.T) {
 				PublicId:  p.PublicID(),
 				Name:      p.Name(),
 				RulesJson: p.RulesJSON(),
+				Version:   "1",
 			}), nil
 		},
 	}
@@ -110,6 +114,28 @@ func TestCryptoPolicyHandler_CreateCryptoPolicy_Success(t *testing.T) {
 	}
 	if !resp.GetSuccess() {
 		t.Error("expected Success: true")
+	}
+	if resp.GetVersion() != 1 {
+		t.Errorf("version = %d, want 1", resp.GetVersion())
+	}
+}
+
+func TestCryptoPolicyHandler_UnsupportedFormat_ReturnsInvalidArgument(t *testing.T) {
+	ctx := context.Background()
+	// No engine call is expected: the format is rejected first.
+	h := wirePolicy(t, &mockPolicyManager{})
+
+	_, err := h.CreateCryptoPolicy(ctx, &messagespb.CreateCryptoPolicyRequest{
+		Name: "p", PolicyDocument: `{}`, Format: "rego",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("create: expected InvalidArgument, got %v", status.Code(err))
+	}
+	_, err = h.UpdateCryptoPolicy(ctx, &messagespb.UpdateCryptoPolicyRequest{
+		Name: "p", PolicyDocument: `{}`, Format: "cedar",
+	})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("update: expected InvalidArgument, got %v", status.Code(err))
 	}
 }
 
@@ -151,12 +177,17 @@ func TestCryptoPolicyHandler_CreateCryptoPolicy_EmptyName_ReturnsInvalidArgument
 
 func TestCryptoPolicyHandler_ReadCryptoPolicy_Success(t *testing.T) {
 	ctx := context.Background()
+	created := timestamppb.New(time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC))
+	updated := timestamppb.New(time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC))
 	pm := &mockPolicyManager{
 		getFn: func(_ context.Context, name string) (*policy.Policy, error) {
 			return policy.New(&storepb.StoredPolicy{
-				PublicId:  name,
-				Name:      name,
-				RulesJson: []byte(`{"version":1}`),
+				PublicId:   name,
+				Name:       name,
+				RulesJson:  []byte(`{"version":1}`),
+				Version:    "3",
+				CreateTime: created,
+				UpdateTime: updated,
 			}), nil
 		},
 	}
@@ -171,6 +202,12 @@ func TestCryptoPolicyHandler_ReadCryptoPolicy_Success(t *testing.T) {
 	}
 	if resp.GetPolicyDocument() != `{"version":1}` {
 		t.Errorf("policy_document: got %q", resp.GetPolicyDocument())
+	}
+	if resp.GetFormat() != "json" || resp.GetVersion() != 3 {
+		t.Errorf("format/version = %q/%d, want json/3", resp.GetFormat(), resp.GetVersion())
+	}
+	if !proto.Equal(resp.GetCreatedAt(), created) || !proto.Equal(resp.GetUpdatedAt(), updated) {
+		t.Errorf("times = %v/%v, want %v/%v", resp.GetCreatedAt(), resp.GetUpdatedAt(), created, updated)
 	}
 }
 
@@ -206,21 +243,25 @@ func TestCryptoPolicyHandler_ReadCryptoPolicy_EmptyName_ReturnsInvalidArgument(t
 func TestCryptoPolicyHandler_UpdateCryptoPolicy_Success(t *testing.T) {
 	ctx := context.Background()
 	pm := &mockPolicyManager{
-		updateFn: func(_ context.Context, p *policy.Policy) error {
+		updateFn: func(_ context.Context, p *policy.Policy, expectedVersion int64) (*policy.Policy, error) {
 			if p.Name() != "tenant-a/strict" {
 				t.Errorf("name: got %q want tenant-a/strict", p.Name())
 			}
 			if string(p.RulesJSON()) != `{"version":2}` {
 				t.Errorf("rules_json: got %q", string(p.RulesJSON()))
 			}
-			return nil
+			if expectedVersion != 4 {
+				t.Errorf("expected_version passed as %d, want 4", expectedVersion)
+			}
+			return policy.New(&storepb.StoredPolicy{Name: p.Name(), Version: "5"}), nil
 		},
 	}
 	h := wirePolicy(t, pm)
 
 	resp, err := h.UpdateCryptoPolicy(ctx, &messagespb.UpdateCryptoPolicyRequest{
-		Name:           "tenant-a/strict",
-		PolicyDocument: `{"version":2}`,
+		Name:            "tenant-a/strict",
+		PolicyDocument:  `{"version":2}`,
+		ExpectedVersion: 4,
 	})
 	if err != nil {
 		t.Fatalf("UpdateCryptoPolicy: %v", err)
@@ -228,13 +269,33 @@ func TestCryptoPolicyHandler_UpdateCryptoPolicy_Success(t *testing.T) {
 	if !resp.GetSuccess() {
 		t.Error("expected Success: true")
 	}
+	if resp.GetVersion() != 5 {
+		t.Errorf("version = %d, want 5", resp.GetVersion())
+	}
+}
+
+func TestCryptoPolicyHandler_UpdateCryptoPolicy_VersionConflict_ReturnsFailedPrecondition(t *testing.T) {
+	ctx := context.Background()
+	pm := &mockPolicyManager{
+		updateFn: func(ctx context.Context, _ *policy.Policy, _ int64) (*policy.Policy, error) {
+			return nil, engerr.New(ctx, "test", engerr.CodeFailedPrecondition, "policy version conflict")
+		},
+	}
+	h := wirePolicy(t, pm)
+
+	_, err := h.UpdateCryptoPolicy(ctx, &messagespb.UpdateCryptoPolicyRequest{
+		Name: "p", PolicyDocument: `{}`, ExpectedVersion: 1,
+	})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Errorf("expected FailedPrecondition, got %v", status.Code(err))
+	}
 }
 
 func TestCryptoPolicyHandler_UpdateCryptoPolicy_NotFound_ReturnsNotFound(t *testing.T) {
 	ctx := context.Background()
 	pm := &mockPolicyManager{
-		updateFn: func(ctx context.Context, _ *policy.Policy) error {
-			return engerr.New(ctx, "test", engerr.CodePolicyNotFound, "not found")
+		updateFn: func(ctx context.Context, _ *policy.Policy, _ int64) (*policy.Policy, error) {
+			return nil, engerr.New(ctx, "test", engerr.CodePolicyNotFound, "not found")
 		},
 	}
 	h := wirePolicy(t, pm)

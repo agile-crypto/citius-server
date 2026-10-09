@@ -44,6 +44,9 @@ func (h *CryptoPolicyHandler) CreateCryptoPolicy(ctx context.Context, req *messa
 	if err := h.authorizePolicy(ctx, createOp, name); err != nil {
 		return nil, grpcstatus.ToStatusError(err)
 	}
+	if err := checkFormat(ctx, createOp, req.GetFormat()); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
 
 	engine, err := h.policy(ctx)
 	if err != nil {
@@ -51,13 +54,15 @@ func (h *CryptoPolicyHandler) CreateCryptoPolicy(ctx context.Context, req *messa
 	}
 
 	p := policy.NewPolicy(name, name, []byte(req.GetPolicyDocument()))
-	if _, err := engine.CreatePolicy(ctx, p); err != nil {
+	created, err := engine.CreatePolicy(ctx, p)
+	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, createOp, err))
 	}
 
 	return &messagespb.CreateCryptoPolicyResponse{
 		Success: true,
 		Message: "policy created",
+		Version: created.Version(),
 	}, nil
 }
 
@@ -86,6 +91,10 @@ func (h *CryptoPolicyHandler) ReadCryptoPolicy(ctx context.Context, req *message
 	return &messagespb.ReadCryptoPolicyResponse{
 		Name:           p.Name(),
 		PolicyDocument: string(p.RulesJSON()),
+		Format:         policyFormatJSON,
+		Version:        p.Version(),
+		CreatedAt:      p.CreateTime(),
+		UpdatedAt:      p.UpdateTime(),
 	}, nil
 }
 
@@ -96,6 +105,12 @@ func (h *CryptoPolicyHandler) DeleteCryptoPolicy(ctx context.Context, req *messa
 
 // UpdateCryptoPolicy handles the UpdateCryptoPolicy RPC. The document is
 // replaced wholesale — there are no merge semantics.
+//
+// expected_version is checked by the engine, not atomically with the write:
+// the stored version is read and the new policy written in two store calls,
+// so two concurrent updates with the same expected_version can both succeed
+// and the later one wins (see policy.Manager.UpdatePolicy). A stale
+// expected_version is still refused.
 func (h *CryptoPolicyHandler) UpdateCryptoPolicy(ctx context.Context, req *messagespb.UpdateCryptoPolicyRequest) (*messagespb.UpdateCryptoPolicyResponse, error) {
 	const updateOp engerr.Op = cryptoPolicyHandlerOp + ".UpdateCryptoPolicy"
 
@@ -106,6 +121,9 @@ func (h *CryptoPolicyHandler) UpdateCryptoPolicy(ctx context.Context, req *messa
 	if err := h.authorizePolicy(ctx, updateOp, name); err != nil {
 		return nil, grpcstatus.ToStatusError(err)
 	}
+	if err := checkFormat(ctx, updateOp, req.GetFormat()); err != nil {
+		return nil, grpcstatus.ToStatusError(err)
+	}
 
 	engine, err := h.policy(ctx)
 	if err != nil {
@@ -113,14 +131,30 @@ func (h *CryptoPolicyHandler) UpdateCryptoPolicy(ctx context.Context, req *messa
 	}
 
 	p := policy.NewPolicy(name, name, []byte(req.GetPolicyDocument()))
-	if err := engine.UpdatePolicy(ctx, p); err != nil {
+	updated, err := engine.UpdatePolicy(ctx, p, req.GetExpectedVersion())
+	if err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, updateOp, err))
 	}
 
 	return &messagespb.UpdateCryptoPolicyResponse{
 		Success: true,
 		Message: "policy updated",
+		Version: updated.Version(),
 	}, nil
+}
+
+// policyFormatJSON is the only policy document format the server reads: the
+// rules evaluator parses JSON.
+const policyFormatJSON = "json"
+
+// checkFormat rejects a policy document format the server cannot read. An
+// empty format means the server default, JSON.
+func checkFormat(ctx context.Context, op engerr.Op, format string) error {
+	if format == "" || format == policyFormatJSON {
+		return nil
+	}
+	return engerr.New(ctx, op, engerr.CodeInvalidArgument,
+		"unsupported policy format %q: only %q is supported", format, policyFormatJSON)
 }
 
 // ListCryptoPolicies handles the ListCryptoPolicies RPC.

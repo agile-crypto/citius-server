@@ -12,8 +12,8 @@ github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERo
 github.com/Microsoft/go-winio v0.6.2/go.mod h1:yd8OoFMLzJbo9gZq8j5qaps8bJ9aShtEA8Ipt1oGCvU=
 github.com/agile-crypto/citius-api-go v0.3.0 h1:CULscB+OHvujFpfulIsZdmdksjXz3Gt0w/4UEnsV6UU=
 github.com/agile-crypto/citius-api-go v0.3.0/go.mod h1:RE03ghdD1IlBzzfarppY/CnPENlQpCqzpXBUYolU8iE=
-github.com/agile-crypto/citius-core v0.4.1 h1:AL7HdGnxmxiiCq1jrjpYGMSc9YqtkjZEI0jBbYfC6tA=
-github.com/agile-crypto/citius-core v0.4.1/go.mod h1:k5fzuOD7O6Kvy0n6xCviUf2diL/sw0cOL7oszMmIPf4=
+github.com/agile-crypto/citius-core v0.4.2 h1:RWg+7KimWiH9A6UxRStpnpIGwJT41AWNJPpJ09rrqfU=
+github.com/agile-crypto/citius-core v0.4.2/go.mod h1:k5fzuOD7O6Kvy0n6xCviUf2diL/sw0cOL7oszMmIPf4=
 github.com/agile-crypto/citius-provider-go v0.1.0 h1:z5xZehYBorjO9aAOtkro/EYOjUBQPc/9AFtspnuumsU=
 github.com/agile-crypto/citius-provider-go v0.1.0/go.mod h1:lyDi9EYaKn9NiOcTFOCbw1vpjZ5UUDB+pWJtfLPe7Hk=
 github.com/agile-crypto/ossl-go v0.1.0 h1:rRTlCg2Pce6SnFTH5TUMpPddX5Iw8YJW8Mmil+KSHaM=

@@ -21,6 +21,7 @@ import (
 	"github.com/agile-crypto/vault-storage/template"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/proto"
 )
 
 // ============================================================================
@@ -149,7 +150,7 @@ func TestKeyOrchestrator_TransformKey(t *testing.T) {
 				ScopeSpecification: &core.ScopeSpecification{
 					Scope: core.ScopeSignatureStandard,
 					SecurityProps: &core.SecurityProperties{
-						QuantumSafe: true,
+						QuantumSafe: proto.Bool(true),
 					},
 				},
 			},
