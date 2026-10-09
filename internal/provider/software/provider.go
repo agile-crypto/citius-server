@@ -5,6 +5,7 @@ package software
 import (
 	"context"
 	"fmt"
+	"runtime"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/errors"
@@ -465,13 +466,29 @@ func (p *Provider) ImplementationProperties() *types.ImplementationProperties {
 	}
 }
 
+// ProviderInfo describes the software provider. It has one instance, so the
+// provider-wide implementation is that instance's. The version is the Go
+// toolchain the binary was built with, whose standard library is the
+// implementation (circl's version is not reported).
+func (p *Provider) ProviderInfo() *providerpb.ProviderInfo {
+	return &providerpb.ProviderInfo{
+		Name:                  "Go cryptography (standard library and circl)",
+		Version:               runtime.Version(),
+		Type:                  p.Type(),
+		Description:           "In-process software provider: Go's crypto packages, with circl for ML-DSA.",
+		ProviderType:          types.ProviderType_PROVIDER_TYPE_SOFTWARE,
+		DefaultImplementation: p.ImplementationProperties(),
+	}
+}
+
 // Compile-time assertion: Provider implements provider.Backend, Signer, and
 // Cipher. The software provider does not (yet) implement Macer, Hasher,
 // Randomizer, or KeyEstablisher.
 var (
-	_ provider.Backend = (*Provider)(nil)
-	_ provider.Signer  = (*Provider)(nil)
-	_ provider.Cipher  = (*Provider)(nil)
+	_ provider.Backend   = (*Provider)(nil)
+	_ provider.Signer    = (*Provider)(nil)
+	_ provider.Cipher    = (*Provider)(nil)
+	_ provider.Describer = (*Provider)(nil)
 )
 
 // Compile-time assertion: Provider implements AlgorithmCapabilityProvider.

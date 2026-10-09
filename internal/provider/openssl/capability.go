@@ -8,6 +8,7 @@ import (
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/errors"
+	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -156,6 +157,21 @@ func (p *Provider) VerifyCapabilities(ctx context.Context) error {
 // number, module name, or validation date is fabricated.
 func (p *Provider) ImplementationProperties() *types.ImplementationProperties {
 	return implementationProperties(p.FIPSEnabled())
+}
+
+// ProviderInfo describes the OpenSSL provider, the same for every mode
+// instance. Its default implementation is what holds for all of them, the
+// properties of a non-FIPS instance; a FIPS instance adds its FIPS 140
+// status through ImplementationProperties.
+func (p *Provider) ProviderInfo() *providerpb.ProviderInfo {
+	return &providerpb.ProviderInfo{
+		Name:                  "OpenSSL libcrypto",
+		Version:               ossl.Version(),
+		Type:                  p.Type(),
+		Description:           "In-process software provider: OpenSSL 3 libcrypto through ossl-go, one instance per library context (default, FIPS).",
+		ProviderType:          types.ProviderType_PROVIDER_TYPE_SOFTWARE,
+		DefaultImplementation: implementationProperties(false),
+	}
 }
 
 // implementationProperties is ImplementationProperties for an instance

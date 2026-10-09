@@ -64,6 +64,22 @@ func TestGetProvider(t *testing.T) {
 		"ml-dsa-65":   "instances: openssl",
 	}, support)
 
+	info := resp.GetProvider()
+	want := opensslInfo()
+	require.Equal(t, want.GetName(), info.GetDisplayName())
+	require.Equal(t, want.GetDescription(), info.GetDescription())
+	require.Equal(t, typespb.ProviderType_PROVIDER_TYPE_SOFTWARE, info.GetProviderType())
+	require.True(t, proto.Equal(want.GetDefaultImplementation(), info.GetDefaultImplementation()),
+		"default implementation = %v", info.GetDefaultImplementation())
+
+	// A provider whose instances describe nothing is reported by id alone.
+	resp, err = h.GetProvider(ctx, &servicespb.GetProviderRequest{ProviderId: "software"})
+	require.NoError(t, err)
+	require.Equal(t, "software", resp.GetProvider().GetDisplayName())
+	require.Empty(t, resp.GetProvider().GetDescription())
+	require.Equal(t, typespb.ProviderType_PROVIDER_TYPE_UNSPECIFIED, resp.GetProvider().GetProviderType())
+	require.Nil(t, resp.GetProvider().GetDefaultImplementation())
+
 	_, err = h.GetProvider(ctx, &servicespb.GetProviderRequest{ProviderId: "openssl-fips"})
 	require.Equal(t, codes.NotFound, status.Code(err), "an instance is not a provider")
 	_, err = h.GetProvider(ctx, &servicespb.GetProviderRequest{})

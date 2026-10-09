@@ -19,6 +19,7 @@ import (
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 // Compile-time assertion: Provider implements provider.Backend.
@@ -75,6 +76,25 @@ func TestProvider_ImplementationProperties(t *testing.T) {
 	}
 	if props.GetFips_140() != nil {
 		t.Errorf("Fips_140: got %v, want nil — software provider has no FIPS certification to report", props.GetFips_140())
+	}
+}
+
+func TestProvider_ProviderInfo(t *testing.T) {
+	p := software.New()
+	info := provider.InfoOf(p)
+
+	if info.GetType() != p.Type() || info.GetName() == "" || info.GetDescription() == "" {
+		t.Errorf("identity: type %q name %q description %q", info.GetType(), info.GetName(), info.GetDescription())
+	}
+	if info.GetVersion() != runtime.Version() {
+		t.Errorf("Version: got %q want %q", info.GetVersion(), runtime.Version())
+	}
+	if info.GetProviderType() != api.ProviderType_PROVIDER_TYPE_SOFTWARE {
+		t.Errorf("ProviderType: got %v want SOFTWARE", info.GetProviderType())
+	}
+	if !proto.Equal(info.GetDefaultImplementation(), p.ImplementationProperties()) {
+		t.Errorf("DefaultImplementation %v differs from the only instance's %v",
+			info.GetDefaultImplementation(), p.ImplementationProperties())
 	}
 }
 

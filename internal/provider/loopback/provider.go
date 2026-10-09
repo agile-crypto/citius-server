@@ -13,6 +13,7 @@ import (
 	"bytes"
 	"context"
 
+	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/provider"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 )
@@ -101,10 +102,23 @@ func (p *Provider) Decrypt(_ context.Context, req *providerpb.DecryptRequest) (*
 	}, nil
 }
 
+// ProviderInfo describes the loopback provider. It has no version of its own
+// and no default implementation: it performs no cryptography, so it can
+// substantiate no implementation property.
+func (p *Provider) ProviderInfo() *providerpb.ProviderInfo {
+	return &providerpb.ProviderInfo{
+		Name:         "Loopback (testing only)",
+		Type:         p.Type(),
+		Description:  "Deterministic in-process test provider. It performs no real cryptography; never use it in production.",
+		ProviderType: types.ProviderType_PROVIDER_TYPE_SOFTWARE,
+	}
+}
+
 // Compile-time assertions.
 var (
 	_ provider.Backend                     = (*Provider)(nil)
 	_ provider.Signer                      = (*Provider)(nil)
 	_ provider.Cipher                      = (*Provider)(nil)
 	_ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
+	_ provider.Describer                   = (*Provider)(nil)
 )

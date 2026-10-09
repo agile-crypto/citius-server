@@ -579,3 +579,6 @@ var _ provider.AlgorithmCapabilityProvider = (*Provider)(nil)
 
 // Compile-time assertion: Provider implements ImplementationDescriber.
 var _ provider.ImplementationDescriber = (*Provider)(nil)
+
+// Compile-time assertion: Provider implements Describer.
+var _ provider.Describer = (*Provider)(nil)

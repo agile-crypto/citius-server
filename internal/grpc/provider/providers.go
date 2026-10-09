@@ -10,6 +10,7 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/provider"
+	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 
 	"github.com/agile-crypto/citius-server/internal/grpc/paging"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
@@ -92,6 +93,17 @@ func instancesByType(backends []provider.Backend) map[string][]provider.Backend 
 	return out
 }
 
+// describedBy returns a copy of the first description an instance gives of
+// its provider, or nil if none gives one.
+func describedBy(instances []provider.Backend) *providerpb.ProviderInfo {
+	for _, b := range instances {
+		if d := provider.InfoOf(b); d != nil {
+			return d
+		}
+	}
+	return nil
+}
+
 // providerInfo describes provider id from its instances.
 func providerInfo(id string, instances []provider.Backend) *typespb.ProviderInfo {
 	servedBy := map[string][]string{}
@@ -116,6 +128,18 @@ func providerInfo(id string, instances []provider.Backend) *typespb.ProviderInfo
 		ProviderId:      id,
 		DisplayName:     id,
 		TemplateSupport: make([]*typespb.ProviderTemplateSupport, 0, len(templates)),
+	}
+	// Every instance describes its provider alike (provider.Describer), so
+	// the first that does speaks for all. Template support carries no
+	// implementation override: no backend's implementation varies by
+	// template, so each template inherits default_implementation.
+	if d := describedBy(instances); d != nil {
+		if d.GetName() != "" {
+			info.DisplayName = d.GetName()
+		}
+		info.Description = d.GetDescription()
+		info.ProviderType = d.GetProviderType()
+		info.DefaultImplementation = d.GetDefaultImplementation()
 	}
 	for _, t := range templates {
 		info.TemplateSupport = append(info.TemplateSupport, &typespb.ProviderTemplateSupport{

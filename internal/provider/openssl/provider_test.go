@@ -2,6 +2,7 @@ package openssl_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
@@ -9,6 +10,7 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
+	"google.golang.org/protobuf/proto"
 )
 
 // Compile-time assertion: Provider implements provider.Backend.
@@ -259,6 +261,32 @@ func TestProvider_ImplementationProperties_defaultMode(t *testing.T) {
 	}
 	if props.GetFips_140() != nil {
 		t.Errorf("Fips_140: got %v, want nil for a default-mode (non-FIPS) instance", props.GetFips_140())
+	}
+}
+
+// TestProvider_ProviderInfo checks the description every mode instance gives
+// of the openssl provider: its default implementation is what a default-mode
+// instance reports, which carries no FIPS status.
+func TestProvider_ProviderInfo(t *testing.T) {
+	p, err := openssl.New(context.Background())
+	if err != nil {
+		t.Fatalf("openssl.New: %v", err)
+	}
+	defer p.Close()
+
+	info := provider.InfoOf(p)
+	if info.GetType() != "openssl" || info.GetName() == "" || info.GetDescription() == "" {
+		t.Errorf("identity: type %q name %q description %q", info.GetType(), info.GetName(), info.GetDescription())
+	}
+	if !strings.HasPrefix(info.GetVersion(), "3.") {
+		t.Errorf("Version: got %q, want libcrypto's 3.x version", info.GetVersion())
+	}
+	if info.GetProviderType() != types.ProviderType_PROVIDER_TYPE_SOFTWARE {
+		t.Errorf("ProviderType: got %v want SOFTWARE", info.GetProviderType())
+	}
+	if !proto.Equal(info.GetDefaultImplementation(), p.ImplementationProperties()) {
+		t.Errorf("DefaultImplementation %v differs from a default-mode instance's %v",
+			info.GetDefaultImplementation(), p.ImplementationProperties())
 	}
 }
 

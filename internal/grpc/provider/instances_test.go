@@ -23,10 +23,12 @@ type fakeBackend struct {
 	name, typ string
 	templates []string
 	impl      *typespb.ImplementationProperties
+	info      *providerpb.ProviderInfo // nil: describes no provider
 }
 
-func (b *fakeBackend) Name() string { return b.name }
-func (b *fakeBackend) Type() string { return b.typ }
+func (b *fakeBackend) Name() string                           { return b.name }
+func (b *fakeBackend) Type() string                           { return b.typ }
+func (b *fakeBackend) ProviderInfo() *providerpb.ProviderInfo { return b.info }
 func (b *fakeBackend) GenerateKey(context.Context, *providerpb.GenerateKeyRequest) (*providerpb.GenerateKeyResponse, error) {
 	panic("not used")
 }
@@ -45,20 +47,21 @@ func fips(level typespb.Fips140Level) *typespb.ImplementationProperties {
 	return &typespb.ImplementationProperties{Fips_140: &typespb.Fips140Certification{Certified: true, Level: level}}
 }
 
-// newProviders registers, out of name order: software (no properties),
-// openssl-fips (FIPS 140 level 1, hardware accelerated) and openssl.
+// newProviders registers, out of name order: software (no properties, no
+// description), openssl-fips (FIPS 140 level 1, hardware accelerated) and
+// openssl, both describing the openssl provider as opensslInfo.
 func newProviders(t *testing.T) (*providergrpc.ProviderHandler, provider.Registry) {
 	t.Helper()
 	ctx := context.Background()
 	reg := provider.NewRegistry()
 	for _, b := range []*fakeBackend{
 		{name: "software", typ: "software", templates: []string{"aes-256-gcm", "ml-dsa-65"}},
-		{name: "openssl-fips", typ: "openssl", templates: []string{"aes-256-gcm"}, impl: func() *typespb.ImplementationProperties {
+		{name: "openssl-fips", typ: "openssl", templates: []string{"aes-256-gcm"}, info: opensslInfo(), impl: func() *typespb.ImplementationProperties {
 			p := fips(typespb.Fips140Level_FIPS_140_LEVEL_1)
 			p.HardwareAccelerated = proto.Bool(true)
 			return p
 		}()},
-		{name: "openssl", typ: "openssl", templates: []string{"aes-256-gcm", "ml-dsa-65"}, impl: &typespb.ImplementationProperties{HardwareAccelerated: proto.Bool(true)}},
+		{name: "openssl", typ: "openssl", templates: []string{"aes-256-gcm", "ml-dsa-65"}, info: opensslInfo(), impl: &typespb.ImplementationProperties{HardwareAccelerated: proto.Bool(true)}},
 	} {
 		require.NoError(t, reg.Register(ctx, b))
 	}
@@ -67,6 +70,16 @@ func newProviders(t *testing.T) (*providergrpc.ProviderHandler, provider.Registr
 		func(context.Context) (provider.InstanceManager, error) { return nil, nil })
 	require.NoError(t, err)
 	return h, reg
+}
+
+func opensslInfo() *providerpb.ProviderInfo {
+	return &providerpb.ProviderInfo{
+		Name:                  "OpenSSL libcrypto",
+		Type:                  "openssl",
+		Description:           "OpenSSL in process",
+		ProviderType:          typespb.ProviderType_PROVIDER_TYPE_SOFTWARE,
+		DefaultImplementation: &typespb.ImplementationProperties{HardwareAccelerated: proto.Bool(true)},
+	}
 }
 
 func instanceIDs(in []*typespb.ProviderInstance) []string {
