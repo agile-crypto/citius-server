@@ -293,6 +293,7 @@ non-secret JSON outputs.
 | `docker-compose.mode-local-tls.yml` | Dev overlay — mkcert cert mounted into Traefik. |
 | `docker-compose.mode-letsencrypt.yml` | Prod overlay — ACME via Let's Encrypt. |
 | `docker-compose.citius.yml` | Optional overlay — runs the containerized `citius-server` in the same stack (`CITIUS_SERVER=1`). |
+| `docker-compose.podman.yml` | Podman-only overlay, applied automatically when `ENGINE=podman` — disables SELinux labelling on the `proxy` so Traefik can read the engine socket. |
 | `.env.example` | Template; copy to `.env`. |
 | `.env` | **gitignored** — runtime config + generated secrets. |
 | `bootstrap.sh` | Lifecycle orchestrator (`up` / `down` / `reset` / `nuke` / `certs` / `verify` / `login` / `env`). |
@@ -311,19 +312,21 @@ non-secret JSON outputs.
 ## Configurations
 
 `bootstrap.sh` supports both Docker and Podman as the container engine
-(`ENGINE=docker` (default) or `ENGINE=podman`). No engine-specific compose
-overlay is needed — the same vendored `docker-compose.yml` works unmodified
-on both.
+(`ENGINE=docker` (default) or `ENGINE=podman`). The vendored compose files
+are the same for both; with `ENGINE=podman`, `bootstrap.sh` also applies
+`docker-compose.podman.yml`, which sets `security_opt: [label=disable]` on
+the `proxy` service so it works with SELinux enforcing (see below).
 
 **Troubleshooting**:
 
-On macOS, it has been observed that `./bootstrap.sh up` only works when **SELinux is disabled**.
-- Run `podman machine ssh -- setenforce 0` before a Zitadel command
-- Reset SELinux with `podman machine ssh -- setenforce 1`
+If `setup-auth` fails with `rpc error: code = Unimplemented ... 404 (Not Found)
+... content-type "text/plain"`, Traefik has no routes (see *Traefik error 404*
+below). The root cause is SELinux, being enabled by default with Podman. Under Podman, check that `ENGINE=podman` is set; otherwise the Podman
+overlay is not applied.
 
 ### Dev notes and findings
 
-**Traefix error 404**
+**Traefik error 404**
 
 Traefik (the `proxy` service) discovers `zitadel-api` / `zitadel-login` and
 builds routers for `${ZITADEL_DOMAIN}` via its `--providers.docker=true`
@@ -346,16 +349,25 @@ host OS:
 Note that the symlink `/var/run/docker.sock` → `/run/podman/podman.sock` with podman on macOS is present when Docker compatibility is enabled (POdman Desktop > Settings > Docker Compatibility). It is unknown whether the symlink is present when docker compatibility is not enabled.
 
 **The fix in practice**
-On macOS, podman runs in a VM called `podman-machine-default` and is accessed with the set of commands `podman machine [command]`. By default, SELinux is enabled (ie. "Restrictive") on the VM. It has been observed that the `./bootstrap.sh up` works when SELinux is disabled (`podman machine ssh -- setenforce 0`), with the mount:
+On macOS, podman runs in a VM called `podman-machine-default` and is accessed with the set of commands `podman machine [command]`. By default, SELinux is enforcing on the VM (`podman machine ssh -- getenforce` → `Enforcing`). The socket path itself resolves correctly, but SELinux denies the `proxy` container access to the bind mount:
 ```
 volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
 ```
-However, when SELinux is enabled, it does not work. A first exploration with Claude could not determine what the root cause is. Also, Zitadel does not claim support for Podman. The Zitadel docs explicitly require Docker Engine 24+ (https://zitadel.com/docs/self-hosting/deploy/compose) for docker-compose.
+The proxy logs then repeat `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`, Traefik discovers no routers, and every request gets the plain-text 404 described above.
+
+`docker-compose.podman.yml` fixes this by running only the `proxy` with SELinux label separation disabled:
+```
+services:
+  proxy:
+    security_opt:
+      - label=disable
+```
+SELinux stays enforcing for the rest of the VM, so `setenforce 0` is no longer needed. Note that Zitadel does not claim support for Podman. The Zitadel docs explicitly require Docker Engine 24+ (https://zitadel.com/docs/self-hosting/deploy/compose) for docker-compose.
 
 **Rootless Podman**
 
-Under Docker, not pinning `user:0` in the containers `zitadel-init` and `zitadel-setup` works fine. However, it does not work with rootless Podman and the boostrap fails with `open /zitadel/bootstrap/admin.pat: permission denied`, because the containers are rootless. 
+Under Docker, not pinning `user:0` in the containers `zitadel-init` and `zitadel-setup` works fine. However, it does not work with rootless Podman and the bootstrap fails with `open /zitadel/bootstrap/admin.pat: permission denied`, because the containers are rootless. `docker-compose.podman.yml` therefore pins `user: "0"` on those two services; it is applied only when `ENGINE=podman`.
 
 
 ---

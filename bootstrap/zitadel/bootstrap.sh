@@ -26,6 +26,8 @@
 #                         (docker-compose.citius.yml) as part of `up`, and emit
 #                         citius-stack.json for the UI and Go SDK to consume.
 #   CITIUS_DEV_CONSOLE=1  Provision a dev admin console account.
+#   ENGINE=podman         Use podman instead of docker, and apply
+#                         docker-compose.podman.yml (SELinux fix for the proxy).
 #
 # Exit codes: 0 ok, non-zero on failure. Every error is printed to stderr.
 
@@ -47,6 +49,7 @@ readonly COMPOSE_PROJECT="citius-zitadel"
 readonly BASE_COMPOSE="${SCRIPT_DIR}/docker-compose.yml"
 readonly PRODLIKE_COMPOSE="${SCRIPT_DIR}/docker-compose.prodlike.yml"
 readonly CITIUS_COMPOSE="${SCRIPT_DIR}/docker-compose.citius.yml"
+readonly PODMAN_COMPOSE="${SCRIPT_DIR}/docker-compose.podman.yml"
 
 readonly READINESS_TIMEOUT=120  # seconds
 
@@ -161,13 +164,36 @@ tls_overlay_path() {
 
 # Engine is the container runtime to use. Default: docker.
 ENGINE="${ENGINE:-docker}"
+
+# Fail with guidance when the selected container engine is not installed.
+need_engine() {
+  case "$(printf '%s' "$ENGINE" | tr '[:upper:]' '[:lower:]')" in
+    docker)
+      command -v "$ENGINE" >/dev/null 2>&1 \
+        || die "docker not found. To use Podman instead, set ENGINE=podman (e.g. 'ENGINE=podman make zitadel-up')."
+      ;;
+    podman)
+      command -v "$ENGINE" >/dev/null 2>&1 \
+        || die "podman not found (ENGINE=${ENGINE}). Install Podman, or unset ENGINE to use docker."
+      ;;
+    *)
+      die "unsupported ENGINE: ${ENGINE} (expected: docker or podman)"
+      ;;
+  esac
+}
+
 # Wrap `docker compose` with our project name and the active overlay set.
 # Set CITIUS_DEV_CONSOLE=1 to also include docker-compose.dev-console.yml,
 # which provisions a human admin account with known credentials for the UI.
+# With ENGINE=podman, docker-compose.podman.yml is also included so the proxy
+# can read the engine socket under SELinux.
 compose() {
   local extra_overlays=()
+  if [[ "$(printf '%s' "$ENGINE" | tr '[:upper:]' '[:lower:]')" == "podman" ]]; then
+    extra_overlays=(-f "$PODMAN_COMPOSE")
+  fi
   if [[ "${CITIUS_DEV_CONSOLE:-0}" == "1" ]]; then
-    extra_overlays=(-f "${SCRIPT_DIR}/docker-compose.dev-console.yml")
+    extra_overlays+=(-f "${SCRIPT_DIR}/docker-compose.dev-console.yml")
   fi
   if [[ "${CITIUS_SERVER:-0}" == "1" ]]; then
     extra_overlays+=(-f "$CITIUS_COMPOSE")
@@ -188,7 +214,7 @@ compose() {
 # ---------------------------------------------------------------------------
 preflight() {
   log "preflight checks"
-  need_cmd ${ENGINE}
+  need_engine
   need_cmd jq
   need_cmd curl
   need_cmd go
@@ -658,6 +684,7 @@ cmd_down() {
     warn ".env absent; nothing to stop"
     return 0
   fi
+  need_engine
   log "${ENGINE} compose down (volumes preserved)"
   compose down --remove-orphans
 }
@@ -668,6 +695,7 @@ cmd_down() {
 cmd_reset() {
   load_env --optional
   if [[ -f "$ENV_FILE" ]]; then
+    need_engine
     log "${ENGINE} compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
@@ -678,6 +706,7 @@ cmd_reset() {
 cmd_nuke() {
   load_env --optional
   if [[ -f "$ENV_FILE" ]]; then
+    need_engine
     log "${ENGINE} compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
