@@ -1,0 +1,14 @@
+# docker-compose.podman.yml — Citius Podman-only overlay.
+#
+# Applied by bootstrap.sh only when ENGINE=podman.
+#
+# Under Podman with SELinux enforcing (the default on the macOS podman
+# machine VM), the proxy is denied access to the bind-mounted engine socket
+# at /var/run/docker.sock. Traefik then discovers no routers and answers
+# every request with a plain-text 404. Disabling SELinux label separation
+# for the proxy container alone restores socket access without turning
+# SELinux off for the whole VM.
+services:
+  proxy:
+    security_opt:
+      - label=disable

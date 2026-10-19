@@ -26,6 +26,8 @@
 #                         (docker-compose.citius.yml) as part of `up`, and emit
 #                         citius-stack.json for the UI and Go SDK to consume.
 #   CITIUS_DEV_CONSOLE=1  Provision a dev admin console account.
+#   ENGINE=podman         Use podman instead of docker, and apply
+#                         docker-compose.podman.yml (SELinux fix for the proxy).
 #
 # Exit codes: 0 ok, non-zero on failure. Every error is printed to stderr.
 
@@ -47,6 +49,7 @@ readonly COMPOSE_PROJECT="citius-zitadel"
 readonly BASE_COMPOSE="${SCRIPT_DIR}/docker-compose.yml"
 readonly PRODLIKE_COMPOSE="${SCRIPT_DIR}/docker-compose.prodlike.yml"
 readonly CITIUS_COMPOSE="${SCRIPT_DIR}/docker-compose.citius.yml"
+readonly PODMAN_COMPOSE="${SCRIPT_DIR}/docker-compose.podman.yml"
 
 readonly READINESS_TIMEOUT=120  # seconds
 
@@ -164,10 +167,15 @@ ENGINE="${ENGINE:-docker}"
 # Wrap `docker compose` with our project name and the active overlay set.
 # Set CITIUS_DEV_CONSOLE=1 to also include docker-compose.dev-console.yml,
 # which provisions a human admin account with known credentials for the UI.
+# With ENGINE=podman, docker-compose.podman.yml is also included so the proxy
+# can read the engine socket under SELinux.
 compose() {
   local extra_overlays=()
+  if [[ "$(printf '%s' "$ENGINE" | tr '[:upper:]' '[:lower:]')" == "podman" ]]; then
+    extra_overlays=(-f "$PODMAN_COMPOSE")
+  fi
   if [[ "${CITIUS_DEV_CONSOLE:-0}" == "1" ]]; then
-    extra_overlays=(-f "${SCRIPT_DIR}/docker-compose.dev-console.yml")
+    extra_overlays+=(-f "${SCRIPT_DIR}/docker-compose.dev-console.yml")
   fi
   if [[ "${CITIUS_SERVER:-0}" == "1" ]]; then
     extra_overlays+=(-f "$CITIUS_COMPOSE")

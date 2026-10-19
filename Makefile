@@ -312,7 +312,7 @@ test-integration-auth-human-e2e: ## Run auth E2E with hosted-login tokens for al
 	@$(MAKE) test-integration-auth-e2e HUMAN_AUTH_ENV='CITIUS_CISO_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-ciso.token) CITIUS_PRODUCER_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-producer.token) CITIUS_CONSUMER_TOKEN_FILE=$(abspath $(ZITADEL_DIR)/tokens/citius-consumer.token)'
 
 test-integration-auth-e2e-macos-podman: ## One-shot (macOS/Podman): start caas-server via scripts/run_server.sh, run auth integration suite, tear server down
-	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run 'ENGINE=PODMAN make zitadel-up' first" && exit 1)
+	@test -f $(ZITADEL_ENV_FILE) || (echo "ERROR: $(ZITADEL_ENV_FILE) not found - run 'ENGINE=podman make zitadel-up' first" && exit 1)
 	@bash -c '\
 	  set -e; \
 	  bash ./scripts/run_server.sh & \
