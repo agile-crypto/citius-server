@@ -367,7 +367,7 @@ SELinux stays enforcing for the rest of the VM, so `setenforce 0` is no longer n
 
 **Rootless Podman**
 
-Under Docker, not pinning `user:0` in the containers `zitadel-init` and `zitadel-setup` works fine. However, it does not work with rootless Podman and the boostrap fails with `open /zitadel/bootstrap/admin.pat: permission denied`, because the containers are rootless. 
+Under Docker, not pinning `user:0` in the containers `zitadel-init` and `zitadel-setup` works fine. However, it does not work with rootless Podman and the bootstrap fails with `open /zitadel/bootstrap/admin.pat: permission denied`, because the containers are rootless. `docker-compose.podman.yml` therefore pins `user: "0"` on those two services; it is applied only when `ENGINE=podman`.
 
 
 ---
