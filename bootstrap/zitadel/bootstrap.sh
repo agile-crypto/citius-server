@@ -164,6 +164,24 @@ tls_overlay_path() {
 
 # Engine is the container runtime to use. Default: docker.
 ENGINE="${ENGINE:-docker}"
+
+# Fail with guidance when the selected container engine is not installed.
+need_engine() {
+  case "$(printf '%s' "$ENGINE" | tr '[:upper:]' '[:lower:]')" in
+    docker)
+      command -v "$ENGINE" >/dev/null 2>&1 \
+        || die "docker not found. To use Podman instead, set ENGINE=podman (e.g. 'ENGINE=podman make zitadel-up')."
+      ;;
+    podman)
+      command -v "$ENGINE" >/dev/null 2>&1 \
+        || die "podman not found (ENGINE=${ENGINE}). Install Podman, or unset ENGINE to use docker."
+      ;;
+    *)
+      die "unsupported ENGINE: ${ENGINE} (expected: docker or podman)"
+      ;;
+  esac
+}
+
 # Wrap `docker compose` with our project name and the active overlay set.
 # Set CITIUS_DEV_CONSOLE=1 to also include docker-compose.dev-console.yml,
 # which provisions a human admin account with known credentials for the UI.
@@ -196,7 +214,7 @@ compose() {
 # ---------------------------------------------------------------------------
 preflight() {
   log "preflight checks"
-  need_cmd ${ENGINE}
+  need_engine
   need_cmd jq
   need_cmd curl
   need_cmd go
@@ -666,6 +684,7 @@ cmd_down() {
     warn ".env absent; nothing to stop"
     return 0
   fi
+  need_engine
   log "${ENGINE} compose down (volumes preserved)"
   compose down --remove-orphans
 }
@@ -676,6 +695,7 @@ cmd_down() {
 cmd_reset() {
   load_env --optional
   if [[ -f "$ENV_FILE" ]]; then
+    need_engine
     log "${ENGINE} compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
@@ -686,6 +706,7 @@ cmd_reset() {
 cmd_nuke() {
   load_env --optional
   if [[ -f "$ENV_FILE" ]]; then
+    need_engine
     log "${ENGINE} compose down -v (wiping data volumes)"
     compose down -v --remove-orphans
   fi
