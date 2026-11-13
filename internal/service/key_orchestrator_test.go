@@ -33,18 +33,18 @@ func allDeps(t *testing.T) (corekey.Repository, coretemplate.Registry, provider.
 	t.Helper()
 	ctx := context.Background()
 	store := &storage.InmemStorage{}
-	repo, err := key.NewVaultRepository(ctx, store)
+	repo, err := key.NewStorageRepository(ctx, store)
 	if err != nil {
-		t.Fatalf("NewVaultRepository: %v", err)
+		t.Fatalf("NewStorageRepository: %v", err)
 	}
 	reg, err := template.NewVaultRegistry(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
 	prov := provider.NewRegistry()
-	policyRepo, err := policy.NewVaultRepository(ctx, store)
+	policyRepo, err := policy.NewStorageRepository(ctx, store)
 	if err != nil {
-		t.Fatalf("policy.NewVaultRepository: %v", err)
+		t.Fatalf("policy.NewStorageRepository: %v", err)
 	}
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, err := corepolicy.NewEnforcer(policyRepo, eval)

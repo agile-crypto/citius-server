@@ -17,14 +17,14 @@ func newTestPolicy(name string) *corepolicy.Policy {
 
 var repoFn = func() corepolicy.Repository {
 	store := &storage.InmemStorage{}
-	r, err := policy.NewVaultRepository(context.Background(), store)
+	r, err := policy.NewStorageRepository(context.Background(), store)
 	if err != nil {
-		panic("failed to create policy VaultRepository: " + err.Error())
+		panic("failed to create policy StorageRepository: " + err.Error())
 	}
 	return r
 }
 
-func Test_PolicyVaultRepository_PutPolicy_GetPolicy_roundtrip(t *testing.T) {
+func Test_PolicyStorageRepository_PutPolicy_GetPolicy_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	p := newTestPolicy("default-sig-policy")
@@ -41,7 +41,7 @@ func Test_PolicyVaultRepository_PutPolicy_GetPolicy_roundtrip(t *testing.T) {
 	}
 }
 
-func Test_PolicyVaultRepository_GetPolicy_notFound(t *testing.T) {
+func Test_PolicyStorageRepository_GetPolicy_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetPolicy(context.Background(), "pol_doesnotexist")
 	if err == nil {
@@ -52,7 +52,7 @@ func Test_PolicyVaultRepository_GetPolicy_notFound(t *testing.T) {
 	}
 }
 
-func Test_PolicyVaultRepository_DeletePolicy_success(t *testing.T) {
+func Test_PolicyStorageRepository_DeletePolicy_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	_ = r.PutPolicy(ctx, newTestPolicy("p"))
@@ -65,7 +65,7 @@ func Test_PolicyVaultRepository_DeletePolicy_success(t *testing.T) {
 	}
 }
 
-func Test_PolicyVaultRepository_ListPolicies_all(t *testing.T) {
+func Test_PolicyStorageRepository_ListPolicies_all(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	_ = r.PutPolicy(ctx, newTestPolicy("p1"))
@@ -80,7 +80,7 @@ func Test_PolicyVaultRepository_ListPolicies_all(t *testing.T) {
 	}
 }
 
-func Test_PolicyVaultRepository_ListPolicies_empty(t *testing.T) {
+func Test_PolicyStorageRepository_ListPolicies_empty(t *testing.T) {
 	r := repoFn()
 	names, err := r.ListPolicies(context.Background())
 	if err != nil {
@@ -91,14 +91,14 @@ func Test_PolicyVaultRepository_ListPolicies_empty(t *testing.T) {
 	}
 }
 
-func Test_PolicyVaultRepository_PutPolicy_nil_returnsError(t *testing.T) {
+func Test_PolicyStorageRepository_PutPolicy_nil_returnsError(t *testing.T) {
 	r := repoFn()
 	if err := r.PutPolicy(context.Background(), nil); err == nil {
 		t.Fatal("expected error for nil policy")
 	}
 }
 
-func Test_PolicyVaultRepository_GetPolicy_returnsClone(t *testing.T) {
+func Test_PolicyStorageRepository_GetPolicy_returnsClone(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	_ = r.PutPolicy(ctx, newTestPolicy("original"))

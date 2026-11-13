@@ -16,10 +16,10 @@ import (
 
 // VaultRepository is the provider-instance repository built by
 // NewVaultRepository.
-type VaultRepository = storageprovider.VaultRepository
+type VaultRepository = storageprovider.StorageRepository
 
 // NewVaultRepository returns a provider-instance repository backed by the
 // given Vault storage.
 func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...coreprovider.Option) (*VaultRepository, error) {
-	return storageprovider.NewVaultRepository(ctx, vaultlogical.FromLogical(s), opt...)
+	return storageprovider.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
 }

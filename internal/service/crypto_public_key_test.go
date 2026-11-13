@@ -52,9 +52,9 @@ func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 	ctx := context.Background()
 	store := &storage.InmemStorage{}
 
-	repo, err := key.NewVaultRepository(ctx, store)
+	repo, err := key.NewStorageRepository(ctx, store)
 	if err != nil {
-		t.Fatalf("NewVaultRepository: %v", err)
+		t.Fatalf("NewStorageRepository: %v", err)
 	}
 
 	reg, err := template.NewVaultRegistry(ctx, store)
@@ -73,9 +73,9 @@ func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 		t.Fatalf("Register provider: %v", err)
 	}
 
-	policyRepo, err := policy.NewVaultRepository(ctx, store)
+	policyRepo, err := policy.NewStorageRepository(ctx, store)
 	if err != nil {
-		t.Fatalf("policy.NewVaultRepository: %v", err)
+		t.Fatalf("policy.NewStorageRepository: %v", err)
 	}
 	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
 	if err != nil {

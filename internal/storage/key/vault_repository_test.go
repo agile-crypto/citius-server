@@ -77,9 +77,9 @@ func mustCreateKey(t *testing.T, r corekey.Repository, publicID, name string, sc
 
 var repoFn = func() corekey.Repository {
 	store := &storage.InmemStorage{}
-	r, err := NewVaultRepository(context.Background(), store)
+	r, err := NewStorageRepository(context.Background(), store)
 	if err != nil {
-		panic("failed to create VaultRepository: " + err.Error())
+		panic("failed to create StorageRepository: " + err.Error())
 	}
 	return r
 }
@@ -88,7 +88,7 @@ var repoFn = func() corekey.Repository {
 // CreateKey / GetKey
 // ============================================================================
 
-func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
+func Test_StorageRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 
@@ -116,7 +116,7 @@ func Test_VaultRepository_CreateKey_GetKey_roundtrip(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
+func Test_StorageRepository_CreateKey_setsVersion1(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	scopeSpec := &core.ScopeSpecification{
@@ -136,7 +136,7 @@ func Test_VaultRepository_CreateKey_setsVersion1(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
+func Test_StorageRepository_CreateKey_setsStatus(t *testing.T) {
 	testCases := []struct {
 		name       string
 		keyID      string
@@ -165,7 +165,7 @@ func Test_VaultRepository_CreateKey_setsStatus(t *testing.T) {
 	}
 
 }
-func Test_VaultRepository_GetKey_notFound(t *testing.T) {
+func Test_StorageRepository_GetKey_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetKeyByID(context.Background(), "key_doesnotexist")
 	if err == nil {
@@ -176,7 +176,7 @@ func Test_VaultRepository_GetKey_notFound(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_CreateKey_duplicate_returnsError(t *testing.T) {
+func Test_StorageRepository_CreateKey_duplicate_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	scopeSpec := &core.ScopeSpecification{
@@ -194,7 +194,7 @@ func Test_VaultRepository_CreateKey_duplicate_returnsError(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
+func Test_StorageRepository_GetKey_returnsClone(t *testing.T) {
 	// Mutating the returned key should NOT affect the stored copy.
 	r := repoFn()
 	ctx := context.Background()
@@ -213,7 +213,7 @@ func Test_VaultRepository_GetKey_returnsClone(t *testing.T) {
 // DeleteKey (cascading)
 // ============================================================================
 
-func Test_VaultRepository_DeleteKey_success(t *testing.T) {
+func Test_StorageRepository_DeleteKey_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "k", core.ScopeSignatureStandard)
@@ -227,7 +227,7 @@ func Test_VaultRepository_DeleteKey_success(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
+func Test_StorageRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	assert, require := assert.New(t), require.New(t)
 	r := repoFn()
 	ctx := context.Background()
@@ -264,7 +264,7 @@ func Test_VaultRepository_DeleteKey_cascadesVersions(t *testing.T) {
 	require.True(errors.IsKeyNotFound(err), "expected VersionNotFound for version 2 after cascading delete")
 }
 
-func Test_VaultRepository_DeleteKey_notFound_returnsError(t *testing.T) {
+func Test_StorageRepository_DeleteKey_notFound_returnsError(t *testing.T) {
 	r := repoFn()
 	err := r.DeleteKey(context.Background(), "key_doesnotexist")
 	if err == nil {
@@ -279,7 +279,7 @@ func Test_VaultRepository_DeleteKey_notFound_returnsError(t *testing.T) {
 // ListKeys
 // ============================================================================
 
-func Test_VaultRepository_ListKeys_all(t *testing.T) {
+func Test_StorageRepository_ListKeys_all(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k1", core.ScopeSignatureStandard)
@@ -300,7 +300,7 @@ func Test_VaultRepository_ListKeys_all(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_ListKeys_multipleKeys(t *testing.T) {
+func Test_StorageRepository_ListKeys_multipleKeys(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k1", core.ScopeSignatureStandard)
@@ -316,7 +316,7 @@ func Test_VaultRepository_ListKeys_multipleKeys(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_ListKeys_empty(t *testing.T) {
+func Test_StorageRepository_ListKeys_empty(t *testing.T) {
 	r := repoFn()
 	keys, err := r.ListKeys(context.Background())
 	if err != nil {
@@ -331,7 +331,7 @@ func Test_VaultRepository_ListKeys_empty(t *testing.T) {
 // UpdateKey
 // ============================================================================
 
-func Test_VaultRepository_UpdateKey_success(t *testing.T) {
+func Test_StorageRepository_UpdateKey_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01HXYZ", "signing-key", core.ScopeSignatureStandard)
@@ -357,7 +357,7 @@ func Test_VaultRepository_UpdateKey_success(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_UpdateKey_notFound_returnsError(t *testing.T) {
+func Test_StorageRepository_UpdateKey_notFound_returnsError(t *testing.T) {
 	r := repoFn()
 	k, err := newTestKey("id", "signing-key", &core.ScopeSpecification{
 		Scope: core.ScopeSignatureStandard,
@@ -368,7 +368,7 @@ func Test_VaultRepository_UpdateKey_notFound_returnsError(t *testing.T) {
 	require.Truef(t, errors.IsKeyNotFound(err), "expected KeyNotFound, got: %v", err)
 }
 
-func Test_VaultRepository_UpdateKey_nil_returnsError(t *testing.T) {
+func Test_StorageRepository_UpdateKey_nil_returnsError(t *testing.T) {
 	r := repoFn()
 	err := r.UpdateKey(context.Background(), nil)
 	if err == nil {
@@ -380,7 +380,7 @@ func Test_VaultRepository_UpdateKey_nil_returnsError(t *testing.T) {
 // AddVersion / GetVersion
 // ============================================================================
 
-func Test_VaultRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
+func Test_StorageRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", core.ScopeSignatureStandard)
@@ -396,7 +396,7 @@ func Test_VaultRepository_AddVersion_GetVersion_roundtrip(t *testing.T) {
 	assert.Equal(t, uint32(2), got.Version)
 }
 
-func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
+func Test_StorageRepository_AddVersion_GetOldVersion(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", core.ScopeSignatureStandard)
@@ -420,7 +420,7 @@ func Test_VaultRepository_AddVersion_GetOldVersion(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_GetVersion_notFound(t *testing.T) {
+func Test_StorageRepository_GetVersion_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetVersion(context.Background(), "key_01", 99)
 	if err == nil {
@@ -431,7 +431,7 @@ func Test_VaultRepository_GetVersion_notFound(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_AddVersion_returnsClone(t *testing.T) {
+func Test_StorageRepository_AddVersion_returnsClone(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "k", core.ScopeSignatureStandard)
@@ -447,7 +447,7 @@ func Test_VaultRepository_AddVersion_returnsClone(t *testing.T) {
 	}
 }
 
-func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
+func Test_StorageRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	v, err := corekey.NewVersion(ctx, defaultKeyVersionID("key_missing", 1), "key_missing", "template", "software", 1, []byte("key_material"), signatureScopeSpec(), corekey.WithState(types.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE))
@@ -465,7 +465,7 @@ func Test_VaultRepository_AddVersion_keyNotFound_returnsError(t *testing.T) {
 // GetKeyByName
 // ============================================================================
 
-func Test_VaultRepository_GetKeyByName_existing(t *testing.T) {
+func Test_StorageRepository_GetKeyByName_existing(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "my-key", core.ScopeSignatureStandard)
@@ -476,14 +476,14 @@ func Test_VaultRepository_GetKeyByName_existing(t *testing.T) {
 	assert.Equal(t, "my-key", got.Name)
 }
 
-func Test_VaultRepository_GetKeyByName_notFound(t *testing.T) {
+func Test_StorageRepository_GetKeyByName_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetKeyByName(context.Background(), "does-not-exist")
 	require.Error(t, err)
 	require.True(t, errors.IsKeyNotFound(err), "expected KeyNotFound, got: %v", err)
 }
 
-func Test_VaultRepository_GetKeyByName_multipleKeys_returnsCorrectOne(t *testing.T) {
+func Test_StorageRepository_GetKeyByName_multipleKeys_returnsCorrectOne(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "alpha", core.ScopeSignatureStandard)
@@ -498,7 +498,7 @@ func Test_VaultRepository_GetKeyByName_multipleKeys_returnsCorrectOne(t *testing
 // Name-to-ID mapping: storage and caching through key lifecycle
 // ============================================================================
 
-func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T) {
+func Test_StorageRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "signing-key", core.ScopeSignatureStandard)
@@ -518,7 +518,7 @@ func Test_VaultRepository_GetKeyByName_afterUpdate_stillResolvable(t *testing.T)
 	assert.Equal(t, types.KeyLifecycleState_KEY_LIFECYCLE_STATE_SUSPENDED, got.GetState())
 }
 
-func Test_VaultRepository_GetKeyByName_afterDeletion_notFound(t *testing.T) {
+func Test_StorageRepository_GetKeyByName_afterDeletion_notFound(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "signing-key", core.ScopeSignatureStandard)
@@ -530,7 +530,7 @@ func Test_VaultRepository_GetKeyByName_afterDeletion_notFound(t *testing.T) {
 	require.True(t, errors.IsKeyNotFound(err), "expected KeyNotFound after deletion, got: %v", err)
 }
 
-func Test_VaultRepository_CreateKey_duplicateName_notAllowed(t *testing.T) {
+func Test_StorageRepository_CreateKey_duplicateName_notAllowed(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "signing-key", core.ScopeSignatureStandard)
@@ -544,7 +544,7 @@ func Test_VaultRepository_CreateKey_duplicateName_notAllowed(t *testing.T) {
 	require.True(t, errors.IsAlreadyExists(err), "expected AlreadyExists for duplicate name, got: %v", err)
 }
 
-func Test_VaultRepository_CreateKey_sameNameAllowedAfterDeletion(t *testing.T) {
+func Test_StorageRepository_CreateKey_sameNameAllowedAfterDeletion(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "signing-key", core.ScopeSignatureStandard)
@@ -559,7 +559,7 @@ func Test_VaultRepository_CreateKey_sameNameAllowedAfterDeletion(t *testing.T) {
 	assert.Equal(t, "key_02", got.PublicId)
 }
 
-func Test_VaultRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
+func Test_StorageRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "original-name", core.ScopeSignatureStandard)
@@ -575,7 +575,7 @@ func Test_VaultRepository_UpdateKey_nameChange_notAllowed(t *testing.T) {
 	require.True(t, errors.IsInvalidArgument(err), "expected InvalidArgument for name change, got: %v", err)
 }
 
-func Test_VaultRepository_GetKeyByName_afterAddVersion_returnsUpdatedCurrentVersion(t *testing.T) {
+func Test_StorageRepository_GetKeyByName_afterAddVersion_returnsUpdatedCurrentVersion(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	mustCreateKey(t, r, "key_01", "my-key", core.ScopeSignatureStandard)
@@ -593,7 +593,7 @@ func Test_VaultRepository_GetKeyByName_afterAddVersion_returnsUpdatedCurrentVers
 	assert.Equal(t, uint32(2), current.Version)
 }
 
-func Test_VaultRepository_GetCurrentVersion(t *testing.T) {
+func Test_StorageRepository_GetCurrentVersion(t *testing.T) {
 	testCases := []struct {
 		keyID              string
 		additionalVersions int

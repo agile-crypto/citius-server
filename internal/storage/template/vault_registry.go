@@ -18,7 +18,7 @@ var _ coretemplate.Registry = (*VaultRegistry)(nil)
 
 // VaultRegistry is a Vault-backed implementation of the Registry interface.
 // Uses storage.Storage (typically storage.InmemStorage) with proto serialization,
-// following the same pattern as VaultRepository in key, policy, and provider.
+// following the same pattern as StorageRepository in key, policy, and provider.
 type VaultRegistry struct {
 	mu        *sync.RWMutex
 	templates storage.Storage

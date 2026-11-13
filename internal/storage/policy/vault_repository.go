@@ -14,27 +14,27 @@ import (
 
 const policyStoragePrefix = "policy/"
 
-var _ corepolicy.Repository = (*VaultRepository)(nil)
+var _ corepolicy.Repository = (*StorageRepository)(nil)
 
-type VaultRepository struct {
+type StorageRepository struct {
 	mu       *sync.RWMutex
 	policies storage.Storage
 }
 
-func NewVaultRepository(ctx context.Context, store storage.Storage, opt ...corepolicy.Option) (*VaultRepository, error) {
-	const op errors.Op = "policy.NewVaultRepository"
+func NewStorageRepository(ctx context.Context, store storage.Storage, opt ...corepolicy.Option) (*StorageRepository, error) {
+	const op errors.Op = "policy.NewStorageRepository"
 	if store == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
 	opts := corepolicy.GetVaultOptions(opt...)
-	return &VaultRepository{
+	return &StorageRepository{
 		mu:       opts.Lock,
 		policies: storage.NewView(store, policyStoragePrefix),
 	}, nil
 }
 
-func (r *VaultRepository) PutPolicy(ctx context.Context, p *corepolicy.Policy) error {
-	const op errors.Op = "policy.(VaultRepository).PutPolicy"
+func (r *StorageRepository) PutPolicy(ctx context.Context, p *corepolicy.Policy) error {
+	const op errors.Op = "policy.(StorageRepository).PutPolicy"
 	if p == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "policy must not be nil")
 	}
@@ -52,8 +52,8 @@ func (r *VaultRepository) PutPolicy(ctx context.Context, p *corepolicy.Policy) e
 	return nil
 }
 
-func (r *VaultRepository) GetPolicy(ctx context.Context, name string) (*corepolicy.Policy, error) {
-	const op errors.Op = "policy.(VaultRepository).GetPolicy"
+func (r *StorageRepository) GetPolicy(ctx context.Context, name string) (*corepolicy.Policy, error) {
+	const op errors.Op = "policy.(StorageRepository).GetPolicy"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -71,8 +71,8 @@ func (r *VaultRepository) GetPolicy(ctx context.Context, name string) (*corepoli
 	return corepolicy.New(stored), nil
 }
 
-func (r *VaultRepository) DeletePolicy(ctx context.Context, name string) error {
-	const op errors.Op = "policy.(VaultRepository).DeletePolicy"
+func (r *StorageRepository) DeletePolicy(ctx context.Context, name string) error {
+	const op errors.Op = "policy.(StorageRepository).DeletePolicy"
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -86,8 +86,8 @@ func (r *VaultRepository) DeletePolicy(ctx context.Context, name string) error {
 	return r.policies.Delete(ctx, name)
 }
 
-func (r *VaultRepository) ListPolicies(ctx context.Context) ([]string, error) {
-	const op errors.Op = "policy.(VaultRepository).ListPolicies"
+func (r *StorageRepository) ListPolicies(ctx context.Context) ([]string, error) {
+	const op errors.Op = "policy.(StorageRepository).ListPolicies"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

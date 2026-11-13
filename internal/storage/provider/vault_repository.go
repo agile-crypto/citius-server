@@ -14,27 +14,27 @@ import (
 
 const providerInstanceStoragePrefix = "provider_instance/"
 
-var _ coreprovider.InstanceRepository = (*VaultRepository)(nil)
+var _ coreprovider.InstanceRepository = (*StorageRepository)(nil)
 
-type VaultRepository struct {
+type StorageRepository struct {
 	mu        *sync.RWMutex
 	instances storage.Storage
 }
 
-func NewVaultRepository(ctx context.Context, store storage.Storage, opt ...coreprovider.Option) (*VaultRepository, error) {
-	const op errors.Op = "provider.NewVaultRepository"
+func NewStorageRepository(ctx context.Context, store storage.Storage, opt ...coreprovider.Option) (*StorageRepository, error) {
+	const op errors.Op = "provider.NewStorageRepository"
 	if store == nil {
 		return nil, errors.New(ctx, op, errors.CodeInvalidArgument, "nil storage")
 	}
 	opts := coreprovider.GetVaultOptions(opt...)
-	return &VaultRepository{
+	return &StorageRepository{
 		mu:        opts.Lock,
 		instances: storage.NewView(store, providerInstanceStoragePrefix),
 	}, nil
 }
 
-func (r *VaultRepository) PutProviderInstance(ctx context.Context, instance *coreprovider.Instance) error {
-	const op errors.Op = "provider.(VaultRepository).PutProviderInstance"
+func (r *StorageRepository) PutProviderInstance(ctx context.Context, instance *coreprovider.Instance) error {
+	const op errors.Op = "provider.(StorageRepository).PutProviderInstance"
 	if instance == nil {
 		return errors.New(ctx, op, errors.CodeInvalidArgument, "instance must not be nil")
 	}
@@ -52,8 +52,8 @@ func (r *VaultRepository) PutProviderInstance(ctx context.Context, instance *cor
 	return nil
 }
 
-func (r *VaultRepository) GetProviderInstance(ctx context.Context, publicID string) (*coreprovider.Instance, error) {
-	const op errors.Op = "provider.(VaultRepository).GetProviderInstance"
+func (r *StorageRepository) GetProviderInstance(ctx context.Context, publicID string) (*coreprovider.Instance, error) {
+	const op errors.Op = "provider.(StorageRepository).GetProviderInstance"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -71,8 +71,8 @@ func (r *VaultRepository) GetProviderInstance(ctx context.Context, publicID stri
 	return coreprovider.NewInstance(stored), nil
 }
 
-func (r *VaultRepository) DeleteProviderInstance(ctx context.Context, publicID string) error {
-	const op errors.Op = "provider.(VaultRepository).DeleteProviderInstance"
+func (r *StorageRepository) DeleteProviderInstance(ctx context.Context, publicID string) error {
+	const op errors.Op = "provider.(StorageRepository).DeleteProviderInstance"
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -86,8 +86,8 @@ func (r *VaultRepository) DeleteProviderInstance(ctx context.Context, publicID s
 	return r.instances.Delete(ctx, publicID)
 }
 
-func (r *VaultRepository) ListProviderInstances(ctx context.Context) ([]string, error) {
-	const op errors.Op = "provider.(VaultRepository).ListProviderInstances"
+func (r *StorageRepository) ListProviderInstances(ctx context.Context) ([]string, error) {
+	const op errors.Op = "provider.(StorageRepository).ListProviderInstances"
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 

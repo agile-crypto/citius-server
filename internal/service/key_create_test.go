@@ -144,11 +144,11 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 	ctx := context.Background()
 	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, store)
+	repo, _ := key.NewStorageRepository(ctx, store)
 	reg, _ := template.NewVaultRegistry(ctx, store)
 	_ = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
-	policyRepo, _ := policy.NewVaultRepository(ctx, store)
+	policyRepo, _ := policy.NewStorageRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)
@@ -213,11 +213,11 @@ func TestCreateKey_withoutScope_returnsError(t *testing.T) {
 	ctx := context.Background()
 	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, store)
+	repo, _ := key.NewStorageRepository(ctx, store)
 	reg, _ := template.NewVaultRegistry(ctx, store)
 	_ = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
-	policyRepo, _ := policy.NewVaultRepository(ctx, store)
+	policyRepo, _ := policy.NewStorageRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)

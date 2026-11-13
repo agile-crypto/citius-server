@@ -176,11 +176,11 @@ func buildKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
 	reg coretemplate.Registry, provReg provider.Registry,
 ) (service.KeyOrchestrator, error) {
-	repo, err := key.NewVaultRepository(ctx, s)
+	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-	policyRepo, err := policy.NewVaultRepository(ctx, s)
+	policyRepo, err := policy.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
@@ -195,11 +195,11 @@ func buildCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
 	reg coretemplate.Registry, provReg provider.Registry,
 ) (service.CryptoOrchestrator, error) {
-	repo, err := key.NewVaultRepository(ctx, s)
+	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-	policyRepo, err := policy.NewVaultRepository(ctx, s)
+	policyRepo, err := policy.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
@@ -213,7 +213,7 @@ func buildCryptoOrchestrator(
 func buildPolicyEngine(
 	ctx context.Context, s storage.Storage,
 ) (corepolicy.Engine, error) {
-	policyRepo, err := policy.NewVaultRepository(ctx, s)
+	policyRepo, err := policy.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}

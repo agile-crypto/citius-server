@@ -86,9 +86,9 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 	ctx := context.Background()
 	store := &storage.InmemStorage{}
 
-	repo, err := key.NewVaultRepository(ctx, store)
+	repo, err := key.NewStorageRepository(ctx, store)
 	if err != nil {
-		t.Fatalf("NewVaultRepository: %v", err)
+		t.Fatalf("NewStorageRepository: %v", err)
 	}
 
 	reg, err := template.NewVaultRegistry(ctx, store)
@@ -109,9 +109,9 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 		t.Fatalf("Register provider: %v", err)
 	}
 
-	policyRepo, err := policy.NewVaultRepository(ctx, store)
+	policyRepo, err := policy.NewStorageRepository(ctx, store)
 	if err != nil {
-		t.Fatalf("policy.NewVaultRepository: %v", err)
+		t.Fatalf("policy.NewStorageRepository: %v", err)
 	}
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, err := corepolicy.NewEnforcer(policyRepo, eval)

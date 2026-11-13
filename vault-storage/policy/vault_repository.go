@@ -14,10 +14,10 @@ import (
 )
 
 // VaultRepository is the policy repository built by NewVaultRepository.
-type VaultRepository = storagepolicy.VaultRepository
+type VaultRepository = storagepolicy.StorageRepository
 
 // NewVaultRepository returns a policy repository backed by the given Vault
 // storage.
 func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...corepolicy.Option) (*VaultRepository, error) {
-	return storagepolicy.NewVaultRepository(ctx, vaultlogical.FromLogical(s), opt...)
+	return storagepolicy.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
 }

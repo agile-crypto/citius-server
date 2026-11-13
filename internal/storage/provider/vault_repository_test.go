@@ -22,14 +22,14 @@ func newTestProviderInstance(publicID, name, provType string) *coreprovider.Inst
 
 var repoFn = func() coreprovider.InstanceRepository {
 	store := &storage.InmemStorage{}
-	r, err := provider.NewVaultRepository(context.Background(), store)
+	r, err := provider.NewStorageRepository(context.Background(), store)
 	if err != nil {
-		panic("failed to create provider VaultRepository: " + err.Error())
+		panic("failed to create provider StorageRepository: " + err.Error())
 	}
 	return r
 }
 
-func Test_ProviderVaultRepository_PutGet_roundtrip(t *testing.T) {
+func Test_ProviderStorageRepository_PutGet_roundtrip(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	pi := newTestProviderInstance("prv_01", "software-default", "software")
@@ -46,7 +46,7 @@ func Test_ProviderVaultRepository_PutGet_roundtrip(t *testing.T) {
 	}
 }
 
-func Test_ProviderVaultRepository_GetProviderInstance_notFound(t *testing.T) {
+func Test_ProviderStorageRepository_GetProviderInstance_notFound(t *testing.T) {
 	r := repoFn()
 	_, err := r.GetProviderInstance(context.Background(), "prv_doesnotexist")
 	if err == nil {
@@ -57,14 +57,14 @@ func Test_ProviderVaultRepository_GetProviderInstance_notFound(t *testing.T) {
 	}
 }
 
-func Test_ProviderVaultRepository_PutProviderInstance_nil_returnsError(t *testing.T) {
+func Test_ProviderStorageRepository_PutProviderInstance_nil_returnsError(t *testing.T) {
 	r := repoFn()
 	if err := r.PutProviderInstance(context.Background(), nil); err == nil {
 		t.Fatal("expected error for nil instance")
 	}
 }
 
-func Test_ProviderVaultRepository_DeleteProviderInstance_success(t *testing.T) {
+func Test_ProviderStorageRepository_DeleteProviderInstance_success(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	_ = r.PutProviderInstance(ctx, newTestProviderInstance("prv_01", "sw", "software"))
@@ -77,7 +77,7 @@ func Test_ProviderVaultRepository_DeleteProviderInstance_success(t *testing.T) {
 	}
 }
 
-func Test_ProviderVaultRepository_ListProviderInstances(t *testing.T) {
+func Test_ProviderStorageRepository_ListProviderInstances(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	_ = r.PutProviderInstance(ctx, newTestProviderInstance("prv_01", "sw1", "software"))
@@ -92,7 +92,7 @@ func Test_ProviderVaultRepository_ListProviderInstances(t *testing.T) {
 	}
 }
 
-func Test_ProviderVaultRepository_ListProviderInstances_empty(t *testing.T) {
+func Test_ProviderStorageRepository_ListProviderInstances_empty(t *testing.T) {
 	r := repoFn()
 	ids, err := r.ListProviderInstances(context.Background())
 	if err != nil {
@@ -103,7 +103,7 @@ func Test_ProviderVaultRepository_ListProviderInstances_empty(t *testing.T) {
 	}
 }
 
-func Test_ProviderVaultRepository_GetProviderInstance_returnsClone(t *testing.T) {
+func Test_ProviderStorageRepository_GetProviderInstance_returnsClone(t *testing.T) {
 	r := repoFn()
 	ctx := context.Background()
 	_ = r.PutProviderInstance(ctx, newTestProviderInstance("prv_01", "original", "software"))

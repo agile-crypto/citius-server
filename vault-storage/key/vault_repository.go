@@ -14,13 +14,13 @@ import (
 
 type (
 	// VaultRepository is the key repository built by NewVaultRepository.
-	VaultRepository = storagekey.VaultRepository
+	VaultRepository = storagekey.StorageRepository
 	// VaultRepositoryOption configures NewVaultRepository.
-	VaultRepositoryOption = storagekey.VaultRepositoryOption
+	VaultRepositoryOption = storagekey.StorageRepositoryOption
 )
 
 // NewVaultRepository returns a key repository backed by the given Vault
 // storage.
 func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...VaultRepositoryOption) (*VaultRepository, error) {
-	return storagekey.NewVaultRepository(ctx, vaultlogical.FromLogical(s), opt...)
+	return storagekey.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
 }
