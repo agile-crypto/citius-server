@@ -21,10 +21,9 @@ import (
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
 	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // Config carries the small number of knobs for NewServer.
@@ -44,7 +43,7 @@ type Config struct {
 }
 
 // WireFactorySet assembles the dependency graph for the deployment of the gRPC server over an in-memory
-// [logical.Storage]. This method wires the per-request factory functions used the per-request
+// [storage.Storage]. This method wires the per-request factory functions used the per-request
 // to build orchestrators, registries, and policy engine.
 //
 // It mirrors today's deployment exactly:
@@ -69,7 +68,7 @@ type Config struct {
 // a real option once an embedding application wants persistence.
 func WireFactorySet(ctx context.Context, cfg Config) (FactorySet, error) {
 	const op engerr.Op = "server.WireFactorySet"
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 	return wireFactoriesWithStorage(ctx, cfg, store, op)
 }
 

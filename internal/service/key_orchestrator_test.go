@@ -16,10 +16,10 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,17 +32,17 @@ import (
 func allDeps(t *testing.T) (corekey.Repository, coretemplate.Registry, provider.Registry, corepolicy.Engine) {
 	t.Helper()
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
-	repo, err := key.NewVaultRepository(ctx, storage)
+	store := &storage.InmemStorage{}
+	repo, err := key.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRepository: %v", err)
 	}
-	reg, err := template.NewVaultRegistry(ctx, storage)
+	reg, err := template.NewVaultRegistry(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
 	prov := provider.NewRegistry()
-	policyRepo, err := policy.NewVaultRepository(ctx, storage)
+	policyRepo, err := policy.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}

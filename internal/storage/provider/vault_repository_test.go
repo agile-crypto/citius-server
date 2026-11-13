@@ -8,8 +8,8 @@ import (
 
 	"github.com/agile-crypto/citius-core/errors"
 	storepb "github.com/agile-crypto/citius-core/store"
-	"github.com/agile-crypto/vault-storage/provider"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/provider"
 )
 
 func newTestProviderInstance(publicID, name, provType string) *coreprovider.Instance {
@@ -21,8 +21,8 @@ func newTestProviderInstance(publicID, name, provType string) *coreprovider.Inst
 }
 
 var repoFn = func() coreprovider.InstanceRepository {
-	storage := &logical.InmemStorage{}
-	r, err := provider.NewVaultRepository(context.Background(), storage)
+	store := &storage.InmemStorage{}
+	r, err := provider.NewVaultRepository(context.Background(), store)
 	if err != nil {
 		panic("failed to create provider VaultRepository: " + err.Error())
 	}

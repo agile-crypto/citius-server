@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/app"
-	internaltemplate "github.com/agile-crypto/vault-storage/template"
+	internaltemplate "github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // ============================================================================
@@ -155,7 +155,7 @@ var (
 func newTestTemplateRegistry(t *testing.T, templateIDs ...string) template.Registry {
 	t.Helper()
 	ctx := context.Background()
-	reg, err := internaltemplate.NewVaultRegistry(ctx, &logical.InmemStorage{})
+	reg, err := internaltemplate.NewVaultRegistry(ctx, &storage.InmemStorage{})
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
@@ -178,7 +178,7 @@ func newTestTemplateRegistry(t *testing.T, templateIDs ...string) template.Regis
 func newTestTemplateRegistryWithOps(t *testing.T, templateID string, ops ...api.CryptoOperation) template.Registry {
 	t.Helper()
 	ctx := context.Background()
-	reg, err := internaltemplate.NewVaultRegistry(ctx, &logical.InmemStorage{})
+	reg, err := internaltemplate.NewVaultRegistry(ctx, &storage.InmemStorage{})
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}

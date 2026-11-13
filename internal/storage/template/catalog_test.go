@@ -18,7 +18,7 @@ import (
 // citius-core is a standalone module now and has no copy of it.
 func catalogPath() string {
 	_, currentFile, _, _ := runtime.Caller(0)
-	return filepath.Join(filepath.Dir(currentFile), "..", "..", "proto", "standard_algorithms.json")
+	return filepath.Join(filepath.Dir(currentFile), "..", "..", "..", "proto", "standard_algorithms.json")
 }
 
 // readCatalog reads the standard_algorithms.json file for test helpers.

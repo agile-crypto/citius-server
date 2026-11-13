@@ -13,10 +13,10 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 	"github.com/stretchr/testify/require"
 )
 
@@ -142,13 +142,13 @@ func TestCreateKey_withLabels(t *testing.T) {
 func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 	// Use an orchestrator without any provider registered.
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, storage)
-	reg, _ := template.NewVaultRegistry(ctx, storage)
+	repo, _ := key.NewVaultRepository(ctx, store)
+	reg, _ := template.NewVaultRegistry(ctx, store)
 	_ = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo, _ := policy.NewVaultRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)
@@ -211,13 +211,13 @@ func TestCreateKey_providerID_unsatisfiable_returnsError(t *testing.T) {
 func TestCreateKey_withoutScope_returnsError(t *testing.T) {
 	// Use an orchestrator without any provider registered.
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, storage)
-	reg, _ := template.NewVaultRegistry(ctx, storage)
+	repo, _ := key.NewVaultRepository(ctx, store)
+	reg, _ := template.NewVaultRegistry(ctx, store)
 	_ = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo, _ := policy.NewVaultRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)

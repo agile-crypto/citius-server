@@ -1,26 +1,26 @@
 //go:build vault_plugin
 
-package vault
+package app
 
 import (
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
 	"github.com/agile-crypto/citius-core/template"
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // ============================================================================
 // Factory type aliases
 // ============================================================================
 
-type KeyOrchestratorFactory func(storage.Storage) (service.KeyOrchestrator, error)
+type KeyOrchestratorFactory func(logical.Storage) (service.KeyOrchestrator, error)
 
-type CryptoOrchestratorFactory func(storage.Storage) (service.CryptoOrchestrator, error)
+type CryptoOrchestratorFactory func(logical.Storage) (service.CryptoOrchestrator, error)
 
-type PolicyEngineFactory func(storage.Storage) (policy.Engine, error)
+type PolicyEngineFactory func(logical.Storage) (policy.Engine, error)
 
-type ProviderInstanceManagerFactory func(storage.Storage) (provider.InstanceManager, error)
+type ProviderInstanceManagerFactory func(logical.Storage) (provider.InstanceManager, error)
 
 // Option is a functional option for configuring a Service.
 type Option func(*Service)

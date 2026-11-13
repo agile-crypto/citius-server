@@ -1,11 +1,12 @@
 # Server — Makefile
 #
 # Targets:
-#   ci          — CI entry point: lint + test-race + smoke (merge gate)
+#   ci          — CI entry point: lint + test-race + test-vault + smoke (merge gate)
 #   build       — compile all internal packages
 #   docker-build — build the local citius-server container image
 #   test        — run all tests (no race detector)
 #   test-race   — run all tests with race detector
+#   test-vault  — run the Vault-plugin tests (vault_plugin build tag)
 #   test-cover  — run tests with coverage report
 #   smoke       — run smoke tests under test/smoke/...
 #   vet         — go vet
@@ -22,7 +23,7 @@
 #   zitadel-up-server — boot Zitadel with the containerized Citius server
 #   hooks       — install .githooks/ as the local git hooks directory (run once per clone)
 
-.PHONY: help build docker-build test test-race test-cover smoke vet lint lint-go lint-proto
+.PHONY: help build docker-build test test-race test-vault test-cover smoke vet lint lint-go lint-proto
 .PHONY: fmt proto generate clean ci test-pkg run run-dev run-dev-tls hooks _hooks-check
 .PHONY: zitadel-up zitadel-up-server zitadel-up-dev zitadel-down zitadel-reset zitadel-reset-dev zitadel-nuke zitadel-env zitadel-login zitadel-login-all zitadel-smoke test-integration-auth-e2e test-integration-auth-human-e2e test-integration-auth-e2e-macos-podman
 .PHONY: proto-update-api
@@ -79,7 +80,7 @@ export CGO_LDFLAGS := -Wl,-rpath,$(OPENSSL_PREFIX)/lib64 $(CGO_LDFLAGS)
 # ---------------------------------------------------------------------------
 # CI gate — MUST pass before merge
 # ---------------------------------------------------------------------------
-ci: _hooks-check lint test-race smoke ## CI entry point: lint + test-race + smoke (merge gate)
+ci: _hooks-check lint test-race test-vault smoke ## CI entry point: lint + test-race + test-vault + smoke (merge gate)
 
 # Warn (not fail) if the git hooks have not been installed in this clone.
 _hooks-check:
@@ -147,6 +148,10 @@ test-race: ## Run all unit tests with the race detector
 	go test ./internal/... ./vault-storage/... ./bootstrap/zitadel/interactive-login -race -count=1
 	# setup-auth is its own module, outside go.work.
 	cd bootstrap/zitadel/setup-auth && GOWORK=off go test ./... -race -count=1
+
+test-vault: ## Run the Vault-plugin tests (vault_plugin build tag) in vault-storage
+	# vault-storage/app and vault-storage/integration only build with the tag.
+	go test -tags vault_plugin ./vault-storage/... -race -count=1
 
 test-cover: ## Run tests and generate HTML coverage report
 	go test ./internal/... ./vault-storage/... -coverprofile=coverage.out -count=1

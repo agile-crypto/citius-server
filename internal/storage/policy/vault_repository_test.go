@@ -7,8 +7,8 @@ import (
 	corepolicy "github.com/agile-crypto/citius-core/policy"
 
 	"github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
 )
 
 func newTestPolicy(name string) *corepolicy.Policy {
@@ -16,8 +16,8 @@ func newTestPolicy(name string) *corepolicy.Policy {
 }
 
 var repoFn = func() corepolicy.Repository {
-	storage := &logical.InmemStorage{}
-	r, err := policy.NewVaultRepository(context.Background(), storage)
+	store := &storage.InmemStorage{}
+	r, err := policy.NewVaultRepository(context.Background(), store)
 	if err != nil {
 		panic("failed to create policy VaultRepository: " + err.Error())
 	}

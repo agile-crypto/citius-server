@@ -1,7 +1,8 @@
-//go:build vault_plugin
-
-// Package integration_test contains end-to-end tests for the CaaS core.
-// These tests wire the entire system via vault.NewService → ForStorage and
+// Package integration contains end-to-end tests for the CaaS core.
+// These tests wire the entire system via requestWiring → ForStorage, over the
+// same internal/storage repositories and storage.InmemStorage as the gRPC
+// server (the *_vault_test.go files run the same tests through vault.Service
+// and Vault's logical.Storage, under the vault_plugin build tag), and
 // verify that all components (orchestrators, policy, template registry,
 // provider registry) work together through the factory wiring.
 //
@@ -11,7 +12,7 @@
 //   - Verify returns true iff signature == input
 //
 // This makes tests 100% hermetic — no real crypto, no external dependencies.
-package integration_test
+package integration
 
 import (
 	"context"
@@ -28,13 +29,11 @@ import (
 	"github.com/agile-crypto/citius-core/service"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
-	"github.com/agile-crypto/citius-server/internal/app/vault"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
 	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // ============================================================================
@@ -62,15 +61,15 @@ func (n *noopInstanceManager) List(_ context.Context) ([]*provider.Instance, err
 }
 func (n *noopInstanceManager) Delete(_ context.Context, _ string) error { return nil }
 
-// wireLoopback builds a fully wired vault.Service backed by the loopback provider.
+// wireLoopback builds a fully wired requestWiring backed by the loopback provider.
 // Templates are loaded from the standard catalog; the loopback provider handles
 // both ecdsa-p256-sha256-der and ml-dsa-65.
-func wireLoopback(t *testing.T) *vault.Service {
+func wireLoopback(t *testing.T) *requestWiring {
 	t.Helper()
 	ctx := context.Background()
 
 	// Shared template registry — loaded once, used across all ForStorage calls.
-	bootstrapStorage := &logical.InmemStorage{}
+	bootstrapStorage := &storage.InmemStorage{}
 	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
@@ -93,33 +92,46 @@ func wireLoopback(t *testing.T) *vault.Service {
 		t.Fatalf("ValidateAllProviders: %v", err)
 	}
 
-	// Factory functions — each receives the per-request storage.Storage
-	// and creates the full dependency graph from it.
-	keyFactory := func(s storage.Storage) (service.KeyOrchestrator, error) {
-		return buildKeyOrchestrator(ctx, s, reg, provReg)
-	}
-	cryptoFactory := func(s storage.Storage) (service.CryptoOrchestrator, error) {
-		return buildCryptoOrchestrator(ctx, s, reg, provReg)
-	}
-	policyFactory := func(s storage.Storage) (corepolicy.Engine, error) {
-		return buildPolicyEngine(ctx, s)
-	}
-	instanceFactory := func(_ storage.Storage) (provider.InstanceManager, error) {
-		return &noopInstanceManager{}, nil
-	}
+	return &requestWiring{templates: reg, providers: provReg}
+}
 
-	svc, err := vault.NewService(
-		vault.WithKeyOrchestratorFactory(keyFactory),
-		vault.WithCryptoOrchestratorFactory(cryptoFactory),
-		vault.WithPolicyEngineFactory(policyFactory),
-		vault.WithProviderInstanceManagerFactory(instanceFactory),
-		vault.WithTemplateRegistry(reg),
-		vault.WithProviderRegistry(provReg),
-	)
+// requestWiring is the non-Vault counterpart of vault.Service. It builds the
+// orchestrators and policy engine the way the gRPC server does
+// (internal/cmd/server wireFactoriesWithStorage): the internal/storage
+// repositories over a storage.Storage, with shared template and provider
+// registries. The provider registry is injected so the tests can use the
+// loopback or software provider alone.
+type requestWiring struct {
+	templates coretemplate.Registry
+	providers provider.Registry
+}
+
+// requestScope holds one storage's orchestrators and policy engine.
+type requestScope struct {
+	keys      service.KeyOrchestrator
+	cryptoOps service.CryptoOrchestrator
+	policy    corepolicy.Engine
+}
+
+func (r *requestScope) Keys() service.KeyOrchestrator      { return r.keys }
+func (r *requestScope) Crypto() service.CryptoOrchestrator { return r.cryptoOps }
+func (r *requestScope) Policy() corepolicy.Engine          { return r.policy }
+
+// ForStorage builds a requestScope whose repositories all share store.
+func (w *requestWiring) ForStorage(ctx context.Context, store storage.Storage) (*requestScope, error) {
+	keys, err := buildKeyOrchestrator(ctx, store, w.templates, w.providers)
 	if err != nil {
-		t.Fatalf("NewService: %v", err)
+		return nil, err
 	}
-	return svc
+	cryptoOps, err := buildCryptoOrchestrator(ctx, store, w.templates, w.providers)
+	if err != nil {
+		return nil, err
+	}
+	pol, err := buildPolicyEngine(ctx, store)
+	if err != nil {
+		return nil, err
+	}
+	return &requestScope{keys: keys, cryptoOps: cryptoOps, policy: pol}, nil
 }
 
 // seedPolicy creates a policy in the request scope that allows the given
@@ -215,7 +227,7 @@ func buildPolicyEngine(
 func TestIntegration_Loopback_CreateKey_Sign_Verify_ECDSA(t *testing.T) {
 	svc := wireLoopback(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -280,7 +292,7 @@ func TestIntegration_Loopback_CreateKey_Sign_Verify_ECDSA(t *testing.T) {
 func TestIntegration_Loopback_CreateKey_Sign_Verify_MLDSA(t *testing.T) {
 	svc := wireLoopback(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -334,7 +346,7 @@ func TestIntegration_Loopback_CreateKey_Sign_Verify_MLDSA(t *testing.T) {
 func TestIntegration_Loopback_TamperedPayload_ReturnsFalse(t *testing.T) {
 	svc := wireLoopback(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -388,7 +400,7 @@ func TestIntegration_Loopback_TamperedPayload_ReturnsFalse(t *testing.T) {
 func TestIntegration_Loopback_ScopeBased_CreateKey(t *testing.T) {
 	svc := wireLoopback(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -436,8 +448,8 @@ func TestIntegration_Loopback_MultipleKeys_IsolatedStorage(t *testing.T) {
 	ctx := context.Background()
 
 	// Each ForStorage call gets its own InmemStorage — keys are isolated.
-	store1 := &logical.InmemStorage{}
-	store2 := &logical.InmemStorage{}
+	store1 := &storage.InmemStorage{}
+	store2 := &storage.InmemStorage{}
 
 	requestScope1, err := svc.ForStorage(ctx, store1)
 	if err != nil {
@@ -488,7 +500,7 @@ func TestIntegration_Loopback_MultipleKeys_IsolatedStorage(t *testing.T) {
 func TestIntegration_Loopback_TransformKey_Sign_Verify(t *testing.T) {
 	svc := wireLoopback(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {

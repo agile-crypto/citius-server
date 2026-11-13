@@ -15,11 +15,11 @@ import (
 	coreprovider "github.com/agile-crypto/citius-core/provider"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
 
-	"github.com/agile-crypto/vault-storage/template"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // ============================================================================
@@ -84,14 +84,14 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 	t.Helper()
 
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, err := key.NewVaultRepository(ctx, storage)
+	repo, err := key.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRepository: %v", err)
 	}
 
-	reg, err := template.NewVaultRegistry(ctx, storage)
+	reg, err := template.NewVaultRegistry(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
@@ -109,7 +109,7 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 		t.Fatalf("Register provider: %v", err)
 	}
 
-	policyRepo, err := policy.NewVaultRepository(ctx, storage)
+	policyRepo, err := policy.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}

@@ -17,10 +17,10 @@ import (
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 const (
@@ -50,14 +50,14 @@ type publicKeyFixture struct {
 func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 	t.Helper()
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, err := key.NewVaultRepository(ctx, storage)
+	repo, err := key.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRepository: %v", err)
 	}
 
-	reg, err := template.NewVaultRegistry(ctx, storage)
+	reg, err := template.NewVaultRegistry(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
@@ -73,7 +73,7 @@ func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 		t.Fatalf("Register provider: %v", err)
 	}
 
-	policyRepo, err := policy.NewVaultRepository(ctx, storage)
+	policyRepo, err := policy.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}

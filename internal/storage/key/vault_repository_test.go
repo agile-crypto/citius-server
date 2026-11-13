@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -76,8 +76,8 @@ func mustCreateKey(t *testing.T, r corekey.Repository, publicID, name string, sc
 }
 
 var repoFn = func() corekey.Repository {
-	storage := &logical.InmemStorage{}
-	r, err := NewVaultRepository(context.Background(), storage)
+	store := &storage.InmemStorage{}
+	r, err := NewVaultRepository(context.Background(), store)
 	if err != nil {
 		panic("failed to create VaultRepository: " + err.Error())
 	}

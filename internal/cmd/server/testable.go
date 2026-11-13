@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
 
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
@@ -14,7 +14,6 @@ import (
 	keymgmthandler "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	policyhandler "github.com/agile-crypto/citius-server/internal/grpc/policy"
 	providergrpc "github.com/agile-crypto/citius-server/internal/grpc/provider"
-	"github.com/agile-crypto/citius-server/internal/storage"
 )
 
 // TestableHandler wraps a Handler with access to a shared request-scoped
@@ -46,7 +45,7 @@ func NewTestableServer(ctx context.Context, cfg Config) (*TestableHandler, error
 	const op engerr.Op = "server.NewTestableServer"
 	// Both the handler's storageFactory and SeedPolicy use the SAME
 	// InmemStorage so that policies seeded before an RPC are visible.
-	sharedStore := &logical.InmemStorage{}
+	sharedStore := &storage.InmemStorage{}
 
 	fns, err := wireFactoriesWithStorage(ctx, cfg, sharedStore, op)
 	if err != nil {

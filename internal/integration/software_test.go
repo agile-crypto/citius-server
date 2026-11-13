@@ -1,47 +1,42 @@
-//go:build vault_plugin
-
-// Package integration_test — software_test.go exercises the software provider
+// Package integration — software_test.go exercises the software provider
 // with real ECDSA-P256 and ML-DSA-65 crypto through the full orchestration
-// stack: vault.Service => RequestScope => CryptoOrchestrator => KeyOrchestrator =>
+// stack: requestWiring => requestScope => CryptoOrchestrator => KeyOrchestrator =>
 // ProviderRegistry => software.Provider.
 //
 // Unlike the loopback tests (deterministic echo), these tests validate
 // real cryptographic correctness end-to-end.
-package integration_test
+package integration
 
 import (
 	"bytes"
 	"context"
 	"testing"
 
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
-	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
-	"github.com/agile-crypto/citius-server/internal/app/vault"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/vault-storage/template"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // ============================================================================
 // Wiring Helper — Software Provider
 // ============================================================================
 
-// wireWithSoftwareProvider builds a fully wired vault.Service backed by the real software
+// wireWithSoftwareProvider builds a fully wired requestWiring backed by the real software
 // provider. Templates are loaded from the standard catalog.
-func wireWithSoftwareProvider(t *testing.T) *vault.Service {
+func wireWithSoftwareProvider(t *testing.T) *requestWiring {
 	t.Helper()
 	ctx := context.Background()
 
 	// Shared template registry — loaded once from the standard catalog.
-	bootstrapStorage := &logical.InmemStorage{}
+	bootstrapStorage := &storage.InmemStorage{}
 	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
@@ -64,32 +59,8 @@ func wireWithSoftwareProvider(t *testing.T) *vault.Service {
 		t.Fatalf("ValidateAllProviders: %v", err)
 	}
 
-	// Factory functions — reuse the extracted builders from loopback_test.go.
-	keyFactory := func(s storage.Storage) (service.KeyOrchestrator, error) {
-		return buildKeyOrchestrator(ctx, s, reg, provReg)
-	}
-	cryptoFactory := func(s storage.Storage) (service.CryptoOrchestrator, error) {
-		return buildCryptoOrchestrator(ctx, s, reg, provReg)
-	}
-	policyFactory := func(s storage.Storage) (policy.Engine, error) {
-		return buildPolicyEngine(ctx, s)
-	}
-	instanceFactory := func(_ storage.Storage) (provider.InstanceManager, error) {
-		return &noopInstanceManager{}, nil
-	}
-
-	svc, err := vault.NewService(
-		vault.WithKeyOrchestratorFactory(keyFactory),
-		vault.WithCryptoOrchestratorFactory(cryptoFactory),
-		vault.WithPolicyEngineFactory(policyFactory),
-		vault.WithProviderInstanceManagerFactory(instanceFactory),
-		vault.WithTemplateRegistry(reg),
-		vault.WithProviderRegistry(provReg),
-	)
-	if err != nil {
-		t.Fatalf("NewService (software): %v", err)
-	}
-	return svc
+	// requestWiring and its builders are defined in loopback_test.go.
+	return &requestWiring{templates: reg, providers: provReg}
 }
 
 // ============================================================================
@@ -99,7 +70,7 @@ func wireWithSoftwareProvider(t *testing.T) *vault.Service {
 func TestIntegration_Software_ECDSA_RoundTrip(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -154,7 +125,7 @@ func TestIntegration_Software_ECDSA_RoundTrip(t *testing.T) {
 func TestIntegration_Software_MLDSA_RoundTrip(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -213,7 +184,7 @@ func TestIntegration_Software_MLDSA_RoundTrip(t *testing.T) {
 func TestIntegration_Software_TamperedPayload_ECDSA(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -266,7 +237,7 @@ func TestIntegration_Software_TamperedPayload_ECDSA(t *testing.T) {
 func TestIntegration_Software_TamperedSignature_ECDSA(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -324,7 +295,7 @@ func TestIntegration_Software_TamperedSignature_ECDSA(t *testing.T) {
 func TestIntegration_Software_SignatureSizes_Different(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -386,7 +357,7 @@ func TestIntegration_Software_MultipleSignatures_NotDeterministic(t *testing.T) 
 	// ECDSA uses a random nonce (k) — two signatures of the same payload must differ.
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -453,7 +424,7 @@ func TestIntegration_Software_MultipleSignatures_NotDeterministic(t *testing.T) 
 func TestIntegration_Software_ReadKey_AfterCreate(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -493,7 +464,7 @@ func TestIntegration_Software_ReadKey_AfterCreate(t *testing.T) {
 func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t *testing.T) {
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
@@ -608,7 +579,7 @@ func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t 
 // func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t *testing.T) {
 // 	svc := wireWithSoftwareProvider(t)
 // 	ctx := context.Background()
-// 	store := &logical.InmemStorage{}
+// 	store := &storage.InmemStorage{}
 
 // 	requestScope, err := svc.ForStorage(ctx, store)
 // 	if err != nil {

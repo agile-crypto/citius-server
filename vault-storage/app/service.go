@@ -1,6 +1,6 @@
 //go:build vault_plugin
 
-package vault
+package app
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
 	"github.com/agile-crypto/citius-core/template"
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 const (
@@ -67,7 +67,7 @@ func (s *Service) validate() error {
 
 // ForStorage calls all four factories with the given Storage and returns a
 // *RequestScope ready for a single request's use.
-func (s *Service) ForStorage(ctx context.Context, store storage.Storage) (*RequestScope, error) {
+func (s *Service) ForStorage(ctx context.Context, store logical.Storage) (*RequestScope, error) {
 	keys, err := s.keyOrchestratorFn(store)
 	if err != nil {
 		return nil, errors.Wrap(ctx, opForStorage, err)

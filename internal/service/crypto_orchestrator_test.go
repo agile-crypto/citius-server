@@ -10,10 +10,10 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/vault-storage/key"
-	"github.com/agile-crypto/vault-storage/policy"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-server/internal/storage/policy"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // ============================================================================
@@ -27,14 +27,14 @@ import (
 func setupCryptoOrchestratorFull(t *testing.T) (service.CryptoOrchestrator, service.KeyOrchestrator, corepolicy.Engine) {
 	t.Helper()
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, err := key.NewVaultRepository(ctx, storage)
+	repo, err := key.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRepository: %v", err)
 	}
 
-	reg, err := template.NewVaultRegistry(ctx, storage)
+	reg, err := template.NewVaultRegistry(ctx, store)
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
@@ -51,7 +51,7 @@ func setupCryptoOrchestratorFull(t *testing.T) (service.CryptoOrchestrator, serv
 		t.Fatalf("Register provider: %v", err)
 	}
 
-	policyRepo, err := policy.NewVaultRepository(ctx, storage)
+	policyRepo, err := policy.NewVaultRepository(ctx, store)
 	if err != nil {
 		t.Fatalf("policy.NewVaultRepository: %v", err)
 	}
@@ -95,11 +95,11 @@ func TestNewCryptoOrchestrator_allDependencies_succeeds(t *testing.T) {
 
 func TestNewCryptoOrchestrator_nilKeyReader_returnsError(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	reg, _ := template.NewVaultRegistry(ctx, storage)
+	reg, _ := template.NewVaultRegistry(ctx, store)
 	provReg := provider.NewRegistry()
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo, _ := policy.NewVaultRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 
@@ -111,10 +111,10 @@ func TestNewCryptoOrchestrator_nilKeyReader_returnsError(t *testing.T) {
 
 func TestNewCryptoOrchestrator_nilPolicyEngine_returnsError(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, storage)
-	reg, _ := template.NewVaultRegistry(ctx, storage)
+	repo, _ := key.NewVaultRepository(ctx, store)
+	reg, _ := template.NewVaultRegistry(ctx, store)
 	provReg := provider.NewRegistry()
 
 	_, err := service.NewCryptoOrchestrator(repo, nil, provReg, reg)
@@ -125,11 +125,11 @@ func TestNewCryptoOrchestrator_nilPolicyEngine_returnsError(t *testing.T) {
 
 func TestNewCryptoOrchestrator_nilProviderRegistry_returnsError(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, storage)
-	reg, _ := template.NewVaultRegistry(ctx, storage)
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	repo, _ := key.NewVaultRepository(ctx, store)
+	reg, _ := template.NewVaultRegistry(ctx, store)
+	policyRepo, _ := policy.NewVaultRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 
@@ -141,11 +141,11 @@ func TestNewCryptoOrchestrator_nilProviderRegistry_returnsError(t *testing.T) {
 
 func TestNewCryptoOrchestrator_nilTemplateRegistry_returnsError(t *testing.T) {
 	ctx := context.Background()
-	storage := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
-	repo, _ := key.NewVaultRepository(ctx, storage)
+	repo, _ := key.NewVaultRepository(ctx, store)
 	provReg := provider.NewRegistry()
-	policyRepo, _ := policy.NewVaultRepository(ctx, storage)
+	policyRepo, _ := policy.NewVaultRepository(ctx, store)
 	eval := corepolicy.NewSimpleRulesEvaluator()
 	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
 

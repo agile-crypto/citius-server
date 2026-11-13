@@ -1,6 +1,6 @@
 //go:build vault_plugin
 
-package vault
+package app
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
 	"github.com/agile-crypto/citius-core/template"
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // ============================================================================
@@ -17,7 +17,7 @@ import (
 // ============================================================================
 //
 // This file is the Vault-plugin half of the wiring, and the only place a
-// storage.Storage is threaded through per request — a genuine property of the
+// logical.Storage is threaded through per request — a genuine property of the
 // Vault deployment, where the plugin receives a logical.Storage on every
 // inbound *logical.Request and must use exactly that one.
 //
@@ -26,20 +26,19 @@ import (
 // …), which say nothing about storage; binding a request's storage into those
 // factories happens here.
 //
-// This package belongs on the adapter tier of the module topology and should
-// move to the vault-storage module when that split happens. Nothing above it
-// should acquire an import of it in the meantime.
+// This package lives in the vault-storage module, the adapter tier of the
+// module topology. citius-server must not import it.
 
 // Vault*Builder types build one subsystem over one request's storage. They are
 // the storage-taking form; Bind converts them into the storage-free domain
 // factories the transports accept.
 type (
-	VaultKeyBuilder      func(ctx context.Context, store storage.Storage) (service.KeyOrchestrator, error)
-	VaultCryptoBuilder   func(ctx context.Context, store storage.Storage) (service.CryptoOrchestrator, error)
-	VaultPolicyBuilder   func(ctx context.Context, store storage.Storage) (policy.Engine, error)
-	VaultInstanceBuilder func(ctx context.Context, store storage.Storage) (provider.InstanceManager, error)
-	VaultTemplateBuilder func(ctx context.Context, store storage.Storage) (template.Registry, error)
-	VaultCatalogBuilder  func(ctx context.Context, store storage.Storage) (provider.Registry, error)
+	VaultKeyBuilder      func(ctx context.Context, store logical.Storage) (service.KeyOrchestrator, error)
+	VaultCryptoBuilder   func(ctx context.Context, store logical.Storage) (service.CryptoOrchestrator, error)
+	VaultPolicyBuilder   func(ctx context.Context, store logical.Storage) (policy.Engine, error)
+	VaultInstanceBuilder func(ctx context.Context, store logical.Storage) (provider.InstanceManager, error)
+	VaultTemplateBuilder func(ctx context.Context, store logical.Storage) (template.Registry, error)
+	VaultCatalogBuilder  func(ctx context.Context, store logical.Storage) (provider.Registry, error)
 )
 
 // Every capability is a builder, including the two that are startup-built and
@@ -89,4 +88,4 @@ type BoundFactories struct {
 // passing a different store would silently read and write the wrong Vault
 // mount. The returned factories are lazy — a path that only reads policy never
 // invokes the key builder — and single-request scoped.
-func (p *VaultProviders) Bind(store storage.Storage) BoundFactories { panic("not implemented") }
+func (p *VaultProviders) Bind(store logical.Storage) BoundFactories { panic("not implemented") }

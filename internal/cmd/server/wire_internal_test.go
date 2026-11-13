@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
 
 	"github.com/agile-crypto/ossl-go/ossl"
 
@@ -71,7 +71,7 @@ activate = 1
 // black-box request would ever observe openssl missing.
 func TestBuildProviderRegistry_registersBothProviders(t *testing.T) {
 	ctx := context.Background()
-	templateReg, err := buildTemplateRegistry(ctx, &logical.InmemStorage{}, catalogPath())
+	templateReg, err := buildTemplateRegistry(ctx, &storage.InmemStorage{}, catalogPath())
 	if err != nil {
 		t.Fatalf("buildTemplateRegistry: %v", err)
 	}
@@ -109,7 +109,7 @@ func TestBuildProviderRegistry_FIPSConfigured_registersThirdProvider(t *testing.
 	fipsCfgPath := activatingFIPSConfig(t)
 
 	ctx := context.Background()
-	templateReg, err := buildTemplateRegistry(ctx, &logical.InmemStorage{}, catalogPath())
+	templateReg, err := buildTemplateRegistry(ctx, &storage.InmemStorage{}, catalogPath())
 	if err != nil {
 		t.Fatalf("buildTemplateRegistry: %v", err)
 	}
@@ -212,7 +212,7 @@ func TestBuildProviderRegistry_FIPSConfigured_registersThirdProvider(t *testing.
 // instance is skipped.
 func TestBuildProviderRegistry_FIPSConstructionFails_isNonFatal(t *testing.T) {
 	ctx := context.Background()
-	templateReg, err := buildTemplateRegistry(ctx, &logical.InmemStorage{}, catalogPath())
+	templateReg, err := buildTemplateRegistry(ctx, &storage.InmemStorage{}, catalogPath())
 	if err != nil {
 		t.Fatalf("buildTemplateRegistry: %v", err)
 	}

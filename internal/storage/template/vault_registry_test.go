@@ -8,8 +8,8 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/errors"
 	coretemplate "github.com/agile-crypto/citius-core/template"
-	"github.com/agile-crypto/vault-storage/template"
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // boolPtr mirrors core/template's private test helper of the same name —
@@ -80,8 +80,8 @@ func mldsaTemplate() *coretemplate.Template {
 }
 
 var registryFn = func() coretemplate.Registry {
-	storage := &logical.InmemStorage{}
-	r, err := template.NewVaultRegistry(context.Background(), storage)
+	store := &storage.InmemStorage{}
+	r, err := template.NewVaultRegistry(context.Background(), store)
 	if err != nil {
 		panic("failed to create template VaultRegistry: " + err.Error())
 	}

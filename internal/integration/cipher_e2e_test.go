@@ -1,12 +1,10 @@
-//go:build vault_plugin
-
-package integration_test
+package integration
 
 import (
 	"context"
 	"testing"
 
-	"github.com/hashicorp/vault/sdk/logical"
+	"github.com/agile-crypto/citius-server/internal/storage"
 	"google.golang.org/protobuf/proto"
 
 	messages "github.com/agile-crypto/citius-api-go/gen/go/messages"
@@ -16,7 +14,7 @@ import (
 )
 
 // cipherE2ETemplates lists every cipher template this test exercises through
-// the full orchestration stack (vault.Service -> RequestScope ->
+// the full orchestration stack (requestWiring -> RequestScope ->
 // CryptoOrchestrator -> KeyOrchestrator -> ProviderRegistry ->
 // software.Provider), paired with the scope its catalog entry declares and
 // whether that scope requires AeadParams (GCM, ChaCha20-Poly1305/XChaCha20)
@@ -72,7 +70,7 @@ func assertCreateKeyEncryptDecryptRoundTrip(t *testing.T, templateID string, sco
 	t.Helper()
 	svc := wireWithSoftwareProvider(t)
 	ctx := context.Background()
-	store := &logical.InmemStorage{}
+	store := &storage.InmemStorage{}
 
 	requestScope, err := svc.ForStorage(ctx, store)
 	if err != nil {
