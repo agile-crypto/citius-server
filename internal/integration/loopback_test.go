@@ -46,21 +46,6 @@ func catalogPath() string {
 	return filepath.Join(filepath.Dir(f), "..", "..", "proto", "standard_algorithms.json")
 }
 
-// noopInstanceManager is a minimal stub satisfying provider.InstanceManager.
-// The integration tests do not exercise provider instance CRUD.
-type noopInstanceManager struct{}
-
-func (n *noopInstanceManager) Create(_ context.Context, pi *provider.Instance) (*provider.Instance, error) {
-	return pi, nil
-}
-func (n *noopInstanceManager) Read(_ context.Context, _ string) (*provider.Instance, error) {
-	return nil, nil
-}
-func (n *noopInstanceManager) List(_ context.Context) ([]*provider.Instance, error) {
-	return nil, nil
-}
-func (n *noopInstanceManager) Delete(_ context.Context, _ string) error { return nil }
-
 // wireLoopback builds a fully wired requestWiring backed by the loopback provider.
 // Templates are loaded from the standard catalog; the loopback provider handles
 // both ecdsa-p256-sha256-der and ml-dsa-65.
