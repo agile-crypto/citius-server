@@ -8,7 +8,7 @@ package vaultlogical
 import (
 	"context"
 
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-core/storage"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 

@@ -9,7 +9,7 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-core/storage"
 
 	"github.com/agile-crypto/ossl-go/ossl"
 

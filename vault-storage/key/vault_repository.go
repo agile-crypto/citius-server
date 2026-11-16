@@ -7,20 +7,20 @@ package key
 import (
 	"context"
 
-	storagekey "github.com/agile-crypto/citius-server/internal/storage/key"
+	"github.com/agile-crypto/citius-core/key"
 	"github.com/agile-crypto/citius-server/vault-storage/vaultlogical"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
 type (
 	// VaultRepository is the key repository built by NewVaultRepository.
-	VaultRepository = storagekey.StorageRepository
+	VaultRepository = key.StorageRepository
 	// VaultRepositoryOption configures NewVaultRepository.
-	VaultRepositoryOption = storagekey.StorageRepositoryOption
+	VaultRepositoryOption = key.RepoOptions
 )
 
 // NewVaultRepository returns a key repository backed by the given Vault
 // storage.
-func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...VaultRepositoryOption) (*VaultRepository, error) {
-	return storagekey.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
+func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...key.Option) (*VaultRepository, error) {
+	return key.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
 }

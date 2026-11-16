@@ -8,17 +8,16 @@ package template
 import (
 	"context"
 
-	coretemplate "github.com/agile-crypto/citius-core/template"
-	storagetemplate "github.com/agile-crypto/citius-server/internal/storage/template"
+	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/vault-storage/vaultlogical"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // VaultRegistry is the template registry built by NewVaultRegistry.
-type VaultRegistry = storagetemplate.VaultRegistry
+type VaultRegistry = template.VaultRegistry
 
 // NewVaultRegistry returns a template registry backed by the given Vault
 // storage.
-func NewVaultRegistry(ctx context.Context, s logical.Storage, opt ...coretemplate.Option) (*VaultRegistry, error) {
-	return storagetemplate.NewVaultRegistry(ctx, vaultlogical.FromLogical(s), opt...)
+func NewVaultRegistry(ctx context.Context, s logical.Storage, opt ...template.Option) (*VaultRegistry, error) {
+	return template.NewVaultRegistry(ctx, vaultlogical.FromLogical(s), opt...)
 }

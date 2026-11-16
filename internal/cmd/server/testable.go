@@ -3,7 +3,7 @@ package server
 import (
 	"context"
 
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-core/storage"
 
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"

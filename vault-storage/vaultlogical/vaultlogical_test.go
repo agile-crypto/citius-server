@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-core/storage"
 	"github.com/agile-crypto/citius-server/vault-storage/vaultlogical"
 	"github.com/hashicorp/vault/sdk/logical"
 	"github.com/stretchr/testify/assert"

@@ -7,19 +7,16 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
 
 	core "github.com/agile-crypto/citius-core"
-	corekey "github.com/agile-crypto/citius-core/key"
-	corepolicy "github.com/agile-crypto/citius-core/policy"
-	coreprovider "github.com/agile-crypto/citius-core/provider"
-	coretemplate "github.com/agile-crypto/citius-core/template"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/storage"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/storage/key"
-	"github.com/agile-crypto/citius-server/internal/storage/policy"
 
-	"github.com/agile-crypto/citius-server/internal/storage/template"
+	"github.com/agile-crypto/citius-core/template"
 )
 
 // ============================================================================
@@ -43,12 +40,12 @@ func scopeSpecWithScope(t *testing.T, scope core.Scope) *core.ScopeSpecification
 
 // seedPermissivePolicy creates a policy that allows the ml-dsa-65 template and
 // the create_key operation. Used by setupOrchestrator and inline test setups.
-func seedPermissivePolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine) {
+func seedPermissivePolicy(t *testing.T, ctx context.Context, pol policy.Engine) {
 	t.Helper()
-	rules := &corepolicy.Rules{
+	rules := &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ml-dsa-65"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	}
@@ -56,7 +53,7 @@ func seedPermissivePolicy(t *testing.T, ctx context.Context, pol corepolicy.Engi
 	if err != nil {
 		t.Fatalf("marshal rules: %v", err)
 	}
-	p := corepolicy.NewPolicy("pol_testperm", testPolicyName, rulesJSON)
+	p := policy.NewPolicy("pol_testperm", testPolicyName, rulesJSON)
 	_, err = pol.CreatePolicy(ctx, p)
 	if err != nil {
 		t.Fatalf("seed policy: %v", err)
@@ -80,7 +77,7 @@ func catalogPath() string {
 //
 // A permissive policy (testPolicyName) is pre-seeded that allows ml-dsa-65 and
 // the create_key operation.
-func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repository, coreprovider.Registry, corepolicy.Engine, coretemplate.Registry) {
+func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, key.Repository, provider.Registry, policy.Engine, template.Registry) {
 	t.Helper()
 
 	ctx := context.Background()
@@ -97,12 +94,12 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 	}
 
 	// Load the standard algorithm catalog — includes "ml-dsa-65".
-	err = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
+	err = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
 
-	provReg := coreprovider.NewRegistry()
+	provReg := provider.NewRegistry()
 	sw := software.New()
 	err = provReg.Register(ctx, sw)
 	if err != nil {
@@ -113,8 +110,8 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 	if err != nil {
 		t.Fatalf("policy.NewStorageRepository: %v", err)
 	}
-	eval := corepolicy.NewSimpleRulesEvaluator()
-	pol, err := corepolicy.NewEnforcer(policyRepo, eval)
+	eval := policy.NewSimpleRulesEvaluator()
+	pol, err := policy.NewEnforcer(policyRepo, eval)
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -131,7 +128,7 @@ func setupOrchestratorFull(t *testing.T) (service.KeyOrchestrator, corekey.Repos
 // setupOrchestratorWithPolicy is a convenience wrapper that returns the
 // orchestrator and policy engine (without the repo). Use setupOrchestratorFull
 // when you also need the underlying key.Repository for lifecycle mutation.
-func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, corepolicy.Engine) {
+func setupOrchestratorWithPolicy(t *testing.T) (service.KeyOrchestrator, policy.Engine) {
 	t.Helper()
 	orch, _, _, pol, _ := setupOrchestratorFull(t)
 	return orch, pol

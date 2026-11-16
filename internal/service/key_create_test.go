@@ -9,14 +9,12 @@ import (
 
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
-	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	coretemplate "github.com/agile-crypto/citius-core/template"
+	"github.com/agile-crypto/citius-core/storage"
+	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/storage/key"
-	"github.com/agile-crypto/citius-server/internal/storage/policy"
-	"github.com/agile-crypto/citius-server/internal/storage/template"
 	"github.com/stretchr/testify/require"
 )
 
@@ -146,11 +144,11 @@ func TestCreateKey_providerNotFound_returnsError(t *testing.T) {
 
 	repo, _ := key.NewStorageRepository(ctx, store)
 	reg, _ := template.NewVaultRegistry(ctx, store)
-	_ = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
+	_ = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
 	policyRepo, _ := policy.NewStorageRepository(ctx, store)
-	eval := corepolicy.NewSimpleRulesEvaluator()
-	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
+	eval := policy.NewSimpleRulesEvaluator()
+	pol, _ := policy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)
 
 	orch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
@@ -215,11 +213,11 @@ func TestCreateKey_withoutScope_returnsError(t *testing.T) {
 
 	repo, _ := key.NewStorageRepository(ctx, store)
 	reg, _ := template.NewVaultRegistry(ctx, store)
-	_ = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
+	_ = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	provReg := provider.NewRegistry() // empty — no providers
 	policyRepo, _ := policy.NewStorageRepository(ctx, store)
-	eval := corepolicy.NewSimpleRulesEvaluator()
-	pol, _ := corepolicy.NewEnforcer(policyRepo, eval)
+	eval := policy.NewSimpleRulesEvaluator()
+	pol, _ := policy.NewEnforcer(policyRepo, eval)
 	seedPermissivePolicy(t, ctx, pol)
 
 	orch, _ := service.NewKeyOrchestrator(repo, reg, provReg, pol)
@@ -238,7 +236,7 @@ func TestCreateKey_withoutScope_returnsError(t *testing.T) {
 
 // seedScopePolicy creates a named policy with the given rules and returns the
 // policy name. Convenience for scope-based tests that need custom policies.
-func seedScopePolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine, name string, rules *corepolicy.Rules) string {
+func seedScopePolicy(t *testing.T, ctx context.Context, pol policy.Engine, name string, rules *policy.Rules) string {
 	t.Helper()
 	var rulesJSON []byte
 	if rules != nil {
@@ -248,7 +246,7 @@ func seedScopePolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine, n
 			t.Fatalf("marshal rules: %v", err)
 		}
 	}
-	p := corepolicy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
+	p := policy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
 	_, err := pol.CreatePolicy(ctx, p)
 	if err != nil {
 		t.Fatalf("seed policy %q: %v", name, err)
@@ -265,10 +263,10 @@ func TestCreateKey_scopeBased_permissivePolicy_selectsByScope(t *testing.T) {
 	ctx := context.Background()
 
 	// Seed a policy that allows ml-dsa-65 + create_key for the scope path.
-	policyName := seedScopePolicy(t, ctx, pol, "scope-permissive", &corepolicy.Rules{
+	policyName := seedScopePolicy(t, ctx, pol, "scope-permissive", &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ml-dsa-65"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	})
@@ -293,10 +291,10 @@ func TestCreateKey_scopeBased_policyAllowsTemplate(t *testing.T) {
 	orch, pol := setupOrchestratorWithPolicy(t)
 	ctx := context.Background()
 
-	policyName := seedScopePolicy(t, ctx, pol, "allow-mldsa", &corepolicy.Rules{
+	policyName := seedScopePolicy(t, ctx, pol, "allow-mldsa", &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ml-dsa-65"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	})
@@ -319,10 +317,10 @@ func TestCreateKey_scopeBased_policyDenies_noMatchingTemplate(t *testing.T) {
 	ctx := context.Background()
 
 	// Policy allows only a template that doesn't exist in the catalog.
-	policyName := seedScopePolicy(t, ctx, pol, "deny-all-real", &corepolicy.Rules{
+	policyName := seedScopePolicy(t, ctx, pol, "deny-all-real", &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"nonexistent-template"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	})
@@ -360,10 +358,10 @@ func TestCreateKey_scopeBased_quantumSafeFilter(t *testing.T) {
 
 	// Allow both templates; the quantum_safe filter in the scope should narrow
 	// selection to ml-dsa-65 only (ecdsa-p256 is not quantum-safe).
-	policyName := seedScopePolicy(t, ctx, pol, "qs-policy", &corepolicy.Rules{
+	policyName := seedScopePolicy(t, ctx, pol, "qs-policy", &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ml-dsa-65", "ecdsa-p256-sha256-der"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	})
@@ -416,10 +414,10 @@ func TestCreateKey_scopeBased_primitiveMismatch(t *testing.T) {
 	ctx := context.Background()
 
 	// Allow everything — but the KEM primitive has no templates in the catalog.
-	policyName := seedScopePolicy(t, ctx, pol, "allow-all-kem", &corepolicy.Rules{
+	policyName := seedScopePolicy(t, ctx, pol, "allow-all-kem", &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ml-dsa-65", "ecdsa-p256-sha256-der"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationCreateKey)},
 		},
 	})

@@ -12,18 +12,16 @@ import (
 	"log"
 
 	engerr "github.com/agile-crypto/citius-core/errors"
-	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
-	coretemplate "github.com/agile-crypto/citius-core/template"
+	"github.com/agile-crypto/citius-core/storage"
+	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/grpc/authz"
 	"github.com/agile-crypto/citius-server/internal/provider/openssl"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/storage/key"
-	"github.com/agile-crypto/citius-server/internal/storage/policy"
-	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // Config carries the small number of knobs for NewServer.
@@ -77,7 +75,7 @@ func wireFactoriesWithStorage(ctx context.Context, cfg Config, store storage.Sto
 	if err != nil {
 		return FactorySet{}, engerr.Wrap(ctx, op, err)
 	}
-	templatesFn := func(context.Context) (coretemplate.Registry, error) {
+	templatesFn := func(context.Context) (template.Registry, error) {
 		return templateReg, nil
 	}
 
@@ -95,7 +93,7 @@ func wireFactoriesWithStorage(ctx context.Context, cfg Config, store storage.Sto
 	cryptoFn := func(context.Context) (service.CryptoOrchestrator, error) {
 		return buildVaultCryptoOrchestrator(ctx, store, templateReg, providerReg)
 	}
-	policyFn := func(context.Context) (corepolicy.Engine, error) {
+	policyFn := func(context.Context) (policy.Engine, error) {
 		return buildVaultPolicyEngine(ctx, store)
 	}
 
@@ -146,14 +144,14 @@ func buildTemplateRegistry(
 	ctx context.Context,
 	bootstrapStorage storage.Storage,
 	catalogPath string,
-) (coretemplate.Registry, error) {
+) (template.Registry, error) {
 	const op engerr.Op = "server.buildTemplateRegistry"
 	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
 	if err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}
 	if catalogPath != "" {
-		if err := coretemplate.LoadStandardCatalog(ctx, catalogPath, reg); err != nil {
+		if err := template.LoadStandardCatalog(ctx, catalogPath, reg); err != nil {
 			return nil, engerr.Wrap(ctx, op, err)
 		}
 	}
@@ -166,7 +164,7 @@ func buildTemplateRegistry(
 // template registry.
 func buildProviderRegistry(
 	ctx context.Context,
-	templateReg coretemplate.Registry,
+	templateReg template.Registry,
 	fipsConfigPath string,
 ) (provider.Registry, error) {
 	const op engerr.Op = "server.buildProviderRegistry"
@@ -226,7 +224,7 @@ func registerFIPSProvider(ctx context.Context, providerReg provider.Registry, fi
 
 func buildVaultKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
-	templateReg coretemplate.Registry, providerReg provider.Registry,
+	templateReg template.Registry, providerReg provider.Registry,
 ) (service.KeyOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
@@ -236,7 +234,7 @@ func buildVaultKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +243,7 @@ func buildVaultKeyOrchestrator(
 
 func buildVaultCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
-	templateReg coretemplate.Registry, providerReg provider.Registry,
+	templateReg template.Registry, providerReg provider.Registry,
 ) (service.CryptoOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
@@ -255,7 +253,7 @@ func buildVaultCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		return nil, err
 	}
@@ -264,12 +262,12 @@ func buildVaultCryptoOrchestrator(
 
 func buildVaultPolicyEngine(
 	ctx context.Context, s storage.Storage,
-) (corepolicy.Engine, error) {
+) (policy.Engine, error) {
 	policyRepo, err := policy.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-	return corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	return policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 }
 
 // noopInstanceManager satisfies provider.InstanceManager.

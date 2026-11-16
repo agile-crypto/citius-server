@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/agile-crypto/citius-server/internal/storage"
+	"github.com/agile-crypto/citius-core/storage"
 	"google.golang.org/protobuf/proto"
 
 	messages "github.com/agile-crypto/citius-api-go/gen/go/messages"

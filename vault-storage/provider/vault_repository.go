@@ -8,18 +8,17 @@ package provider
 import (
 	"context"
 
-	coreprovider "github.com/agile-crypto/citius-core/provider"
-	storageprovider "github.com/agile-crypto/citius-server/internal/storage/provider"
+	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-server/vault-storage/vaultlogical"
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
 // VaultRepository is the provider-instance repository built by
 // NewVaultRepository.
-type VaultRepository = storageprovider.StorageRepository
+type VaultRepository = provider.StorageRepository
 
 // NewVaultRepository returns a provider-instance repository backed by the
 // given Vault storage.
-func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...coreprovider.Option) (*VaultRepository, error) {
-	return storageprovider.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
+func NewVaultRepository(ctx context.Context, s logical.Storage, opt ...provider.Option) (*VaultRepository, error) {
+	return provider.NewStorageRepository(ctx, vaultlogical.FromLogical(s), opt...)
 }

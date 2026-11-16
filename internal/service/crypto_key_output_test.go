@@ -10,15 +10,13 @@ import (
 	types "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
-	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	coretemplate "github.com/agile-crypto/citius-core/template"
+	"github.com/agile-crypto/citius-core/storage"
+	"github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/storage/key"
-	"github.com/agile-crypto/citius-server/internal/storage/policy"
-	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // capturingSigner wraps the real software provider, recording the last
@@ -76,7 +74,7 @@ func setupWithCapturingSigner(t *testing.T) (service.CryptoOrchestrator, service
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
-	if err = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg); err != nil {
+	if err = template.LoadStandardCatalog(ctx, catalogPath(), reg); err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
 
@@ -90,15 +88,15 @@ func setupWithCapturingSigner(t *testing.T) (service.CryptoOrchestrator, service
 	if err != nil {
 		t.Fatalf("policy.NewStorageRepository: %v", err)
 	}
-	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
 
-	rules := &corepolicy.Rules{
+	rules := &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: []string{"ecdsa-p256-sha256-der", "ecdsa-p256-prehashed-der", "aes-256-gcm-128-96"},
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{
 				string(core.OperationCreateKey),
 				string(core.OperationSign),
@@ -113,7 +111,7 @@ func setupWithCapturingSigner(t *testing.T) (service.CryptoOrchestrator, service
 		t.Fatalf("marshal rules: %v", err)
 	}
 	const policyName = "test-key-output-allow"
-	p := corepolicy.NewPolicy("pol_keyoutput", policyName, rulesJSON)
+	p := policy.NewPolicy("pol_keyoutput", policyName, rulesJSON)
 	if _, err = pol.CreatePolicy(ctx, p); err != nil {
 		t.Fatalf("seed policy: %v", err)
 	}

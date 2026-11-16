@@ -24,16 +24,14 @@ import (
 	api "github.com/agile-crypto/citius-api-go/gen/go/types"
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
-	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
 	"github.com/agile-crypto/citius-core/service"
-	coretemplate "github.com/agile-crypto/citius-core/template"
+	"github.com/agile-crypto/citius-core/storage"
+	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/storage/key"
-	"github.com/agile-crypto/citius-server/internal/storage/policy"
-	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 // ============================================================================
@@ -59,7 +57,7 @@ func wireLoopback(t *testing.T) *requestWiring {
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
-	err = coretemplate.LoadStandardCatalog(context.Background(), catalogPath(), reg)
+	err = template.LoadStandardCatalog(context.Background(), catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -87,7 +85,7 @@ func wireLoopback(t *testing.T) *requestWiring {
 // registries. The provider registry is injected so the tests can use the
 // loopback or software provider alone.
 type requestWiring struct {
-	templates coretemplate.Registry
+	templates template.Registry
 	providers provider.Registry
 }
 
@@ -95,12 +93,12 @@ type requestWiring struct {
 type requestScope struct {
 	keys      service.KeyOrchestrator
 	cryptoOps service.CryptoOrchestrator
-	policy    corepolicy.Engine
+	policy    policy.Engine
 }
 
 func (r *requestScope) Keys() service.KeyOrchestrator      { return r.keys }
 func (r *requestScope) Crypto() service.CryptoOrchestrator { return r.cryptoOps }
-func (r *requestScope) Policy() corepolicy.Engine          { return r.policy }
+func (r *requestScope) Policy() policy.Engine              { return r.policy }
 
 // ForStorage builds a requestScope whose repositories all share store.
 func (w *requestWiring) ForStorage(ctx context.Context, store storage.Storage) (*requestScope, error) {
@@ -121,17 +119,17 @@ func (w *requestWiring) ForStorage(ctx context.Context, store storage.Storage) (
 
 // seedPolicy creates a policy in the request scope that allows the given
 // templates and operations, then returns the policy name.
-func seedPolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine,
+func seedPolicy(t *testing.T, ctx context.Context, pol policy.Engine,
 	name string, templates []string, ops []core.Operation) string {
 	t.Helper()
 	keyOps := make([]string, len(ops))
 	for i, op := range ops {
 		keyOps[i] = string(op)
 	}
-	rules := &corepolicy.Rules{
+	rules := &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: templates,
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: keyOps,
 		},
 	}
@@ -139,7 +137,7 @@ func seedPolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine,
 	if err != nil {
 		t.Fatalf("marshal rules: %v", err)
 	}
-	p := corepolicy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
+	p := policy.NewPolicy(core.NewID(core.PolicyPrefix), name, rulesJSON)
 	if _, err := pol.CreatePolicy(ctx, p); err != nil {
 		t.Fatalf("seed policy %q: %v", name, err)
 	}
@@ -159,7 +157,7 @@ func sigScopeSpec() *core.ScopeSpecification {
 
 func buildKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
-	reg coretemplate.Registry, provReg provider.Registry,
+	reg template.Registry, provReg provider.Registry,
 ) (service.KeyOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
@@ -169,7 +167,7 @@ func buildKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		return nil, err
 	}
@@ -178,7 +176,7 @@ func buildKeyOrchestrator(
 
 func buildCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
-	reg coretemplate.Registry, provReg provider.Registry,
+	reg template.Registry, provReg provider.Registry,
 ) (service.CryptoOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
@@ -188,7 +186,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		return nil, err
 	}
@@ -197,12 +195,12 @@ func buildCryptoOrchestrator(
 
 func buildPolicyEngine(
 	ctx context.Context, s storage.Storage,
-) (corepolicy.Engine, error) {
+) (policy.Engine, error) {
 	policyRepo, err := policy.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
 	}
-	return corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	return policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 }
 
 // ============================================================================

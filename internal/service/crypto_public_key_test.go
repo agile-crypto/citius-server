@@ -12,15 +12,13 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
 	"github.com/agile-crypto/citius-core/errors"
-	corepolicy "github.com/agile-crypto/citius-core/policy"
+	"github.com/agile-crypto/citius-core/key"
+	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	coretemplate "github.com/agile-crypto/citius-core/template"
+	"github.com/agile-crypto/citius-core/storage"
+	"github.com/agile-crypto/citius-core/template"
 	providerpb "github.com/agile-crypto/citius-provider-go/gen/provider"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
-	"github.com/agile-crypto/citius-server/internal/storage"
-	"github.com/agile-crypto/citius-server/internal/storage/key"
-	"github.com/agile-crypto/citius-server/internal/storage/policy"
-	"github.com/agile-crypto/citius-server/internal/storage/template"
 )
 
 const (
@@ -40,7 +38,7 @@ const (
 type publicKeyFixture struct {
 	ops       service.CryptoOrchestrator
 	sw        *software.Provider
-	templates coretemplate.Registry
+	templates template.Registry
 }
 
 // setupPublicKeyVerify creates a service.CryptoOrchestrator backed by
@@ -61,7 +59,7 @@ func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 	if err != nil {
 		t.Fatalf("NewVaultRegistry: %v", err)
 	}
-	err = coretemplate.LoadStandardCatalog(ctx, catalogPath(), reg)
+	err = template.LoadStandardCatalog(ctx, catalogPath(), reg)
 	if err != nil {
 		t.Fatalf("LoadStandardCatalog: %v", err)
 	}
@@ -77,7 +75,7 @@ func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 	if err != nil {
 		t.Fatalf("policy.NewStorageRepository: %v", err)
 	}
-	pol, err := corepolicy.NewEnforcer(policyRepo, corepolicy.NewSimpleRulesEvaluator())
+	pol, err := policy.NewEnforcer(policyRepo, policy.NewSimpleRulesEvaluator())
 	if err != nil {
 		t.Fatalf("NewEnforcer: %v", err)
 	}
@@ -93,12 +91,12 @@ func setupPublicKeyVerify(t *testing.T) publicKeyFixture {
 
 // seedVerifyOnlyPolicy creates a policy that allows the verify operation for
 // templateIDs.
-func seedVerifyOnlyPolicy(t *testing.T, ctx context.Context, pol corepolicy.Engine, id, name string, templateIDs ...string) {
+func seedVerifyOnlyPolicy(t *testing.T, ctx context.Context, pol policy.Engine, id, name string, templateIDs ...string) {
 	t.Helper()
-	rules := &corepolicy.Rules{
+	rules := &policy.Rules{
 		Version:          "1",
 		AllowedTemplates: templateIDs,
-		AllowedOperations: &corepolicy.OperationRule{
+		AllowedOperations: &policy.OperationRule{
 			KeyOperations: []string{string(core.OperationVerify)},
 		},
 	}
@@ -106,7 +104,7 @@ func seedVerifyOnlyPolicy(t *testing.T, ctx context.Context, pol corepolicy.Engi
 	if err != nil {
 		t.Fatalf("marshal rules: %v", err)
 	}
-	_, err = pol.CreatePolicy(ctx, corepolicy.NewPolicy(id, name, rulesJSON))
+	_, err = pol.CreatePolicy(ctx, policy.NewPolicy(id, name, rulesJSON))
 	if err != nil {
 		t.Fatalf("seed policy %q: %v", name, err)
 	}
