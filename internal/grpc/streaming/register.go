@@ -20,7 +20,7 @@ import (
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
 
 	"google.golang.org/grpc"
 )
@@ -34,7 +34,7 @@ const newOp engerr.Op = "grpc/streaming.New"
 // takes only what can be honestly wired.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newCrypto service.CryptoOrchestratorFactory) (*StreamingCryptoHandler, error) {
+func New(ctx context.Context, newCrypto cryptosvc.CryptoOrchestratorFactory) (*StreamingCryptoHandler, error) {
 	if newCrypto == nil {
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "crypto orchestrator factory is required")
 	}

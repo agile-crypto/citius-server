@@ -13,8 +13,8 @@ import (
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
-
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"google.golang.org/grpc"
 )
 
@@ -25,7 +25,7 @@ const newOp engerr.Op = "grpc/keyestablishment.New"
 // material they consume or produce. Both must be non-nil.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newCrypto service.CryptoOrchestratorFactory, newKeys service.KeyOrchestratorFactory) (*KeyEstablishmentHandler, error) {
+func New(ctx context.Context, newCrypto cryptosvc.CryptoOrchestratorFactory, newKeys keysvc.KeyOrchestratorFactory) (*KeyEstablishmentHandler, error) {
 	switch {
 	case newCrypto == nil:
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "crypto orchestrator factory is required")

@@ -16,7 +16,7 @@ import (
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 
 	"google.golang.org/grpc"
@@ -35,7 +35,7 @@ const newOp engerr.Op = "grpc/crypto.New"
 // disabled case out of every RPC.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newCrypto service.CryptoOrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*CryptoHandler, error) {
+func New(ctx context.Context, newCrypto cryptosvc.CryptoOrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*CryptoHandler, error) {
 	switch {
 	case newCrypto == nil:
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "crypto orchestrator factory is required")

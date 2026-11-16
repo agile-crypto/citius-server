@@ -8,7 +8,8 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	cryptohandler "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	discogrpc "github.com/agile-crypto/citius-server/internal/grpc/discovery"
 	keymgmthandler "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
@@ -32,8 +33,8 @@ type TestableHandler struct {
 	ProviderHandler  *providergrpc.ProviderHandler
 
 	store                storage.Storage
-	keyOrchestratorFn    service.KeyOrchestratorFactory
-	cryptoOrchestratorFn service.CryptoOrchestratorFactory
+	keyOrchestratorFn    keysvc.KeyOrchestratorFactory
+	cryptoOrchestratorFn cryptosvc.CryptoOrchestratorFactory
 	policyEngineFn       policy.EngineFactory
 }
 

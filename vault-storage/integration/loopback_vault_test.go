@@ -25,7 +25,8 @@ import (
 	"github.com/agile-crypto/citius-core/crypto"
 	corepolicy "github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/provider/loopback"
@@ -94,10 +95,10 @@ func wireLoopback(t *testing.T) *vaultapp.Service {
 
 	// Factory functions — each receives the per-request logical.Storage
 	// and creates the full dependency graph from it.
-	keyFactory := func(s logical.Storage) (service.KeyOrchestrator, error) {
+	keyFactory := func(s logical.Storage) (keysvc.KeyOrchestrator, error) {
 		return buildKeyOrchestrator(ctx, s, reg, provReg)
 	}
-	cryptoFactory := func(s logical.Storage) (service.CryptoOrchestrator, error) {
+	cryptoFactory := func(s logical.Storage) (cryptosvc.CryptoOrchestrator, error) {
 		return buildCryptoOrchestrator(ctx, s, reg, provReg)
 	}
 	policyFactory := func(s logical.Storage) (corepolicy.Engine, error) {
@@ -162,7 +163,7 @@ func sigScopeSpec() *core.ScopeSpecification {
 func buildKeyOrchestrator(
 	ctx context.Context, s logical.Storage,
 	reg coretemplate.Registry, provReg provider.Registry,
-) (service.KeyOrchestrator, error) {
+) (keysvc.KeyOrchestrator, error) {
 	repo, err := key.NewVaultRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -175,13 +176,13 @@ func buildKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewKeyOrchestrator(repo, reg, provReg, pol)
+	return keysvc.NewKeyOrchestrator(repo, reg, provReg, pol)
 }
 
 func buildCryptoOrchestrator(
 	ctx context.Context, s logical.Storage,
 	reg coretemplate.Registry, provReg provider.Registry,
-) (service.CryptoOrchestrator, error) {
+) (cryptosvc.CryptoOrchestrator, error) {
 	repo, err := key.NewVaultRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -194,7 +195,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewCryptoOrchestrator(repo, pol, provReg, reg)
+	return cryptosvc.NewCryptoOrchestrator(repo, pol, provReg, reg)
 }
 
 func buildPolicyEngine(
@@ -528,7 +529,7 @@ func TestIntegration_Loopback_TransformKey_Sign_Verify_Vault(t *testing.T) {
 	}
 
 	// Transform the key to ml-dsa-65 — should produce version 2.
-	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+	transformedMeta, err := requestScope.Keys().TransformKey(ctx, keysvc.TransformKeySpec{
 		KeyName:            keyName,
 		TemplateID:         "ml-dsa-65",
 		ScopeSpecification: sigScopeSpec(),

@@ -18,7 +18,7 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
@@ -511,7 +511,7 @@ func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t 
 	}
 
 	// Transform the key from ecdsa-p256-sha256-der to ml-dsa-65 (post-quantum).
-	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+	transformedMeta, err := requestScope.Keys().TransformKey(ctx, keysvc.TransformKeySpec{
 		KeyName:            keyName,
 		TemplateID:         "ml-dsa-65",
 		ScopeSpecification: sigScopeSpec(),
@@ -626,7 +626,7 @@ func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify(t 
 // 	}
 
 // 	// Transform the key from ecdsa-p256-sha256-der to ml-dsa-65 (post-quantum).
-// 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+// 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, keysvc.TransformKeySpec{
 // 		KeyName:            keyName,
 // 		TemplateID:         "ml-dsa-65",
 // 		ScopeSpecification: sigScopeSpec(),

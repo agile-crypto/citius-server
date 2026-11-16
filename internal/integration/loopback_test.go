@@ -27,7 +27,8 @@ import (
 	"github.com/agile-crypto/citius-core/key"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/storage"
 	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
@@ -91,14 +92,14 @@ type requestWiring struct {
 
 // requestScope holds one storage's orchestrators and policy engine.
 type requestScope struct {
-	keys      service.KeyOrchestrator
-	cryptoOps service.CryptoOrchestrator
+	keys      keysvc.KeyOrchestrator
+	cryptoOps cryptosvc.CryptoOrchestrator
 	policy    policy.Engine
 }
 
-func (r *requestScope) Keys() service.KeyOrchestrator      { return r.keys }
-func (r *requestScope) Crypto() service.CryptoOrchestrator { return r.cryptoOps }
-func (r *requestScope) Policy() policy.Engine              { return r.policy }
+func (r *requestScope) Keys() keysvc.KeyOrchestrator         { return r.keys }
+func (r *requestScope) Crypto() cryptosvc.CryptoOrchestrator { return r.cryptoOps }
+func (r *requestScope) Policy() policy.Engine                { return r.policy }
 
 // ForStorage builds a requestScope whose repositories all share store.
 func (w *requestWiring) ForStorage(ctx context.Context, store storage.Storage) (*requestScope, error) {
@@ -158,7 +159,7 @@ func sigScopeSpec() *core.ScopeSpecification {
 func buildKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
 	reg template.Registry, provReg provider.Registry,
-) (service.KeyOrchestrator, error) {
+) (keysvc.KeyOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -171,13 +172,13 @@ func buildKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewKeyOrchestrator(repo, reg, provReg, pol)
+	return keysvc.NewKeyOrchestrator(repo, reg, provReg, pol)
 }
 
 func buildCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
 	reg template.Registry, provReg provider.Registry,
-) (service.CryptoOrchestrator, error) {
+) (cryptosvc.CryptoOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -190,7 +191,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewCryptoOrchestrator(repo, pol, provReg, reg)
+	return cryptosvc.NewCryptoOrchestrator(repo, pol, provReg, reg)
 }
 
 func buildPolicyEngine(
@@ -524,7 +525,7 @@ func TestIntegration_Loopback_TransformKey_Sign_Verify(t *testing.T) {
 	}
 
 	// Transform the key to ml-dsa-65 — should produce version 2.
-	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+	transformedMeta, err := requestScope.Keys().TransformKey(ctx, keysvc.TransformKeySpec{
 		KeyName:            keyName,
 		TemplateID:         "ml-dsa-65",
 		ScopeSpecification: sigScopeSpec(),

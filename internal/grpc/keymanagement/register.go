@@ -1,4 +1,4 @@
-// Package keygrpc serves services.KeyManagementService.
+// Package keygrpc serves services.KeyManagementkeysvc.
 //
 // Its dependency is the key orchestrator, which by construction reaches every
 // domain port (keys, policy, providers, templates) because key creation
@@ -13,7 +13,7 @@ import (
 
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 
 	"google.golang.org/grpc"
@@ -30,7 +30,7 @@ const newOp engerr.Op = "grpc/keymanagement.New"
 // disabled case out of every RPC.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newKeys service.KeyOrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*KeyManagementHandler, error) {
+func New(ctx context.Context, newKeys keysvc.KeyOrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*KeyManagementHandler, error) {
 	switch {
 	case newKeys == nil:
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "key orchestrator factory is required")

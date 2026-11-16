@@ -18,7 +18,7 @@ import (
 	"github.com/agile-crypto/citius-core/crypto"
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/key"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	"google.golang.org/grpc/codes"
@@ -108,7 +108,7 @@ func (m *mockCryptoOps) VerifyWithPublicKey(ctx context.Context, req crypto.Veri
 
 // wireCrypto builds the handler under test over a fixed orchestrator, with
 // key and policy authorization always allowing.
-func wireCrypto(t *testing.T, ops service.CryptoOrchestrator) *cryptogrpc.CryptoHandler {
+func wireCrypto(t *testing.T, ops cryptosvc.CryptoOrchestrator) *cryptogrpc.CryptoHandler {
 	t.Helper()
 	return wireCryptoWithPolicyAuth(t, ops, func(_ context.Context, _ engerr.Op, _ string) error {
 		return nil
@@ -117,9 +117,9 @@ func wireCrypto(t *testing.T, ops service.CryptoOrchestrator) *cryptogrpc.Crypto
 
 // wireCryptoWithPolicyAuth is wireCrypto with the given policy authorization
 // check.
-func wireCryptoWithPolicyAuth(t *testing.T, ops service.CryptoOrchestrator, authorizePolicy grpcstatus.AuthorizePolicyName) *cryptogrpc.CryptoHandler {
+func wireCryptoWithPolicyAuth(t *testing.T, ops cryptosvc.CryptoOrchestrator, authorizePolicy grpcstatus.AuthorizePolicyName) *cryptogrpc.CryptoHandler {
 	t.Helper()
-	newCrypto := service.CryptoOrchestratorFactory(func(_ context.Context) (service.CryptoOrchestrator, error) {
+	newCrypto := cryptosvc.CryptoOrchestratorFactory(func(_ context.Context) (cryptosvc.CryptoOrchestrator, error) {
 		return ops, nil
 	})
 	authFn := func(ctx context.Context, op engerr.Op, name string) error {
@@ -1122,7 +1122,7 @@ func TestCryptoHandler_VerifyWithPublicKey_InvalidProviderRequirements_InvalidAr
 }
 
 func TestNew_NilPolicyAuthorization_ReturnsError(t *testing.T) {
-	newCrypto := service.CryptoOrchestratorFactory(func(_ context.Context) (service.CryptoOrchestrator, error) {
+	newCrypto := cryptosvc.CryptoOrchestratorFactory(func(_ context.Context) (cryptosvc.CryptoOrchestrator, error) {
 		return &mockCryptoOps{}, nil
 	})
 	allow := func(_ context.Context, _ engerr.Op, _ string) error { return nil }

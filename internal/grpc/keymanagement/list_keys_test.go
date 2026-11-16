@@ -10,15 +10,15 @@ import (
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	typespb "github.com/agile-crypto/citius-api-go/gen/go/types"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	keygrpc "github.com/agile-crypto/citius-server/internal/grpc/keymanagement"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func listFixture() []*service.KeyMetadata {
+func listFixture() []*keysvc.KeyMetadata {
 	active := typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE
-	return []*service.KeyMetadata{
+	return []*keysvc.KeyMetadata{
 		{Name: "charlie", Provider: "openssl-fips", Policy: "p1", LifecycleState: active},
 		{Name: "alpha", Provider: "software", Policy: "p1", LifecycleState: active},
 		{Name: "secret", Provider: "software", Policy: "p2", LifecycleState: active},
@@ -28,8 +28,8 @@ func listFixture() []*service.KeyMetadata {
 
 func wireList(t *testing.T, authKey func(context.Context, engerr.Op, string) error) *keygrpc.KeyManagementHandler {
 	t.Helper()
-	km := &mockKeyOrchestrator{listFn: func(context.Context) ([]*service.KeyMetadata, error) { return listFixture(), nil }}
-	newKeys := service.KeyOrchestratorFactory(func(context.Context) (service.KeyOrchestrator, error) { return km, nil })
+	km := &mockKeyOrchestrator{listFn: func(context.Context) ([]*keysvc.KeyMetadata, error) { return listFixture(), nil }}
+	newKeys := keysvc.KeyOrchestratorFactory(func(context.Context) (keysvc.KeyOrchestrator, error) { return km, nil })
 	allow := func(context.Context, engerr.Op, string) error { return nil }
 	if authKey == nil {
 		authKey = allow
@@ -121,7 +121,7 @@ func TestKeyManagementHandler_ListKeys_InvalidRequests(t *testing.T) {
 }
 
 func TestKeyManagementHandler_ListKeys_StoreFailureIsReported(t *testing.T) {
-	km := &mockKeyOrchestrator{listFn: func(ctx context.Context) ([]*service.KeyMetadata, error) {
+	km := &mockKeyOrchestrator{listFn: func(ctx context.Context) ([]*keysvc.KeyMetadata, error) {
 		return nil, engerr.Wrap(ctx, "test", errors.New("disk on fire"))
 	}}
 	h := wireKeys(t, km)

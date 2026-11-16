@@ -21,7 +21,8 @@ import (
 	"github.com/agile-crypto/citius-core/crypto"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	coretemplate "github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
 	"github.com/agile-crypto/citius-server/internal/provider/software"
@@ -64,10 +65,10 @@ func wireWithSoftwareProvider(t *testing.T) *vaultapp.Service {
 	}
 
 	// Factory functions — reuse the extracted builders from loopback_test.go.
-	keyFactory := func(s logical.Storage) (service.KeyOrchestrator, error) {
+	keyFactory := func(s logical.Storage) (keysvc.KeyOrchestrator, error) {
 		return buildKeyOrchestrator(ctx, s, reg, provReg)
 	}
-	cryptoFactory := func(s logical.Storage) (service.CryptoOrchestrator, error) {
+	cryptoFactory := func(s logical.Storage) (cryptosvc.CryptoOrchestrator, error) {
 		return buildCryptoOrchestrator(ctx, s, reg, provReg)
 	}
 	policyFactory := func(s logical.Storage) (policy.Engine, error) {
@@ -540,7 +541,7 @@ func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify_Va
 	}
 
 	// Transform the key from ecdsa-p256-sha256-der to ml-dsa-65 (post-quantum).
-	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+	transformedMeta, err := requestScope.Keys().TransformKey(ctx, keysvc.TransformKeySpec{
 		KeyName:            keyName,
 		TemplateID:         "ml-dsa-65",
 		ScopeSpecification: sigScopeSpec(),
@@ -655,7 +656,7 @@ func TestIntegration_Software_TransformKey_withScopeSpecification_Sign_Verify_Va
 // 	}
 
 // 	// Transform the key from ecdsa-p256-sha256-der to ml-dsa-65 (post-quantum).
-// 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, service.TransformKeySpec{
+// 	transformedMeta, err := requestScope.Keys().TransformKey(ctx, keysvc.TransformKeySpec{
 // 		KeyName:            keyName,
 // 		TemplateID:         "ml-dsa-65",
 // 		ScopeSpecification: sigScopeSpec(),

@@ -5,7 +5,7 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
 )
 
 // StreamingCryptoHandler serves services.StreamingCryptoService — the
@@ -26,7 +26,7 @@ import (
 //
 // Immutable after construction, safe for concurrent use.
 type StreamingCryptoHandler struct {
-	crypto service.CryptoOrchestratorFactory
+	crypto cryptosvc.CryptoOrchestratorFactory
 	servicespb.UnimplementedStreamingCryptoServiceServer
 }
 

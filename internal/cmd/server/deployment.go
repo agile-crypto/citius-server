@@ -7,7 +7,8 @@ import (
 	engerr "github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/template"
 	cryptogrpc "github.com/agile-crypto/citius-server/internal/grpc/crypto"
 	discogrpc "github.com/agile-crypto/citius-server/internal/grpc/discovery"
@@ -58,8 +59,8 @@ const (
 // A nil field means the capability was not configured; Validate reports the
 // combinations that cannot work.
 type FactorySet struct {
-	Keys      service.KeyOrchestratorFactory
-	Crypto    service.CryptoOrchestratorFactory
+	Keys      keysvc.KeyOrchestratorFactory
+	Crypto    cryptosvc.CryptoOrchestratorFactory
 	Policy    policy.EngineFactory
 	Instances provider.InstanceManagerFactory
 	Templates template.RegistryFactory

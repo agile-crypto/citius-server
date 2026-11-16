@@ -9,7 +9,7 @@ import (
 	core "github.com/agile-crypto/citius-core"
 	"github.com/agile-crypto/citius-core/crypto"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 )
 
@@ -24,7 +24,7 @@ import (
 // when the deployment runs without authorization — which is why this package
 // does not import internal/auth.
 type CryptoHandler struct {
-	crypto          service.CryptoOrchestratorFactory
+	crypto          cryptosvc.CryptoOrchestratorFactory
 	authorizeKey    grpcstatus.AuthorizeKeyName
 	authorizePolicy grpcstatus.AuthorizePolicyName
 	servicespb.UnimplementedCryptoServiceServer

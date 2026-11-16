@@ -8,7 +8,8 @@ import (
 	"github.com/agile-crypto/citius-core/errors"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -97,17 +98,17 @@ func (s *Service) ForStorage(ctx context.Context, store logical.Storage) (*Reque
 // RequestScope holds the per-request instances of all core subsystems.
 // Obtain one by calling Service.ForStorage.
 type RequestScope struct {
-	keys              service.KeyOrchestrator
-	cryptoOps         service.CryptoOrchestrator
+	keys              keysvc.KeyOrchestrator
+	cryptoOps         cryptosvc.CryptoOrchestrator
 	policy            policy.Engine
 	providerInstances provider.InstanceManager
 	templates         template.Registry
 	providers         provider.Registry
 }
 
-func (r *RequestScope) Keys() service.KeyOrchestrator { return r.keys }
+func (r *RequestScope) Keys() keysvc.KeyOrchestrator { return r.keys }
 
-func (r *RequestScope) Crypto() service.CryptoOrchestrator { return r.cryptoOps }
+func (r *RequestScope) Crypto() cryptosvc.CryptoOrchestrator { return r.cryptoOps }
 
 func (r *RequestScope) Policy() policy.Engine { return r.policy }
 

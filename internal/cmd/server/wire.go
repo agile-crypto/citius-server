@@ -15,7 +15,8 @@ import (
 	"github.com/agile-crypto/citius-core/key"
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/storage"
 	"github.com/agile-crypto/citius-core/template"
 	"github.com/agile-crypto/citius-server/internal/app"
@@ -87,10 +88,10 @@ func wireFactoriesWithStorage(ctx context.Context, cfg Config, store storage.Sto
 		return providerReg, nil
 	}
 
-	keysFn := func(context.Context) (service.KeyOrchestrator, error) {
+	keysFn := func(context.Context) (keysvc.KeyOrchestrator, error) {
 		return buildVaultKeyOrchestrator(ctx, store, templateReg, providerReg)
 	}
-	cryptoFn := func(context.Context) (service.CryptoOrchestrator, error) {
+	cryptoFn := func(context.Context) (cryptosvc.CryptoOrchestrator, error) {
 		return buildVaultCryptoOrchestrator(ctx, store, templateReg, providerReg)
 	}
 	policyFn := func(context.Context) (policy.Engine, error) {
@@ -225,7 +226,7 @@ func registerFIPSProvider(ctx context.Context, providerReg provider.Registry, fi
 func buildVaultKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
 	templateReg template.Registry, providerReg provider.Registry,
-) (service.KeyOrchestrator, error) {
+) (keysvc.KeyOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -238,13 +239,13 @@ func buildVaultKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
+	return keysvc.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
 }
 
 func buildVaultCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
 	templateReg template.Registry, providerReg provider.Registry,
-) (service.CryptoOrchestrator, error) {
+) (cryptosvc.CryptoOrchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -257,7 +258,7 @@ func buildVaultCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return service.NewCryptoOrchestrator(repo, pol, providerReg, templateReg)
+	return cryptosvc.NewCryptoOrchestrator(repo, pol, providerReg, templateReg)
 }
 
 func buildVaultPolicyEngine(

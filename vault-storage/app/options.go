@@ -5,7 +5,8 @@ package app
 import (
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -14,9 +15,9 @@ import (
 // Factory type aliases
 // ============================================================================
 
-type KeyOrchestratorFactory func(logical.Storage) (service.KeyOrchestrator, error)
+type KeyOrchestratorFactory func(logical.Storage) (keysvc.KeyOrchestrator, error)
 
-type CryptoOrchestratorFactory func(logical.Storage) (service.CryptoOrchestrator, error)
+type CryptoOrchestratorFactory func(logical.Storage) (cryptosvc.CryptoOrchestrator, error)
 
 type PolicyEngineFactory func(logical.Storage) (policy.Engine, error)
 

@@ -8,7 +8,7 @@ import (
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
 	core "github.com/agile-crypto/citius-core"
 	engerr "github.com/agile-crypto/citius-core/errors"
-	"github.com/agile-crypto/citius-core/service"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	grpcstatus "github.com/agile-crypto/citius-server/internal/grpc/status"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,7 +26,7 @@ import (
 // when the deployment runs without authorization — which is why this package
 // does not import internal/auth.
 type KeyManagementHandler struct {
-	keys            service.KeyOrchestratorFactory
+	keys            keysvc.KeyOrchestratorFactory
 	authorizeKey    grpcstatus.AuthorizeKeyName
 	authorizePolicy grpcstatus.AuthorizePolicyName
 	servicespb.UnimplementedKeyManagementServiceServer
@@ -181,7 +181,7 @@ func (h *KeyManagementHandler) TransformKey(ctx context.Context, req *messagespb
 		return nil, grpcstatus.ToStatusError(err)
 	}
 
-	transformSpec := service.TransformKeySpec{
+	transformSpec := keysvc.TransformKeySpec{
 		KeyName:     keyName,
 		RetainBytes: req.GetRetainKeyBytes(),
 		TemplateID:  req.GetTemplateId(), // default to empty; will be set below if present in request
@@ -222,10 +222,10 @@ func (h *KeyManagementHandler) UpdateKeyPolicy(ctx context.Context, req *message
 //
 // Proto mapping:
 //
-//	messages.MigrateKeyRequest.name                        => service.MigrateKeySpec.KeyName
-//	messages.MigrateKeyRequest.target_instance_id          => service.MigrateKeySpec.TargetInstanceID (oneof)
-//	messages.MigrateKeyRequest.provider_target.provider_id => service.MigrateKeySpec.TargetProviderID (oneof)
-//	messages.MigrateKeyRequest.strategy                    => service.MigrateKeySpec.Strategy
+//	messages.MigrateKeyRequest.name                        => keysvc.MigrateKeySpec.KeyName
+//	messages.MigrateKeyRequest.target_instance_id          => keysvc.MigrateKeySpec.TargetInstanceID (oneof)
+//	messages.MigrateKeyRequest.provider_target.provider_id => keysvc.MigrateKeySpec.TargetProviderID (oneof)
+//	messages.MigrateKeyRequest.strategy                    => keysvc.MigrateKeySpec.Strategy
 func (h *KeyManagementHandler) MigrateKey(ctx context.Context, req *messagespb.MigrateKeyRequest) (*messagespb.MigrateKeyResponse, error) {
 	const op engerr.Op = keyManagementHandlerOp + ".MigrateKey"
 
@@ -233,7 +233,7 @@ func (h *KeyManagementHandler) MigrateKey(ctx context.Context, req *messagespb.M
 		return nil, grpcstatus.ToStatusError(err)
 	}
 
-	var spec service.MigrateKeySpec
+	var spec keysvc.MigrateKeySpec
 	if err := spec.FromProto(ctx, req); err != nil {
 		return nil, grpcstatus.ToStatusError(engerr.Wrap(ctx, op, err))
 	}
@@ -260,10 +260,10 @@ func (h *KeyManagementHandler) MigrateKey(ctx context.Context, req *messagespb.M
 //
 // Proto mapping (migrate intent):
 //
-//	messages.ValidateKeyOperationRequest.name                       => service.MigrateKeySpec.KeyName
-//	messages.ValidateKeyOperationRequest.migrate.target_instance_id => service.MigrateKeySpec.TargetInstanceID (oneof)
-//	messages.ValidateKeyOperationRequest.migrate.target_provider_id => service.MigrateKeySpec.TargetProviderID (oneof)
-//	messages.ValidateKeyOperationRequest.migrate.preferred_strategy => service.MigrateKeySpec.Strategy (UNSPECIFIED assesses every strategy)
+//	messages.ValidateKeyOperationRequest.name                       => keysvc.MigrateKeySpec.KeyName
+//	messages.ValidateKeyOperationRequest.migrate.target_instance_id => keysvc.MigrateKeySpec.TargetInstanceID (oneof)
+//	messages.ValidateKeyOperationRequest.migrate.target_provider_id => keysvc.MigrateKeySpec.TargetProviderID (oneof)
+//	messages.ValidateKeyOperationRequest.migrate.preferred_strategy => keysvc.MigrateKeySpec.Strategy (UNSPECIFIED assesses every strategy)
 func (h *KeyManagementHandler) ValidateKeyOperation(ctx context.Context, req *messagespb.ValidateKeyOperationRequest) (*messagespb.ValidateKeyOperationResponse, error) {
 	const op engerr.Op = keyManagementHandlerOp + ".ValidateKeyOperation"
 
@@ -282,7 +282,7 @@ func (h *KeyManagementHandler) ValidateKeyOperation(ctx context.Context, req *me
 		return nil, grpcstatus.ToStatusError(engerr.New(ctx, op, engerr.CodeInvalidArgument,
 			"an intent is required"))
 	}
-	spec := service.MigrateKeySpec{
+	spec := keysvc.MigrateKeySpec{
 		KeyName:          req.GetName(),
 		TargetInstanceID: intent.GetTargetInstanceId(),
 		TargetProviderID: intent.GetTargetProviderId(),

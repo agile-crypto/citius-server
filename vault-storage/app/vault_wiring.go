@@ -7,7 +7,8 @@ import (
 
 	"github.com/agile-crypto/citius-core/policy"
 	"github.com/agile-crypto/citius-core/provider"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 	"github.com/agile-crypto/citius-core/template"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -22,7 +23,7 @@ import (
 // inbound *logical.Request and must use exactly that one.
 //
 // The gRPC handler packages do not, and must not, import this. They accept the
-// domain factory types (policy.EngineFactory, service.KeyOrchestratorFactory,
+// domain factory types (policy.EngineFactory, keysvc.KeyOrchestratorFactory,
 // …), which say nothing about storage; binding a request's storage into those
 // factories happens here.
 //
@@ -33,8 +34,8 @@ import (
 // the storage-taking form; Bind converts them into the storage-free domain
 // factories the transports accept.
 type (
-	VaultKeyBuilder      func(ctx context.Context, store logical.Storage) (service.KeyOrchestrator, error)
-	VaultCryptoBuilder   func(ctx context.Context, store logical.Storage) (service.CryptoOrchestrator, error)
+	VaultKeyBuilder      func(ctx context.Context, store logical.Storage) (keysvc.KeyOrchestrator, error)
+	VaultCryptoBuilder   func(ctx context.Context, store logical.Storage) (cryptosvc.CryptoOrchestrator, error)
 	VaultPolicyBuilder   func(ctx context.Context, store logical.Storage) (policy.Engine, error)
 	VaultInstanceBuilder func(ctx context.Context, store logical.Storage) (provider.InstanceManager, error)
 	VaultTemplateBuilder func(ctx context.Context, store logical.Storage) (template.Registry, error)
@@ -74,8 +75,8 @@ type VaultProviders struct {
 // A field is nil when the corresponding capability was not configured, so a
 // backend registering only the policy paths never constructs a key repository.
 type BoundFactories struct {
-	Keys      service.KeyOrchestratorFactory
-	Crypto    service.CryptoOrchestratorFactory
+	Keys      keysvc.KeyOrchestratorFactory
+	Crypto    cryptosvc.CryptoOrchestratorFactory
 	Policy    policy.EngineFactory
 	Instances provider.InstanceManagerFactory
 	Templates template.RegistryFactory

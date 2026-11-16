@@ -5,21 +5,22 @@ import (
 
 	messagespb "github.com/agile-crypto/citius-api-go/gen/go/messages"
 	servicespb "github.com/agile-crypto/citius-api-go/gen/go/services"
-	"github.com/agile-crypto/citius-core/service"
+	cryptosvc "github.com/agile-crypto/citius-core/service/crypto"
+	keysvc "github.com/agile-crypto/citius-core/service/key"
 )
 
 // KeyEstablishmentHandler serves services.KeyEstablishmentService — wrapping,
 // unwrapping, derivation, agreement and KEM encapsulation.
 //
 // This service straddles two capabilities, which is why it is its own handler:
-// the operations themselves are cryptographic (service.CryptoOrchestratorFactory), but every one of
+// the operations themselves are cryptographic (cryptosvc.CryptoOrchestratorFactory), but every one of
 // them either consumes or produces a managed key, so the resulting key material
-// must be registered through the key orchestrator (service.KeyOrchestratorFactory).
+// must be registered through the key orchestrator (keysvc.KeyOrchestratorFactory).
 //
 // Immutable after construction, safe for concurrent use.
 type KeyEstablishmentHandler struct {
-	crypto service.CryptoOrchestratorFactory
-	keys   service.KeyOrchestratorFactory
+	crypto cryptosvc.CryptoOrchestratorFactory
+	keys   keysvc.KeyOrchestratorFactory
 	servicespb.UnimplementedKeyEstablishmentServiceServer
 }
 
