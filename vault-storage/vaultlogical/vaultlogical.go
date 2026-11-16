@@ -48,7 +48,7 @@ func (a *Adapter) Get(ctx context.Context, key string) (*storage.Entry, error) {
 // Put implements storage.Storage.
 func (a *Adapter) Put(ctx context.Context, entry *storage.Entry) error {
 	if entry == nil {
-		return a.s.Put(ctx, nil)
+		return storage.ErrNilEntry
 	}
 	return a.s.Put(ctx, &logical.StorageEntry{Key: entry.Key, Value: entry.Value, SealWrap: entry.SealWrap})
 }
