@@ -146,7 +146,7 @@ var (
 	_ provider.Signer                      = (*signOnlyProvider)(nil)
 )
 
-// newTestTemplateRegistry creates a VaultRegistry backed by InmemStorage and
+// newTestTemplateRegistry creates a StorageRegistry backed by InmemStorage and
 // registers the given template IDs as active templates with no
 // scoped_capabilities — equivalent to a template declaring no operations, so
 // ValidateProviderCapabilities' capability check requires nothing of a
@@ -154,9 +154,9 @@ var (
 func newTestTemplateRegistry(t *testing.T, templateIDs ...string) template.Registry {
 	t.Helper()
 	ctx := context.Background()
-	reg, err := template.NewVaultRegistry(ctx, &storage.InmemStorage{})
+	reg, err := template.NewStorageRegistry(ctx, &storage.InmemStorage{})
 	if err != nil {
-		t.Fatalf("NewVaultRegistry: %v", err)
+		t.Fatalf("NewStorageRegistry: %v", err)
 	}
 	for _, id := range templateIDs {
 		err = reg.Register(ctx, template.NewTemplate(&api.TemplateInfo{
@@ -177,9 +177,9 @@ func newTestTemplateRegistry(t *testing.T, templateIDs ...string) template.Regis
 func newTestTemplateRegistryWithOps(t *testing.T, templateID string, ops ...api.CryptoOperation) template.Registry {
 	t.Helper()
 	ctx := context.Background()
-	reg, err := template.NewVaultRegistry(ctx, &storage.InmemStorage{})
+	reg, err := template.NewStorageRegistry(ctx, &storage.InmemStorage{})
 	if err != nil {
-		t.Fatalf("NewVaultRegistry: %v", err)
+		t.Fatalf("NewStorageRegistry: %v", err)
 	}
 	err = reg.Register(ctx, template.NewTemplate(&api.TemplateInfo{
 		TemplateId: templateID,
