@@ -6,10 +6,10 @@ require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.12-20260825204119-511051f7f437.2
 	buf.build/go/protovalidate v1.4.0
 	github.com/agile-crypto/citius-api-go v0.3.0
-	github.com/agile-crypto/citius-core v0.4.2
+	github.com/agile-crypto/citius-core v0.4.3-0.20261118114425-53ad1882e74d
 	github.com/agile-crypto/citius-provider-go v0.1.0
 	github.com/agile-crypto/ossl-go v0.1.0
-	github.com/cloudflare/circl v1.6.4
+	github.com/cloudflare/circl v1.6.5
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.31.0
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
@@ -59,5 +59,3 @@ require (
 )
 
 replace github.com/agile-crypto/citius-api-go => ../api
-
-replace github.com/agile-crypto/citius-core => ../citius-core
