@@ -146,7 +146,7 @@ message SignDigestRequest {
   string hash_algorithm_oid = 7;
 
   // Typed algorithm specification for provider dispatch.  REQUIRED —
-  // consumed by service.(cryptoOrchestrator).DigestSign, which resolves this
+  // consumed in citius-core by service.crypto.(Orchestrator).DigestSign, which resolves this
   // from the key's bound template and always sets it.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
@@ -180,8 +180,8 @@ message VerifyDigestRequest {
   string hash_algorithm_oid = 8;
 
   // Typed algorithm specification — must match the algorithm used during
-  // SignDigest.  REQUIRED — consumed by
-  // service.(cryptoOrchestrator).DigestVerify, which resolves this from the
+  // SignDigest.  REQUIRED — consumed in citius-core by
+  // service.crypto.(Orchestrator).DigestVerify, which resolves this from the
   // key's bound template and always sets it (see SignDigestRequest.algorithm).
   caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
 
@@ -238,7 +238,7 @@ message EncryptRequest {
   // key_material is opaque bytes and scope_params only carries caller-supplied
   // values (AAD, tweak, OAEP label), never the mechanism.
   //
-  // REQUIRED — consumed by service.(cryptoOrchestrator).Encrypt, which
+  // REQUIRED — consumed in citius-core by service.crypto.(Orchestrator).Encrypt, which
   // resolves this from the key's bound template and always sets it.
   caas.crypto.v1.AlgorithmDetails algorithm = 8 [(buf.validate.field).required = true];
 
@@ -289,8 +289,8 @@ message DecryptRequest {
   }
 
   // Typed algorithm specification — must match the algorithm used during
-  // Encrypt.  See EncryptRequest.algorithm.  REQUIRED — consumed by
-  // service.(cryptoOrchestrator).Decrypt, which resolves this from the key's
+  // Encrypt.  See EncryptRequest.algorithm.  REQUIRED — consumed in citius-core by
+  // service.crypto.(Orchestrator).Decrypt, which resolves this from the key's
   // bound template and always sets it.
   caas.crypto.v1.AlgorithmDetails algorithm = 9 [(buf.validate.field).required = true];
 
