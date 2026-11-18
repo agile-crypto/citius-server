@@ -98,17 +98,17 @@ func (s *Service) ForStorage(ctx context.Context, store logical.Storage) (*Reque
 // RequestScope holds the per-request instances of all core subsystems.
 // Obtain one by calling Service.ForStorage.
 type RequestScope struct {
-	keys              keysvc.KeyOrchestrator
-	cryptoOps         cryptosvc.CryptoOrchestrator
+	keys              keysvc.Orchestrator
+	cryptoOps         cryptosvc.Orchestrator
 	policy            policy.Engine
 	providerInstances provider.InstanceManager
 	templates         template.Registry
 	providers         provider.Registry
 }
 
-func (r *RequestScope) Keys() keysvc.KeyOrchestrator { return r.keys }
+func (r *RequestScope) Keys() keysvc.Orchestrator { return r.keys }
 
-func (r *RequestScope) Crypto() cryptosvc.CryptoOrchestrator { return r.cryptoOps }
+func (r *RequestScope) Crypto() cryptosvc.Orchestrator { return r.cryptoOps }
 
 func (r *RequestScope) Policy() policy.Engine { return r.policy }
 

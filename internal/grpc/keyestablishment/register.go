@@ -25,7 +25,7 @@ const newOp engerr.Op = "grpc/keyestablishment.New"
 // material they consume or produce. Both must be non-nil.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newCrypto cryptosvc.CryptoOrchestratorFactory, newKeys keysvc.KeyOrchestratorFactory) (*KeyEstablishmentHandler, error) {
+func New(ctx context.Context, newCrypto cryptosvc.OrchestratorFactory, newKeys keysvc.OrchestratorFactory) (*KeyEstablishmentHandler, error) {
 	switch {
 	case newCrypto == nil:
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "crypto orchestrator factory is required")

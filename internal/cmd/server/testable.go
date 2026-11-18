@@ -33,8 +33,8 @@ type TestableHandler struct {
 	ProviderHandler  *providergrpc.ProviderHandler
 
 	store                storage.Storage
-	keyOrchestratorFn    keysvc.KeyOrchestratorFactory
-	cryptoOrchestratorFn cryptosvc.CryptoOrchestratorFactory
+	keyOrchestratorFn    keysvc.OrchestratorFactory
+	cryptoOrchestratorFn cryptosvc.OrchestratorFactory
 	policyEngineFn       policy.EngineFactory
 }
 

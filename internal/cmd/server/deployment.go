@@ -59,8 +59,8 @@ const (
 // A nil field means the capability was not configured; Validate reports the
 // combinations that cannot work.
 type FactorySet struct {
-	Keys      keysvc.KeyOrchestratorFactory
-	Crypto    cryptosvc.CryptoOrchestratorFactory
+	Keys      keysvc.OrchestratorFactory
+	Crypto    cryptosvc.OrchestratorFactory
 	Policy    policy.EngineFactory
 	Instances provider.InstanceManagerFactory
 	Templates template.RegistryFactory

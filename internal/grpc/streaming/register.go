@@ -34,7 +34,7 @@ const newOp engerr.Op = "grpc/streaming.New"
 // takes only what can be honestly wired.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newCrypto cryptosvc.CryptoOrchestratorFactory) (*StreamingCryptoHandler, error) {
+func New(ctx context.Context, newCrypto cryptosvc.OrchestratorFactory) (*StreamingCryptoHandler, error) {
 	if newCrypto == nil {
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "crypto orchestrator factory is required")
 	}

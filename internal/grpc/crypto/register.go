@@ -35,7 +35,7 @@ const newOp engerr.Op = "grpc/crypto.New"
 // disabled case out of every RPC.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newCrypto cryptosvc.CryptoOrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*CryptoHandler, error) {
+func New(ctx context.Context, newCrypto cryptosvc.OrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*CryptoHandler, error) {
 	switch {
 	case newCrypto == nil:
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "crypto orchestrator factory is required")

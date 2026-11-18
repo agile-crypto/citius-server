@@ -14,10 +14,10 @@ import (
 )
 
 // VaultRegistry is the template registry built by NewVaultRegistry.
-type VaultRegistry = template.VaultRegistry
+type VaultRegistry = template.StorageRegistry
 
 // NewVaultRegistry returns a template registry backed by the given Vault
 // storage.
 func NewVaultRegistry(ctx context.Context, s logical.Storage, opt ...template.Option) (*VaultRegistry, error) {
-	return template.NewVaultRegistry(ctx, vaultlogical.FromLogical(s), opt...)
+	return template.NewStorageRegistry(ctx, vaultlogical.FromLogical(s), opt...)
 }

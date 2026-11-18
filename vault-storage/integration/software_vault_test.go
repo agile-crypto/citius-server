@@ -2,7 +2,7 @@
 
 // Package integration_test — software_test.go exercises the software provider
 // with real ECDSA-P256 and ML-DSA-65 crypto through the full orchestration
-// stack: vaultapp.Service => RequestScope => CryptoOrchestrator => KeyOrchestrator =>
+// stack: vaultapp.Service => RequestScope => cryptosvc.Orchestrator => keysvc.Orchestrator =>
 // ProviderRegistry => software.Provider.
 //
 // Unlike the loopback tests (deterministic echo), these tests validate
@@ -65,10 +65,10 @@ func wireWithSoftwareProvider(t *testing.T) *vaultapp.Service {
 	}
 
 	// Factory functions — reuse the extracted builders from loopback_test.go.
-	keyFactory := func(s logical.Storage) (keysvc.KeyOrchestrator, error) {
+	keyFactory := func(s logical.Storage) (keysvc.Orchestrator, error) {
 		return buildKeyOrchestrator(ctx, s, reg, provReg)
 	}
-	cryptoFactory := func(s logical.Storage) (cryptosvc.CryptoOrchestrator, error) {
+	cryptoFactory := func(s logical.Storage) (cryptosvc.Orchestrator, error) {
 		return buildCryptoOrchestrator(ctx, s, reg, provReg)
 	}
 	policyFactory := func(s logical.Storage) (policy.Engine, error) {

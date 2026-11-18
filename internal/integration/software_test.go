@@ -1,6 +1,6 @@
 // Package integration — software_test.go exercises the software provider
 // with real ECDSA-P256 and ML-DSA-65 crypto through the full orchestration
-// stack: requestWiring => requestScope => CryptoOrchestrator => KeyOrchestrator =>
+// stack: requestWiring => requestScope => cryptosvc.Orchestrator => keysvc.Orchestrator =>
 // ProviderRegistry => software.Provider.
 //
 // Unlike the loopback tests (deterministic echo), these tests validate
@@ -36,9 +36,9 @@ func wireWithSoftwareProvider(t *testing.T) *requestWiring {
 
 	// Shared template registry — loaded once from the standard catalog.
 	bootstrapStorage := &storage.InmemStorage{}
-	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
+	reg, err := template.NewStorageRegistry(ctx, bootstrapStorage)
 	if err != nil {
-		t.Fatalf("NewVaultRegistry: %v", err)
+		t.Fatalf("NewStorageRegistry: %v", err)
 	}
 	err = template.LoadStandardCatalog(context.Background(), catalogPath(), reg)
 	if err != nil {

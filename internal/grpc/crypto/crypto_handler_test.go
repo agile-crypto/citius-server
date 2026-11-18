@@ -25,7 +25,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-// mockCryptoOps stubs CryptoOrchestrator for tests.
+// mockCryptoOps stubs cryptosvc.Orchestrator for tests.
 // Only signFn, verifyFn, encryptFn, decryptFn, digestSignFn, and
 // digestVerifyFn are wired; all other methods panic.
 type mockCryptoOps struct {
@@ -108,7 +108,7 @@ func (m *mockCryptoOps) VerifyWithPublicKey(ctx context.Context, req crypto.Veri
 
 // wireCrypto builds the handler under test over a fixed orchestrator, with
 // key and policy authorization always allowing.
-func wireCrypto(t *testing.T, ops cryptosvc.CryptoOrchestrator) *cryptogrpc.CryptoHandler {
+func wireCrypto(t *testing.T, ops cryptosvc.Orchestrator) *cryptogrpc.CryptoHandler {
 	t.Helper()
 	return wireCryptoWithPolicyAuth(t, ops, func(_ context.Context, _ engerr.Op, _ string) error {
 		return nil
@@ -117,9 +117,9 @@ func wireCrypto(t *testing.T, ops cryptosvc.CryptoOrchestrator) *cryptogrpc.Cryp
 
 // wireCryptoWithPolicyAuth is wireCrypto with the given policy authorization
 // check.
-func wireCryptoWithPolicyAuth(t *testing.T, ops cryptosvc.CryptoOrchestrator, authorizePolicy grpcstatus.AuthorizePolicyName) *cryptogrpc.CryptoHandler {
+func wireCryptoWithPolicyAuth(t *testing.T, ops cryptosvc.Orchestrator, authorizePolicy grpcstatus.AuthorizePolicyName) *cryptogrpc.CryptoHandler {
 	t.Helper()
-	newCrypto := cryptosvc.CryptoOrchestratorFactory(func(_ context.Context) (cryptosvc.CryptoOrchestrator, error) {
+	newCrypto := cryptosvc.OrchestratorFactory(func(_ context.Context) (cryptosvc.Orchestrator, error) {
 		return ops, nil
 	})
 	authFn := func(ctx context.Context, op engerr.Op, name string) error {
@@ -1122,7 +1122,7 @@ func TestCryptoHandler_VerifyWithPublicKey_InvalidProviderRequirements_InvalidAr
 }
 
 func TestNew_NilPolicyAuthorization_ReturnsError(t *testing.T) {
-	newCrypto := cryptosvc.CryptoOrchestratorFactory(func(_ context.Context) (cryptosvc.CryptoOrchestrator, error) {
+	newCrypto := cryptosvc.OrchestratorFactory(func(_ context.Context) (cryptosvc.Orchestrator, error) {
 		return &mockCryptoOps{}, nil
 	})
 	allow := func(_ context.Context, _ engerr.Op, _ string) error { return nil }

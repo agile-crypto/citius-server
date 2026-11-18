@@ -24,7 +24,7 @@ import (
 // when the deployment runs without authorization — which is why this package
 // does not import internal/auth.
 type CryptoHandler struct {
-	crypto          cryptosvc.CryptoOrchestratorFactory
+	crypto          cryptosvc.OrchestratorFactory
 	authorizeKey    grpcstatus.AuthorizeKeyName
 	authorizePolicy grpcstatus.AuthorizePolicyName
 	servicespb.UnimplementedCryptoServiceServer

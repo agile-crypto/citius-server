@@ -66,8 +66,8 @@ func (h *KeyManagementHandler) ListKeys(ctx context.Context, req *messagespb.Lis
 // visibleKeys keeps the keys that match the request's filters and that the
 // caller may read, ordered by name. A forbidden key is dropped; any other
 // authorization error is returned.
-func (h *KeyManagementHandler) visibleKeys(ctx context.Context, op engerr.Op, req *messagespb.ListKeysRequest, all []*keysvc.KeyMetadata) ([]*keysvc.KeyMetadata, error) {
-	matched := make([]*keysvc.KeyMetadata, 0, len(all))
+func (h *KeyManagementHandler) visibleKeys(ctx context.Context, op engerr.Op, req *messagespb.ListKeysRequest, all []*keysvc.Metadata) ([]*keysvc.Metadata, error) {
+	matched := make([]*keysvc.Metadata, 0, len(all))
 	for _, md := range all {
 		if md == nil || !listFilterMatches(req, md) {
 			continue
@@ -80,12 +80,12 @@ func (h *KeyManagementHandler) visibleKeys(ctx context.Context, op engerr.Op, re
 		}
 		matched = append(matched, md)
 	}
-	slices.SortFunc(matched, func(a, b *keysvc.KeyMetadata) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortFunc(matched, func(a, b *keysvc.Metadata) int { return strings.Compare(a.Name, b.Name) })
 	return matched, nil
 }
 
 // listFilterMatches reports whether md satisfies the request's set filters.
-func listFilterMatches(req *messagespb.ListKeysRequest, md *keysvc.KeyMetadata) bool {
+func listFilterMatches(req *messagespb.ListKeysRequest, md *keysvc.Metadata) bool {
 	if p := req.GetProviderId(); p != "" && p != md.Provider {
 		return false
 	}

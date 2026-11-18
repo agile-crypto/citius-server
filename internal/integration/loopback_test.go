@@ -54,9 +54,9 @@ func wireLoopback(t *testing.T) *requestWiring {
 
 	// Shared template registry — loaded once, used across all ForStorage calls.
 	bootstrapStorage := &storage.InmemStorage{}
-	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
+	reg, err := template.NewStorageRegistry(ctx, bootstrapStorage)
 	if err != nil {
-		t.Fatalf("NewVaultRegistry: %v", err)
+		t.Fatalf("NewStorageRegistry: %v", err)
 	}
 	err = template.LoadStandardCatalog(context.Background(), catalogPath(), reg)
 	if err != nil {
@@ -92,14 +92,14 @@ type requestWiring struct {
 
 // requestScope holds one storage's orchestrators and policy engine.
 type requestScope struct {
-	keys      keysvc.KeyOrchestrator
-	cryptoOps cryptosvc.CryptoOrchestrator
+	keys      keysvc.Orchestrator
+	cryptoOps cryptosvc.Orchestrator
 	policy    policy.Engine
 }
 
-func (r *requestScope) Keys() keysvc.KeyOrchestrator         { return r.keys }
-func (r *requestScope) Crypto() cryptosvc.CryptoOrchestrator { return r.cryptoOps }
-func (r *requestScope) Policy() policy.Engine                { return r.policy }
+func (r *requestScope) Keys() keysvc.Orchestrator      { return r.keys }
+func (r *requestScope) Crypto() cryptosvc.Orchestrator { return r.cryptoOps }
+func (r *requestScope) Policy() policy.Engine          { return r.policy }
 
 // ForStorage builds a requestScope whose repositories all share store.
 func (w *requestWiring) ForStorage(ctx context.Context, store storage.Storage) (*requestScope, error) {
@@ -159,7 +159,7 @@ func sigScopeSpec() *core.ScopeSpecification {
 func buildKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
 	reg template.Registry, provReg provider.Registry,
-) (keysvc.KeyOrchestrator, error) {
+) (keysvc.Orchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -172,13 +172,13 @@ func buildKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return keysvc.NewKeyOrchestrator(repo, reg, provReg, pol)
+	return keysvc.NewOrchestrator(repo, reg, provReg, pol)
 }
 
 func buildCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
 	reg template.Registry, provReg provider.Registry,
-) (cryptosvc.CryptoOrchestrator, error) {
+) (cryptosvc.Orchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -191,7 +191,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return cryptosvc.NewCryptoOrchestrator(repo, pol, provReg, reg)
+	return cryptosvc.NewOrchestrator(repo, pol, provReg, reg)
 }
 
 func buildPolicyEngine(

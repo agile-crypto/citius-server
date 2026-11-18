@@ -26,7 +26,7 @@ import (
 // when the deployment runs without authorization — which is why this package
 // does not import internal/auth.
 type KeyManagementHandler struct {
-	keys            keysvc.KeyOrchestratorFactory
+	keys            keysvc.OrchestratorFactory
 	authorizeKey    grpcstatus.AuthorizeKeyName
 	authorizePolicy grpcstatus.AuthorizePolicyName
 	servicespb.UnimplementedKeyManagementServiceServer

@@ -88,10 +88,10 @@ func wireFactoriesWithStorage(ctx context.Context, cfg Config, store storage.Sto
 		return providerReg, nil
 	}
 
-	keysFn := func(context.Context) (keysvc.KeyOrchestrator, error) {
+	keysFn := func(context.Context) (keysvc.Orchestrator, error) {
 		return buildVaultKeyOrchestrator(ctx, store, templateReg, providerReg)
 	}
-	cryptoFn := func(context.Context) (cryptosvc.CryptoOrchestrator, error) {
+	cryptoFn := func(context.Context) (cryptosvc.Orchestrator, error) {
 		return buildVaultCryptoOrchestrator(ctx, store, templateReg, providerReg)
 	}
 	policyFn := func(context.Context) (policy.Engine, error) {
@@ -139,7 +139,7 @@ func AllServices() Services {
 // Shared bootstrap helpers (used by both WireFactorySet and NewTestableServer)
 // ============================================================================
 
-// buildTemplateRegistry creates a VaultRegistry and optionally loads the
+// buildTemplateRegistry creates a StorageRegistry and optionally loads the
 // standard algorithm catalog from disk.
 func buildTemplateRegistry(
 	ctx context.Context,
@@ -147,7 +147,7 @@ func buildTemplateRegistry(
 	catalogPath string,
 ) (template.Registry, error) {
 	const op engerr.Op = "server.buildTemplateRegistry"
-	reg, err := template.NewVaultRegistry(ctx, bootstrapStorage)
+	reg, err := template.NewStorageRegistry(ctx, bootstrapStorage)
 	if err != nil {
 		return nil, engerr.Wrap(ctx, op, err)
 	}
@@ -226,7 +226,7 @@ func registerFIPSProvider(ctx context.Context, providerReg provider.Registry, fi
 func buildVaultKeyOrchestrator(
 	ctx context.Context, s storage.Storage,
 	templateReg template.Registry, providerReg provider.Registry,
-) (keysvc.KeyOrchestrator, error) {
+) (keysvc.Orchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -239,13 +239,13 @@ func buildVaultKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return keysvc.NewKeyOrchestrator(repo, templateReg, providerReg, pol)
+	return keysvc.NewOrchestrator(repo, templateReg, providerReg, pol)
 }
 
 func buildVaultCryptoOrchestrator(
 	ctx context.Context, s storage.Storage,
 	templateReg template.Registry, providerReg provider.Registry,
-) (cryptosvc.CryptoOrchestrator, error) {
+) (cryptosvc.Orchestrator, error) {
 	repo, err := key.NewStorageRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -258,7 +258,7 @@ func buildVaultCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return cryptosvc.NewCryptoOrchestrator(repo, pol, providerReg, templateReg)
+	return cryptosvc.NewOrchestrator(repo, pol, providerReg, templateReg)
 }
 
 func buildVaultPolicyEngine(

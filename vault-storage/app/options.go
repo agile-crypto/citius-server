@@ -15,9 +15,9 @@ import (
 // Factory type aliases
 // ============================================================================
 
-type KeyOrchestratorFactory func(logical.Storage) (keysvc.KeyOrchestrator, error)
+type KeyOrchestratorFactory func(logical.Storage) (keysvc.Orchestrator, error)
 
-type CryptoOrchestratorFactory func(logical.Storage) (cryptosvc.CryptoOrchestrator, error)
+type CryptoOrchestratorFactory func(logical.Storage) (cryptosvc.Orchestrator, error)
 
 type PolicyEngineFactory func(logical.Storage) (policy.Engine, error)
 

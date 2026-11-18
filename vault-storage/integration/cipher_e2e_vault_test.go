@@ -17,7 +17,7 @@ import (
 
 // cipherE2ETemplates lists every cipher template this test exercises through
 // the full orchestration stack (vaultapp.Service -> RequestScope ->
-// CryptoOrchestrator -> KeyOrchestrator -> ProviderRegistry ->
+// cryptosvc.Orchestrator -> keysvc.Orchestrator -> ProviderRegistry ->
 // software.Provider), paired with the scope its catalog entry declares and
 // whether that scope requires AeadParams (GCM, ChaCha20-Poly1305/XChaCha20)
 // or NoParams (CBC, CTR) — see validateEncryptionScopeParams.
@@ -47,7 +47,7 @@ var cipherE2ETemplates = []struct {
 // TestE2E_AllSignatureTemplates_CreateKey_Sign_Verify (the gRPC Handler
 // implements Sign/Verify but not Encrypt/Decrypt at all — both currently
 // fall through to UnimplementedCryptoServiceServer — so this test stops one
-// layer short of gRPC, at the same CryptoOrchestrator layer
+// layer short of gRPC, at the same cryptosvc.Orchestrator layer
 // TestIntegration_Software_ECDSA_RoundTrip_Vault already exercises).
 //
 // It also proves metadata replay: EncryptResult.Output (the

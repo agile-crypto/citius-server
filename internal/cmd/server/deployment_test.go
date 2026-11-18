@@ -22,8 +22,8 @@ import (
 // handlers, so the factories need not produce anything.
 func fullSet() server.FactorySet {
 	return server.FactorySet{
-		Keys:      func(context.Context) (keysvc.KeyOrchestrator, error) { return nil, nil },
-		Crypto:    func(context.Context) (cryptosvc.CryptoOrchestrator, error) { return nil, nil },
+		Keys:      func(context.Context) (keysvc.Orchestrator, error) { return nil, nil },
+		Crypto:    func(context.Context) (cryptosvc.Orchestrator, error) { return nil, nil },
 		Policy:    func(context.Context) (policy.Engine, error) { return nil, nil },
 		Instances: func(context.Context) (provider.InstanceManager, error) { return nil, nil },
 		Templates: func(context.Context) (template.Registry, error) { return nil, nil },

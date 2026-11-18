@@ -95,10 +95,10 @@ func wireLoopback(t *testing.T) *vaultapp.Service {
 
 	// Factory functions — each receives the per-request logical.Storage
 	// and creates the full dependency graph from it.
-	keyFactory := func(s logical.Storage) (keysvc.KeyOrchestrator, error) {
+	keyFactory := func(s logical.Storage) (keysvc.Orchestrator, error) {
 		return buildKeyOrchestrator(ctx, s, reg, provReg)
 	}
-	cryptoFactory := func(s logical.Storage) (cryptosvc.CryptoOrchestrator, error) {
+	cryptoFactory := func(s logical.Storage) (cryptosvc.Orchestrator, error) {
 		return buildCryptoOrchestrator(ctx, s, reg, provReg)
 	}
 	policyFactory := func(s logical.Storage) (corepolicy.Engine, error) {
@@ -163,7 +163,7 @@ func sigScopeSpec() *core.ScopeSpecification {
 func buildKeyOrchestrator(
 	ctx context.Context, s logical.Storage,
 	reg coretemplate.Registry, provReg provider.Registry,
-) (keysvc.KeyOrchestrator, error) {
+) (keysvc.Orchestrator, error) {
 	repo, err := key.NewVaultRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -176,13 +176,13 @@ func buildKeyOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return keysvc.NewKeyOrchestrator(repo, reg, provReg, pol)
+	return keysvc.NewOrchestrator(repo, reg, provReg, pol)
 }
 
 func buildCryptoOrchestrator(
 	ctx context.Context, s logical.Storage,
 	reg coretemplate.Registry, provReg provider.Registry,
-) (cryptosvc.CryptoOrchestrator, error) {
+) (cryptosvc.Orchestrator, error) {
 	repo, err := key.NewVaultRepository(ctx, s)
 	if err != nil {
 		return nil, err
@@ -195,7 +195,7 @@ func buildCryptoOrchestrator(
 	if err != nil {
 		return nil, err
 	}
-	return cryptosvc.NewCryptoOrchestrator(repo, pol, provReg, reg)
+	return cryptosvc.NewOrchestrator(repo, pol, provReg, reg)
 }
 
 func buildPolicyEngine(

@@ -338,7 +338,7 @@ func TestSmoke_DigestSign_DigestVerify_ECDSA(t *testing.T) {
 // TestSmoke_CreateKey_providerID_pinned_honoured proves an explicit
 // provider_id on CreateKeyRequest is honoured end-to-end through the real
 // gRPC handler and proto (de)serialization -- not just at the
-// KeyOrchestrator layer (internal/service/key_create_test.go's provider_id
+// keysvc.Orchestrator layer (internal/service/key_create_test.go's provider_id
 // tests) or the Registry layer (citius-core's provider/match_test.go
 // fake-provider tests). buildProviderRegistry registers "software" before
 // "openssl", so this fails if the pin is silently dropped and registration

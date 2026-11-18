@@ -24,26 +24,26 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// mockKeyOrchestrator stubs KeyOrchestrator for tests.
+// mockKeyOrchestrator stubs keysvc.Orchestrator for tests.
 // Only createFn and readFn are wired; all other methods panic.
 type mockKeyOrchestrator struct {
-	createFn             func(ctx context.Context, spec core.KeyCreationSpec) (*keysvc.KeyMetadata, error)
-	readFn               func(ctx context.Context, name string) (*keysvc.KeyMetadata, error)
+	createFn             func(ctx context.Context, spec core.KeyCreationSpec) (*keysvc.Metadata, error)
+	readFn               func(ctx context.Context, name string) (*keysvc.Metadata, error)
 	getKeyWithMaterialFn func(ctx context.Context, name string, version uint32) (*key.Key, *key.Version, error)
-	transformFn          func(ctx context.Context, spec keysvc.TransformKeySpec) (*keysvc.KeyMetadata, error)
+	transformFn          func(ctx context.Context, spec keysvc.TransformKeySpec) (*keysvc.Metadata, error)
 	migrateFn            func(ctx context.Context, spec keysvc.MigrateKeySpec) (*keysvc.MigrationResult, error)
 	validateMigrationFn  func(ctx context.Context, spec keysvc.MigrateKeySpec) (*keysvc.MigrationValidation, error)
-	listFn               func(ctx context.Context) ([]*keysvc.KeyMetadata, error)
+	listFn               func(ctx context.Context) ([]*keysvc.Metadata, error)
 }
 
-func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*keysvc.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) CreateKey(ctx context.Context, spec core.KeyCreationSpec) (*keysvc.Metadata, error) {
 	if m.createFn != nil {
 		return m.createFn(ctx, spec)
 	}
 	panic("mockKeyOrchestrator.CreateKey: not implemented")
 }
 
-func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version uint32) (*keysvc.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version uint32) (*keysvc.Metadata, error) {
 	if m.readFn != nil {
 		return m.readFn(ctx, name)
 	}
@@ -51,7 +51,7 @@ func (m *mockKeyOrchestrator) ReadKey(ctx context.Context, name string, version 
 }
 
 // Stub the rest of the interface.
-func (m *mockKeyOrchestrator) ListKeys(ctx context.Context) ([]*keysvc.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) ListKeys(ctx context.Context) ([]*keysvc.Metadata, error) {
 	if m.listFn != nil {
 		return m.listFn(ctx)
 	}
@@ -66,7 +66,7 @@ func (m *mockKeyOrchestrator) GetKeyWithMaterial(ctx context.Context, name strin
 	}
 	panic("mockKeyOrchestrator.GetKeyWithMaterial: not implemented")
 }
-func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*keysvc.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) RotateKey(_ context.Context, _ string) (*keysvc.Metadata, error) {
 	panic("mockKeyOrchestrator.RotateKey: not implemented")
 }
 func (m *mockKeyOrchestrator) SuspendKey(_ context.Context, _ string) error {
@@ -78,14 +78,14 @@ func (m *mockKeyOrchestrator) RestoreKey(_ context.Context, _ string) error {
 func (m *mockKeyOrchestrator) DestroyKey(_ context.Context, _ string) error {
 	panic("mockKeyOrchestrator.DestroyKey: not implemented")
 }
-func (m *mockKeyOrchestrator) ImportKey(_ context.Context, _ core.ImportKeySpec) (*keysvc.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) ImportKey(_ context.Context, _ core.ImportKeySpec) (*keysvc.Metadata, error) {
 	panic("mockKeyOrchestrator.ImportKey: not implemented")
 }
 func (m *mockKeyOrchestrator) UpdateKeyPolicy(_ context.Context, _ string, _ string) error {
 	panic("mockKeyOrchestrator.UpdateKeyPolicy: not implemented")
 }
 
-func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec keysvc.TransformKeySpec) (*keysvc.KeyMetadata, error) {
+func (m *mockKeyOrchestrator) TransformKey(ctx context.Context, spec keysvc.TransformKeySpec) (*keysvc.Metadata, error) {
 	if m.transformFn != nil {
 		return m.transformFn(ctx, spec)
 	}
@@ -109,9 +109,9 @@ func (m *mockKeyOrchestrator) ValidateMigration(ctx context.Context, spec keysvc
 // wireKeys builds the handler under test over a fixed orchestrator. The factory
 // ignores its context and returns the same mock every call, which is exactly
 // what a startup-wired (SQL or embedded) deployment does.
-func wireKeys(t *testing.T, keys keysvc.KeyOrchestrator) *keygrpc.KeyManagementHandler {
+func wireKeys(t *testing.T, keys keysvc.Orchestrator) *keygrpc.KeyManagementHandler {
 	t.Helper()
-	newKeys := keysvc.KeyOrchestratorFactory(func(_ context.Context) (keysvc.KeyOrchestrator, error) {
+	newKeys := keysvc.OrchestratorFactory(func(_ context.Context) (keysvc.Orchestrator, error) {
 		return keys, nil
 	})
 	authFn := func(ctx context.Context, op engerr.Op, name string) error {
@@ -127,14 +127,14 @@ func wireKeys(t *testing.T, keys keysvc.KeyOrchestrator) *keygrpc.KeyManagementH
 func TestKeyManagementHandler_CreateKey_Success(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*keysvc.KeyMetadata, error) {
+		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*keysvc.Metadata, error) {
 			if spec.Name == "" {
 				t.Error("expected non-empty name in CreateKey spec")
 			}
 			if spec.TemplateID != "ecdsa-p256-sha256-der" {
 				t.Errorf("expected template ecdsa-p256-sha256-der, got %s", spec.TemplateID)
 			}
-			return &keysvc.KeyMetadata{
+			return &keysvc.Metadata{
 				Name:       spec.Name,
 				KeyID:      spec.Name,
 				Version:    1,
@@ -184,9 +184,9 @@ func TestKeyManagementHandler_CreateKey_MapsProviderRequirements(t *testing.T) {
 	ctx := context.Background()
 	var got core.ProviderRequirements
 	km := &mockKeyOrchestrator{
-		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*keysvc.KeyMetadata, error) {
+		createFn: func(_ context.Context, spec core.KeyCreationSpec) (*keysvc.Metadata, error) {
 			got = spec.ProviderRequirements
-			return &keysvc.KeyMetadata{Name: spec.Name, Version: 1}, nil
+			return &keysvc.Metadata{Name: spec.Name, Version: 1}, nil
 		},
 	}
 	h := wireKeys(t, km)
@@ -231,7 +231,7 @@ func TestKeyManagementHandler_CreateKey_UnconsumedFields_ReturnInvalidArgument(t
 func TestKeyManagementHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		createFn: func(ctx context.Context, _ core.KeyCreationSpec) (*keysvc.KeyMetadata, error) {
+		createFn: func(ctx context.Context, _ core.KeyCreationSpec) (*keysvc.Metadata, error) {
 			return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "name required")
 		},
 	}
@@ -250,7 +250,7 @@ func TestKeyManagementHandler_CreateKey_ValidationError_ReturnsInvalidArgument(t
 func TestKeyManagementHandler_ReadKey_NotFound_ReturnsNotFound(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		readFn: func(ctx context.Context, name string) (*keysvc.KeyMetadata, error) {
+		readFn: func(ctx context.Context, name string) (*keysvc.Metadata, error) {
 			return nil, engerr.New(ctx, "test", engerr.CodeKeyNotFound, "key not found")
 		},
 	}
@@ -269,8 +269,8 @@ func TestKeyManagementHandler_ReadKey_NotFound_ReturnsNotFound(t *testing.T) {
 func TestKeyManagementHandler_ReadKey_PreservesScopeMetadata(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		readFn: func(_ context.Context, _ string) (*keysvc.KeyMetadata, error) {
-			return &keysvc.KeyMetadata{
+		readFn: func(_ context.Context, _ string) (*keysvc.Metadata, error) {
+			return &keysvc.Metadata{
 				Name:       "my-key",
 				KeyID:      "key_123",
 				Version:    2,
@@ -292,11 +292,11 @@ func TestKeyManagementHandler_ReadKey_PreservesScopeMetadata(t *testing.T) {
 func TestKeyManagementHandler_TransformKey_Success(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		transformFn: func(_ context.Context, spec keysvc.TransformKeySpec) (*keysvc.KeyMetadata, error) {
+		transformFn: func(_ context.Context, spec keysvc.TransformKeySpec) (*keysvc.Metadata, error) {
 			if spec.KeyName == "" {
 				t.Error("expected non-empty key name in TransformKey spec")
 			}
-			return &keysvc.KeyMetadata{
+			return &keysvc.Metadata{
 				Name:       spec.KeyName,
 				KeyID:      spec.KeyName,
 				Version:    1,
@@ -333,7 +333,7 @@ func TestKeyManagementHandler_TransformKey_Success(t *testing.T) {
 func TestKeyManagementHandler_TransformKey_WithErrors(t *testing.T) {
 	ctx := context.Background()
 	km := &mockKeyOrchestrator{
-		transformFn: func(_ context.Context, spec keysvc.TransformKeySpec) (*keysvc.KeyMetadata, error) {
+		transformFn: func(_ context.Context, spec keysvc.TransformKeySpec) (*keysvc.Metadata, error) {
 			return nil, engerr.New(ctx, "test", engerr.CodeInvalidArgument, "name required")
 		},
 	}
@@ -352,7 +352,7 @@ func TestKeyManagementHandler_MigrateKey_Success(t *testing.T) {
 		migrateFn: func(_ context.Context, spec keysvc.MigrateKeySpec) (*keysvc.MigrationResult, error) {
 			require.Equal(t, keysvc.MigrateKeySpec{KeyName: "key_123", TargetInstanceID: "openssl", Strategy: strategy}, spec)
 			return &keysvc.MigrationResult{
-				Key: &keysvc.KeyMetadata{
+				Key: &keysvc.Metadata{
 					Name: spec.KeyName, KeyID: "key-id", Version: 2,
 					TemplateID: "ecdsa-p256-sha256-der", Provider: "openssl",
 				},

@@ -30,7 +30,7 @@ const newOp engerr.Op = "grpc/keymanagement.New"
 // disabled case out of every RPC.
 //
 // A nil argument returns CodeInvalidArgument.
-func New(ctx context.Context, newKeys keysvc.KeyOrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*KeyManagementHandler, error) {
+func New(ctx context.Context, newKeys keysvc.OrchestratorFactory, authorizeKey grpcstatus.AuthorizeKeyName, authorizePolicy grpcstatus.AuthorizePolicyName) (*KeyManagementHandler, error) {
 	switch {
 	case newKeys == nil:
 		return nil, engerr.New(ctx, newOp, engerr.CodeInvalidArgument, "key orchestrator factory is required")

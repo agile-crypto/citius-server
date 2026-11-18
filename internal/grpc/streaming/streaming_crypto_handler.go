@@ -26,7 +26,7 @@ import (
 //
 // Immutable after construction, safe for concurrent use.
 type StreamingCryptoHandler struct {
-	crypto cryptosvc.CryptoOrchestratorFactory
+	crypto cryptosvc.OrchestratorFactory
 	servicespb.UnimplementedStreamingCryptoServiceServer
 }
 

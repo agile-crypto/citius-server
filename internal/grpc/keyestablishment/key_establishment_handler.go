@@ -13,14 +13,14 @@ import (
 // unwrapping, derivation, agreement and KEM encapsulation.
 //
 // This service straddles two capabilities, which is why it is its own handler:
-// the operations themselves are cryptographic (cryptosvc.CryptoOrchestratorFactory), but every one of
+// the operations themselves are cryptographic (cryptosvc.OrchestratorFactory), but every one of
 // them either consumes or produces a managed key, so the resulting key material
-// must be registered through the key orchestrator (keysvc.KeyOrchestratorFactory).
+// must be registered through the key orchestrator (keysvc.OrchestratorFactory).
 //
 // Immutable after construction, safe for concurrent use.
 type KeyEstablishmentHandler struct {
-	crypto cryptosvc.CryptoOrchestratorFactory
-	keys   keysvc.KeyOrchestratorFactory
+	crypto cryptosvc.OrchestratorFactory
+	keys   keysvc.OrchestratorFactory
 	servicespb.UnimplementedKeyEstablishmentServiceServer
 }
 

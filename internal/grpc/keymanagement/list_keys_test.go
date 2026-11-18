@@ -16,9 +16,9 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func listFixture() []*keysvc.KeyMetadata {
+func listFixture() []*keysvc.Metadata {
 	active := typespb.KeyLifecycleState_KEY_LIFECYCLE_STATE_ACTIVE
-	return []*keysvc.KeyMetadata{
+	return []*keysvc.Metadata{
 		{Name: "charlie", Provider: "openssl-fips", Policy: "p1", LifecycleState: active},
 		{Name: "alpha", Provider: "software", Policy: "p1", LifecycleState: active},
 		{Name: "secret", Provider: "software", Policy: "p2", LifecycleState: active},
@@ -28,8 +28,8 @@ func listFixture() []*keysvc.KeyMetadata {
 
 func wireList(t *testing.T, authKey func(context.Context, engerr.Op, string) error) *keygrpc.KeyManagementHandler {
 	t.Helper()
-	km := &mockKeyOrchestrator{listFn: func(context.Context) ([]*keysvc.KeyMetadata, error) { return listFixture(), nil }}
-	newKeys := keysvc.KeyOrchestratorFactory(func(context.Context) (keysvc.KeyOrchestrator, error) { return km, nil })
+	km := &mockKeyOrchestrator{listFn: func(context.Context) ([]*keysvc.Metadata, error) { return listFixture(), nil }}
+	newKeys := keysvc.OrchestratorFactory(func(context.Context) (keysvc.Orchestrator, error) { return km, nil })
 	allow := func(context.Context, engerr.Op, string) error { return nil }
 	if authKey == nil {
 		authKey = allow
@@ -121,7 +121,7 @@ func TestKeyManagementHandler_ListKeys_InvalidRequests(t *testing.T) {
 }
 
 func TestKeyManagementHandler_ListKeys_StoreFailureIsReported(t *testing.T) {
-	km := &mockKeyOrchestrator{listFn: func(ctx context.Context) ([]*keysvc.KeyMetadata, error) {
+	km := &mockKeyOrchestrator{listFn: func(ctx context.Context) ([]*keysvc.Metadata, error) {
 		return nil, engerr.Wrap(ctx, "test", errors.New("disk on fire"))
 	}}
 	h := wireKeys(t, km)
