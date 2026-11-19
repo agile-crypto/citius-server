@@ -134,11 +134,11 @@ What happens, in order:
 4. `citius-stack.json` is emitted — a single **non-secret** descriptor for
    clients.
 
-On a fresh checkout (no `.env`), `CITIUS_SERVER=1 up` seeds `.env` from the
-example and sets `ZITADEL_HTTPS_PORT=443`, because the containerized server
-reaches Zitadel over the in-network proxy on `:443` and the issuer must
-advertise that port. Host port `443` must be free. The host-only flow keeps the
-unprivileged `8443` default.
+The proxy's HTTPS entrypoint listens on `ZITADEL_HTTPS_PORT` both on the host
+and inside the stack network, so the issuer URL (which carries that port)
+resolves to the proxy from the browser and from the containerized server alike.
+Any port works, including the unprivileged `8443` default — which is what
+rootless Podman needs, since it cannot publish privileged ports such as `443`.
 
 ### The consolidated config: `citius-stack.json`
 

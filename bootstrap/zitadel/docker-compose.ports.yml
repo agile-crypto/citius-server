@@ -28,7 +28,12 @@ services:
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
-      - --entrypoints.websecure.address=:443
+      # Listen on the SAME port inside the container as the host-published
+      # HTTPS port. The issuer advertises https://<domain>:<ZITADEL_HTTPS_PORT>,
+      # and in-network clients (citius-server) resolve <domain> to this proxy,
+      # so they must find it listening on that port too. It also makes the
+      # web->websecure redirect point at the published port.
+      - --entrypoints.websecure.address=:${ZITADEL_HTTPS_PORT:-443}
       - --entrypoints.websecure.http.tls=true
       - --api.dashboard=${TRAEFIK_DASHBOARD_ENABLED}
       - --api.insecure=false
@@ -36,17 +41,19 @@ services:
       - --ping.entrypoint=web
       - --log.level=${TRAEFIK_LOG_LEVEL}
       - --accesslog=${TRAEFIK_ACCESSLOG_ENABLED}
-    # Traefik still listens on :80/:443 inside the container (the
-    # mode-local-tls overlay configures the entrypoints that way and we
-    # don't change them); we only remap the host-side published ports
-    # so the stack can run when 80/443 are already taken on the host.
+    # The web entrypoint stays on :80 inside the container (only its host
+    # side is remapped). The websecure entrypoint listens on
+    # ZITADEL_HTTPS_PORT on BOTH sides, so the issuer URL resolves to the
+    # same port from the host and from inside the compose network. This
+    # lets the stack use an unprivileged HTTPS port (e.g. 8443), which
+    # rootless Podman requires, without breaking in-network clients.
     #
     # The leading `!override` resets the merged `ports` list from the
     # base + prodlike + mode-local-tls files; otherwise compose appends
     # entries instead of replacing them.
     ports: !override
       - "${ZITADEL_HTTP_PORT:-80}:80"
-      - "${ZITADEL_HTTPS_PORT:-443}:443"
+      - "${ZITADEL_HTTPS_PORT:-443}:${ZITADEL_HTTPS_PORT:-443}"
 
   # Override zitadel-setup to use a bind-mount of ./pat instead of the
   # default named volume so that bootstrap.sh can read login-client.pat

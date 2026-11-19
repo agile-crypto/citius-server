@@ -3,8 +3,8 @@ module github.com/agile-crypto/citius-server/vault-storage
 go 1.26.0
 
 require (
-	github.com/agile-crypto/citius-api-go v0.3.0
-	github.com/agile-crypto/citius-core v0.4.2
+	github.com/agile-crypto/citius-api-go v0.3.1-0.20261119075559-7959ff73baa4
+	github.com/agile-crypto/citius-core v0.4.3-0.20261118114425-53ad1882e74d
 	github.com/hashicorp/vault/sdk v0.25.1
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/protobuf v1.36.12
@@ -15,7 +15,7 @@ require (
 	github.com/armon/go-metrics v0.4.1 // indirect
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudflare/circl v1.6.4 // indirect
+	github.com/cloudflare/circl v1.6.5 // indirect
 	github.com/containerd/errdefs v1.0.0 // indirect
 	github.com/containerd/errdefs/pkg v0.3.0 // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -70,7 +70,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	golang.org/x/crypto v0.57.0 // indirect
+	golang.org/x/crypto v0.58.0 // indirect
 )
 
 require (
@@ -79,25 +79,21 @@ require (
 	cel.dev/cel-go v0.32.0 // indirect
 	cel.dev/expr v0.25.3 // indirect
 	github.com/agile-crypto/citius-provider-go v0.1.0 // indirect
-	github.com/agile-crypto/citius-server v0.0.0-00010101000000-000000000000
+	github.com/agile-crypto/citius-server v0.0.0-20261118214955-eba71bc6e23c
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.31.0 // indirect
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.34.0 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/exp v0.0.0-20260908205506-85c1c2202aba // indirect
-	golang.org/x/net v0.59.0 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260921155816-b14227669459 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260918162117-cecb64721679 // indirect
-	google.golang.org/grpc v1.84.0 // indirect
+	golang.org/x/exp v0.0.0-20261113113407-e3970619a1a4 // indirect
+	golang.org/x/net v0.62.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20261118221215-c8830f628b3f // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20261110000943-09e21b237f2c // indirect
+	google.golang.org/grpc v1.85.0 // indirect
 )
 
 // vault-storage is a local-only adapter module, never published and always
 // co-located with citius-server: it imports citius-server/internal/storage,
 // which its module path (nested under citius-server) makes visible.
 replace github.com/agile-crypto/citius-server => ../
-
-replace github.com/agile-crypto/citius-api-go => ../../api
-
-replace github.com/agile-crypto/citius-core => ../../citius-core

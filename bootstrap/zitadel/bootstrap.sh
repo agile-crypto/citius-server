@@ -263,17 +263,23 @@ do_certs() {
   # stack via either citius-auth.localhost or plain localhost.
   ( cd "$CERTS_DIR" && mkcert -cert-file "local.crt" -key-file "local.key" "${ZITADEL_DOMAIN}" "localhost" "127.0.0.1" "::1" )
 
-  # Copy the mkcert root CA into certs/ so the containerized citius-server can
-  # trust it (SSL_CERT_FILE=/certs/rootCA.pem) for the outbound introspection
-  # call. Harmless when the server runs on the host instead.
+  copy_root_ca
+  log "certs written to ${CERTS_DIR}"
+}
+
+# copy_root_ca copies the mkcert root CA into certs/ so the containerized
+# citius-server can trust it (SSL_CERT_FILE=/certs/rootCA.pem) for the outbound
+# introspection call. Idempotent, and run on every `up` (not only when certs
+# are first issued) so checkouts whose certs predate this step still get it.
+# Harmless when the server runs on the host instead.
+copy_root_ca() {
+  command -v mkcert >/dev/null 2>&1 || return 0
   local caroot
   caroot="$(mkcert -CAROOT 2>/dev/null || true)"
   if [[ -n "$caroot" && -s "${caroot}/rootCA.pem" ]]; then
     cp "${caroot}/rootCA.pem" "${CERTS_DIR}/rootCA.pem"
     chmod 644 "${CERTS_DIR}/rootCA.pem"
   fi
-
-  log "certs written to ${CERTS_DIR}"
 }
 
 # ---------------------------------------------------------------------------
@@ -587,22 +593,17 @@ start_citius_server() {
   if [[ "$https_port" == "443" ]]; then
     issuer_url="https://${ZITADEL_DOMAIN}"
   else
+    # The issuer carries the host-published port. The proxy listens on that
+    # same port inside the compose network (docker-compose.ports.yml), so the
+    # containerized server reaches it via the in-network domain alias.
     issuer_url="https://${ZITADEL_DOMAIN}:${https_port}"
-    # The issuer carries the host-published port. Inside the compose network the
-    # proxy listens on :443, so the containerized server cannot reach the issuer
-    # at a non-443 port. Fail fast with actionable guidance instead of letting
-    # the container crash-loop on OIDC discovery.
-    die "CITIUS_SERVER=1 requires ZITADEL_HTTPS_PORT=443 so the in-network issuer
-matches the proxy port (current: ${https_port}). Either set ZITADEL_HTTPS_PORT=443
-in .env, or run the server on the host with 'make run-dev-tls' (scripts/run_server.sh),
-which reaches the published port directly."
   fi
 
   log "starting containerized citius-server"
   export CITIUS_SERVER_ISSUER="$issuer_url"
   export CITIUS_SERVER_INTROSPECT_ID="$(jq -r '.api_app.ClientID' "$GENERATED_CONFIG")"
-  require_credential "api_app ClientSecret (server introspection)" "$CITIUS_SERVER_INTROSPECT_SECRET"
   export CITIUS_SERVER_INTROSPECT_SECRET="$(jq -r '.api_app.ClientSecret' "$GENERATED_CONFIG")"
+  require_credential "api_app ClientSecret (server introspection)" "$CITIUS_SERVER_INTROSPECT_SECRET"
   export CITIUS_SERVER_PROJECT_ID="$project_id"
   export CITIUS_SERVER_EXPECTED_AUDIENCE="$project_id"
   export CITIUS_SERVER_REFLECTION="${CITIUS_SERVER_REFLECTION:-false}"
@@ -640,6 +641,8 @@ cmd_up() {
   if [[ "${TLS_MODE:-local-tls}" == "local-tls" ]]; then
     if [[ ! -f "${CERTS_DIR}/local.crt" ]]; then
       do_certs
+    else
+      copy_root_ca
     fi
   fi
 
@@ -741,15 +744,6 @@ main() {
         warn ".env not found; copying from .env.example"
         cp "$ENV_EXAMPLE" "$ENV_FILE"
         chmod 600 "$ENV_FILE"
-        # The containerized server reaches Zitadel over the in-network proxy on
-        # :443, so the issuer must advertise :443. A fresh .env for
-        # CITIUS_SERVER=1 therefore publishes HTTPS on the privileged host port.
-        # The HTTP port stays unprivileged (it is not part of the issuer and 80
-        # is often already bound on the host).
-        if [[ "${1:-up}" == "up" && "${CITIUS_SERVER:-0}" == "1" ]]; then
-          warn "setting ZITADEL_HTTPS_PORT=443 for CITIUS_SERVER=1"
-          persist_env ZITADEL_HTTPS_PORT 443
-        fi
       fi
       ;;
   esac
