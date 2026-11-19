@@ -48,6 +48,23 @@ services:
       - /certs/local.crt
       - -tls-key
       - /certs/local.key
+      - -grpc-health
+    # Like zitadel-api's `zitadel ready`, the server binary is its own probe:
+    # -health-probe calls grpc.health.v1.Health/Check over TLS (verified via
+    # SSL_CERT_FILE; the cert carries a localhost SAN) and exits 0 only when
+    # SERVING. The port opens only after auth setup and Zitadel discovery
+    # succeed, so a crash-looping server never turns healthy, and
+    # `compose up --wait` in bootstrap.sh fails instead of reporting ready.
+    healthcheck:
+      test:
+        - CMD
+        - /app/caas-server
+        - -health-probe
+        - localhost:50051
+      interval: 5s
+      timeout: 10s
+      retries: 12
+      start_period: 10s
     environment:
       AUTH_ENABLED: "true"
       ZITADEL_ISSUER: ${CITIUS_SERVER_ISSUER}

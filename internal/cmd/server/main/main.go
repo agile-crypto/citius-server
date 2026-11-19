@@ -43,10 +43,25 @@ func main() {
 		"register the gRPC reflection service. Default false; production deployments should leave it off. "+
 			"When true, reflection RPCs bypass authentication and authorization \u2014 a deliberate carve-out "+
 			"so `grpcurl list` works. Treat enabling this as exposing the API surface to anonymous callers.")
-	health := flag.Bool("grpc-health", false, "register the gRPC health service (default: false).")
+	health := flag.Bool("grpc-health", false,
+		"register the gRPC health service (default: false). When true, grpc.health.v1.Health/Check "+
+			"bypasses authentication and authorization so probes need no token; it only reveals the serving status.")
+	healthProbe := flag.String("health-probe", "",
+		"probe mode: call grpc.health.v1.Health/Check on this address (e.g. localhost:50051), "+
+			"exit 0 if SERVING and 1 otherwise, without starting a server. For container healthchecks.")
+	healthProbePlaintext := flag.Bool("health-probe-plaintext", false,
+		"with -health-probe, connect without TLS (only for servers started without -tls-cert/-tls-key).")
 	// TODO(mtls): add -mtls-ca to enable client-cert authentication as a defence-in-depth
 	// layer alongside bearer-token introspection. Tracked in the auth roadmap.
 	flag.Parse()
+
+	if *healthProbe != "" {
+		if err := runHealthProbe(context.Background(), *healthProbe, *healthProbePlaintext); err != nil {
+			log.Print(err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
@@ -59,6 +74,12 @@ func main() {
 	// the API surface. The operator opts in by setting -grpc-reflection;
 	// we honour that by carving reflection out of the policy map.
 	authCfg.AllowUnauthenticatedReflection = *enableReflection
+	// Health probes (container healthchecks, kubelet gRPC probes) carry no
+	// token, and the auth layer denies any method it has no policy for. Make
+	// Health/Check public only when the operator registers the service.
+	if *health {
+		authCfg.PublicMethods = append(authCfg.PublicMethods, healthpb.Health_Check_FullMethodName)
+	}
 
 	authOpts, authCloser, err := auth.Build(authCfg)
 	if err != nil {
