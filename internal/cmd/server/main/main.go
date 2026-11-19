@@ -30,7 +30,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-//nolint:cyclop
+//nolint:cyclop,gocognit
 func main() {
 	addr := flag.String("addr", ":50051", "gRPC listen address")
 	catalog := flag.String("catalog", defaultCatalogPath(), "path to standard_algorithms.json")
